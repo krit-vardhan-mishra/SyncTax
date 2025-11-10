@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
@@ -276,14 +277,23 @@ fun MusicApp() {
 
 @Composable
 private fun AppNavigationBar(navController: NavController) {
-    NavigationBar {
+    NavigationBar(
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
 
         data class NavItem(val route: String, val label: String, val icon: @Composable () -> Unit)
 
         val items = listOf(
-            NavItem("home", "Home", { Icon(Icons.Default.Home, contentDescription = "Home") }),
+            NavItem(
+                "home",
+                "Home",
+                { Icon(Icons.Default.Home, contentDescription = "Home") }),
+            NavItem(
+                "search",
+                "Search",
+                { Icon(Icons.Default.Search, contentDescription = "Search") }),
             NavItem(
                 "quick_picks",
                 "Picks",
@@ -310,7 +320,9 @@ private fun AppNavigationBar(navController: NavController) {
                 },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Color.White,
-                    selectedTextColor = Color.White
+                    selectedTextColor = Color.White,
+                    unselectedIconColor = Color.Gray,
+                    unselectedTextColor = Color.Gray
                 )
             )
         }

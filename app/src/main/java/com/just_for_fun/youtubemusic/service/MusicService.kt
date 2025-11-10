@@ -1,24 +1,16 @@
 package com.just_for_fun.youtubemusic.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
-import android.content.ContentResolver
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import androidx.core.app.NotificationCompat
-import androidx.media3.common.Player
-import androidx.media3.session.MediaSession
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import java.io.IOException
 // import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.just_for_fun.youtubemusic.MainActivity
 import com.just_for_fun.youtubemusic.R
@@ -30,7 +22,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.io.IOException
 
 /**
  * Foreground service to keep music playing even when the app is in the background.
@@ -42,7 +33,7 @@ class MusicService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private lateinit var mediaSession: MediaSessionCompat
-    private lateinit var notificationManager: NotificationManager
+    private lateinit var notificationManager: MusicNotificationManager
 
     private var currentSong: Song? = null
     private var isPlaying = false
@@ -67,9 +58,8 @@ class MusicService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
         setupMediaSession()
-        notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager = MusicNotificationManager(this, mediaSession, serviceScope)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -178,7 +168,7 @@ class MusicService : Service() {
             val uri = Uri.parse(albumArtUri)
             val inputStream = contentResolver.openInputStream(uri)
             BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                // Resize bitmap for notification
+                // Resize bitmap for metadata
                 val maxSize = 512
                 val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
                 val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
@@ -201,123 +191,10 @@ class MusicService : Service() {
         mediaSession.setPlaybackState(createPlaybackState())
 
         if (song != null) {
-            startForeground(NOTIFICATION_ID, createNotification())
+            startForeground(MusicNotificationManager.NOTIFICATION_ID, notificationManager.createNotification(song, isPlaying, position, duration))
         } else {
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Music Playback",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows currently playing music"
-                setShowBadge(false)
-                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            }
-
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun createNotification(): Notification {
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val playPauseIntent = PendingIntent.getService(
-            this,
-            0,
-            Intent(this, MusicService::class.java).apply {
-                action = if (isPlaying) ACTION_PAUSE else ACTION_PLAY
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val nextIntent = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, MusicService::class.java).apply {
-                action = ACTION_NEXT
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val previousIntent = PendingIntent.getService(
-            this,
-            2,
-            Intent(this, MusicService::class.java).apply {
-                action = ACTION_PREVIOUS
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val stopIntent = PendingIntent.getService(
-            this,
-            3,
-            Intent(this, MusicService::class.java).apply {
-                action = ACTION_STOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(currentSong?.title ?: "YouTube Music")
-            .setContentText(currentSong?.artist ?: "No song playing")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(contentIntent)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(isPlaying)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle()
-                    .setMediaSession(mediaSession.sessionToken)
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
-            .addAction(
-                R.drawable.ic_previous,
-                "Previous",
-                previousIntent
-            )
-            .addAction(
-                if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
-                if (isPlaying) "Pause" else "Play",
-                playPauseIntent
-            )
-            .addAction(
-                R.drawable.ic_next,
-                "Next",
-                nextIntent
-            )
-
-        // Add progress bar if we have duration
-        if (duration > 0) {
-            builder.setProgress(duration.toInt(), currentPosition.toInt(), false)
-        }
-
-        // Load album art for large icon
-        currentSong?.albumArtUri?.let { uri ->
-            serviceScope.launch {
-                val bitmap = loadAlbumArt(uri)
-                if (bitmap != null) {
-                    builder.setLargeIcon(bitmap)
-                    // Update the notification
-                    notificationManager.notify(NOTIFICATION_ID, builder.build())
-                }
-            }
-        }
-
-        return builder.build()
     }
 
     // Action handlers - send broadcasts to ViewModel
@@ -347,179 +224,3 @@ class MusicService : Service() {
         })
     }
 }
-
-/*
-package com.just_for_fun.youtubemusic.service
-
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
-import android.content.Intent
-import android.media.session.MediaSession
-import android.os.Binder
-import android.os.Build
-import android.os.IBinder
-import androidx.core.app.NotificationCompat
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import com.just_for_fun.youtubemusic.MainActivity
-import com.just_for_fun.youtubemusic.R
-
-class MusicService : Service() {
-    
-    private var exoPlayer: ExoPlayer? = null
-    private var mediaSession: MediaSession? = null
-    private val binder = MusicBinder()
-    
-    companion object {
-        const val CHANNEL_ID = "music_playback_channel"
-        const val NOTIFICATION_ID = 1
-        
-        const val ACTION_PLAY = "ACTION_PLAY"
-        const val ACTION_PAUSE = "ACTION_PAUSE"
-        const val ACTION_NEXT = "ACTION_NEXT"
-        const val ACTION_PREVIOUS = "ACTION_PREVIOUS"
-    }
-    
-    inner class MusicBinder : Binder() {
-        fun getService(): MusicService = this@MusicService
-    }
-    
-    override fun onCreate() {
-        super.onCreate()
-        createNotificationChannel()
-        
-        exoPlayer = ExoPlayer.Builder(this).build().apply {
-            playWhenReady = false
-        }
-        
-        mediaSession = MediaSession.Builder(this, exoPlayer!!)
-            .build()
-    }
-    
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_PLAY -> exoPlayer?.play()
-            ACTION_PAUSE -> exoPlayer?.pause()
-            ACTION_NEXT -> exoPlayer?.seekToNext()
-            ACTION_PREVIOUS -> exoPlayer?.seekToPrevious()
-        }
-        
-        // Update notification when state changes
-        exoPlayer?.let { player ->
-            if (player.playbackState != Player.STATE_IDLE) {
-                startForeground(NOTIFICATION_ID, createNotification(player.isPlaying))
-            }
-        }
-        
-        return START_STICKY
-    }
-    
-    override fun onBind(intent: Intent?): IBinder {
-        return binder
-    }
-    
-    override fun onDestroy() {
-        mediaSession?.release()
-        exoPlayer?.release()
-        super.onDestroy()
-    }
-    
-    fun getPlayer(): ExoPlayer? = exoPlayer
-    
-    fun updateNotification(isPlaying: Boolean, songTitle: String?, artist: String?) {
-        val notification = createNotification(isPlaying, songTitle, artist)
-        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NOTIFICATION_ID, notification)
-    }
-    
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Music Playback",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows currently playing music"
-                setShowBadge(false)
-            }
-            
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-    
-    private fun createNotification(
-        isPlaying: Boolean,
-        songTitle: String? = null,
-        artist: String? = null
-    ): Notification {
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        val playPauseIntent = PendingIntent.getService(
-            this,
-            0,
-            Intent(this, MusicService::class.java).apply {
-                action = if (isPlaying) ACTION_PAUSE else ACTION_PLAY
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        val nextIntent = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, MusicService::class.java).apply {
-                action = ACTION_NEXT
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        val previousIntent = PendingIntent.getService(
-            this,
-            2,
-            Intent(this, MusicService::class.java).apply {
-                action = ACTION_PREVIOUS
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(songTitle ?: "YouTube Music")
-            .setContentText(artist ?: "No song playing")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(contentIntent)
-            .addAction(
-                R.drawable.ic_launcher_foreground,
-                "Previous",
-                previousIntent
-            )
-            .addAction(
-                R.drawable.ic_launcher_foreground,
-                if (isPlaying) "Pause" else "Play",
-                playPauseIntent
-            )
-            .addAction(
-                R.drawable.ic_launcher_foreground,
-                "Next",
-                nextIntent
-            )
-            .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle()
-                    .setMediaSession(mediaSession?.sessionCompatToken)
-                    .setShowActionsInCompactView(0, 1, 2)
-            )
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(isPlaying)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
-    }
-}
-
-*/

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
+import android.media.AudioManager
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,6 +29,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val player = MusicPlayer(application)
     private val playbackCollector = PlaybackCollector(repository, player)
     private val playerPreferences = PlayerPreferences(application)
+    private val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -141,6 +144,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.value = _uiState.value.copy(volume = volume)
             }
         }
+
+        // Initialize volume from device
+        _uiState.value = _uiState.value.copy(volume = getVolume())
 
         // Restore last playing song
         viewModelScope.launch {
@@ -473,11 +479,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setVolume(volume: Float) {
-        player.setVolume(volume)
+        val volumeLevel = (volume * maxVolume).toInt().coerceIn(0, maxVolume)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volumeLevel, 0)
+        _uiState.value = _uiState.value.copy(volume = volume)
     }
 
     fun getVolume(): Float {
-        return player.getVolume()
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        return currentVolume.toFloat() / maxVolume
     }
 
     private fun updateNotification() {
