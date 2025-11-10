@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">YT Music</string>
+    <string name="home">Home</string>
+    <string name="library">Library</string>
+    <string name="quick_picks">Quick Picks</string>
+    <string name="all_songs">All Songs</string>
+    <string name="artists">Artists</string>
+    <string name="albums">Albums</string>
+    <string name="now_playing">Now Playing</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+    <string name="scan_music">Scan Music</string>
+    <string name="train_models">Train ML Models</string>
+    <string name="no_music_found">No Music Found</string>
+    <string name="scan_device">Scan your device to find music files</string>
+    <string name="scanning">Scanning...</string>
+    <string name="generating_recommendations">Generating recommendations...</string>
+    <string name="training_models">Training ML models...</string>
+</resources>
