@@ -18,11 +18,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
 import com.just_for_fun.youtubemusic.ui.components.SongCard
 import com.just_for_fun.youtubemusic.ui.components.QuickPickCard
+import com.just_for_fun.youtubemusic.ui.components.UserProfileIcon
 import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
 import com.just_for_fun.youtubemusic.ui.screens.SortOption
@@ -32,10 +37,13 @@ import com.just_for_fun.youtubemusic.ui.screens.SortOption
 fun HomeScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
+    userPreferences: UserPreferences,
     onSearchClick: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
+    val userName by userPreferences.userName.collectAsState()
+    val userInitial = userPreferences.getUserInitial()
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
@@ -81,12 +89,16 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    // Notification Icon
-                    IconButton(onClick = { playerViewModel.toggleShuffle() }) {
+                    // Shuffle All Songs
+                    IconButton(onClick = { 
+                        if (uiState.allSongs.isNotEmpty()) {
+                            playerViewModel.shufflePlay(uiState.allSongs)
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Shuffle",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            contentDescription = "Shuffle All",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     // Search Icon
@@ -99,20 +111,7 @@ fun HomeScreen(
                     }
                     // Profile Icon
                     IconButton(onClick = { }) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "M",
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        UserProfileIcon(userInitial = userInitial)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -152,6 +151,14 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
+
+                            // Greeting Section
+                            if (userName.isNotEmpty()) {
+                                item {
+                                    GreetingSection(userName = userName)
+                                }
+                            }
+                           
                             // Filter Chips
                             item {
                                 FilterChipsRow()
@@ -232,7 +239,8 @@ fun HomeScreen(
                                     songs = uiState.allSongs,
                                     onSongClick = { song ->
                                         playerViewModel.playSong(song, uiState.allSongs)
-                                    }
+                                    },
+                                    userInitial = userInitial
                                 )
                             }
 
@@ -321,6 +329,71 @@ fun HomeScreen(
         }
     }
 }
+
+@Composable
+fun GreetingSection(userName: String) {
+
+    val greeting = remember {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+
+        when (hour) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..22 -> "Good evening"
+            else -> "Hey there, burning the midnight oil?"
+        }
+    }
+
+    val subGreeting = remember {
+        when (greeting) {
+            "Good morning" -> "Hope your day starts great!"
+            "Good afternoon" -> "Keep going strong!"
+            "Good evening" -> "Hope you had a good day so far!"
+            else -> "Don't forget to rest when you can."
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+    ) {
+        val annotatedString = buildAnnotatedString {
+            withStyle(
+            style = SpanStyle(
+                fontSize = MaterialTheme.typography.headlineMedium.fontSize,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            ) {
+            append("$greeting, ")
+            }
+            withStyle(
+            style = SpanStyle(
+                fontSize = MaterialTheme.typography.headlineLarge.fontSize,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            ) {
+            append(userName)
+            }
+        }
+
+        Text(
+            text = annotatedString,
+            style = MaterialTheme.typography.headlineMedium // Base style, but overridden by spans
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = subGreeting,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
+    }
+}
+
 
 @Composable
 fun FilterChipsRow() {
@@ -426,7 +499,8 @@ fun QuickPicksSection(
 @Composable
 fun SpeedDialSection(
     songs: List<com.just_for_fun.youtubemusic.core.data.local.entities.Song>,
-    onSongClick: (com.just_for_fun.youtubemusic.core.data.local.entities.Song) -> Unit
+    onSongClick: (com.just_for_fun.youtubemusic.core.data.local.entities.Song) -> Unit,
+    userInitial: String = "M"
 ) {
     Column(
         modifier = Modifier.padding(vertical = 16.dp)
@@ -437,27 +511,10 @@ fun SpeedDialSection(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Color(0xFFE57373),
-                                Color(0xFFBA68C8)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "M",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
+            UserProfileIcon(
+                userInitial = userInitial,
+                useGradient = true
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Speed dial",

@@ -307,21 +307,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun next() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
-            val shuffle = _uiState.value.shuffleEnabled
             if (currentPlaylist.isEmpty()) return@launch
 
-            if (shuffle) {
-                // Pick a random index different from currentIndex if possible
-                val indices = currentPlaylist.indices.toList()
-                val candidates = if (indices.size > 1) indices - currentIndex else indices
-                currentIndex = candidates.random()
-                playSong(currentPlaylist[currentIndex], currentPlaylist)
-            } else {
-                if (currentIndex < currentPlaylist.size - 1) {
-                    currentIndex++
-                    val nextSong = currentPlaylist[currentIndex]
-                    playSong(nextSong, currentPlaylist)
-                }
+            // Simply move to next song in the playlist (whether shuffled or not)
+            if (currentIndex < currentPlaylist.size - 1) {
+                currentIndex++
+                val nextSong = currentPlaylist[currentIndex]
+                playSong(nextSong, currentPlaylist)
             }
         }
     }
@@ -329,20 +321,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun previous() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
-            val shuffle = _uiState.value.shuffleEnabled
             if (currentPlaylist.isEmpty()) return@launch
 
-            if (shuffle) {
-                val indices = currentPlaylist.indices.toList()
-                val candidates = if (indices.size > 1) indices - currentIndex else indices
-                currentIndex = candidates.random()
-                playSong(currentPlaylist[currentIndex], currentPlaylist)
-            } else {
-                if (currentIndex > 0) {
-                    currentIndex--
-                    val previousSong = currentPlaylist[currentIndex]
-                    playSong(previousSong, currentPlaylist)
-                }
+            // Simply move to previous song in the playlist (whether shuffled or not)
+            if (currentIndex > 0) {
+                currentIndex--
+                val previousSong = currentPlaylist[currentIndex]
+                playSong(previousSong, currentPlaylist)
             }
         }
     }
@@ -350,7 +335,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun onSongEnded() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = false)
-            val shuffle = _uiState.value.shuffleEnabled
             val repeat = _uiState.value.repeatEnabled
             if (currentPlaylist.isEmpty()) {
                 _uiState.value = _uiState.value.copy(isPlaying = false)
@@ -362,13 +346,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.value.currentSong?.let { song ->
                     playSong(song, currentPlaylist)
                 }
-            } else if (shuffle) {
-                val indices = currentPlaylist.indices.toList()
-                val candidates = if (indices.size > 1) indices - currentIndex else indices
-                currentIndex = candidates.random()
-                playSong(currentPlaylist[currentIndex], currentPlaylist)
             } else {
-                // Auto-play next song in order
+                // Auto-play next song in order (whether playlist is shuffled or not)
                 if (currentIndex < currentPlaylist.size - 1) {
                     currentIndex++
                     val nextSong = currentPlaylist[currentIndex]
@@ -381,29 +360,43 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleShuffle() {
-        val enabled = !_uiState.value.shuffleEnabled
-        _uiState.value = _uiState.value.copy(shuffleEnabled = enabled)
-
-        // When enabling shuffle, fetch all songs from device, shuffle them and start playing
-        if (enabled) {
-            viewModelScope.launch {
-                // Get all songs from the device (first emission only)
+        // Always reshuffle the playlist with current song at first position
+        viewModelScope.launch {
+            val currentSong = _uiState.value.currentSong
+            
+            if (currentSong != null && currentPlaylist.isNotEmpty()) {
+                // Create a mutable list from current playlist
+                val songsToShuffle = currentPlaylist.toMutableList()
+                
+                // Remove current song from the list
+                songsToShuffle.remove(currentSong)
+                
+                // Shuffle remaining songs
+                val shuffledOthers = songsToShuffle.shuffled()
+                
+                // Place current song at the beginning
+                val newPlaylist = mutableListOf(currentSong).apply {
+                    addAll(shuffledOthers)
+                }
+                
+                // Update playlist and index
+                currentPlaylist = newPlaylist
+                currentIndex = 0 // Current song is now at index 0
+                
+                // Update UI state
+                _uiState.value = _uiState.value.copy(shuffleEnabled = true)
+                
+                savePlaylistState()
+            } else {
+                // If no current song, just fetch and shuffle all songs
                 val allSongs = repository.getAllSongs().first()
                 if (allSongs.isNotEmpty()) {
-                    // Shuffle all songs
                     val shuffledPlaylist = allSongs.shuffled()
                     currentPlaylist = shuffledPlaylist
-
-                    // Start playing from the first song in the shuffled list
                     currentIndex = 0
+                    _uiState.value = _uiState.value.copy(shuffleEnabled = true)
                     playSong(shuffledPlaylist[currentIndex], shuffledPlaylist)
                 }
-            }
-        } else {
-            // When disabling shuffle, keep current playlist but reset index to current song
-            _uiState.value.currentSong?.let { currentSong ->
-                currentIndex = currentPlaylist.indexOf(currentSong)
-                savePlaylistState()
             }
         }
     }
@@ -416,11 +409,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun shufflePlay(playlist: List<Song>) {
         viewModelScope.launch {
             if (playlist.isEmpty()) return@launch
-            currentPlaylist = playlist
-            val indices = playlist.indices
-            currentIndex = if (indices.isEmpty()) 0 else indices.random()
+            
+            // Shuffle the playlist
+            val shuffledPlaylist = playlist.shuffled()
+            currentPlaylist = shuffledPlaylist
+            
+            // Start playing from the first song in shuffled list
+            currentIndex = 0
             _uiState.value = _uiState.value.copy(shuffleEnabled = true)
-            playSong(playlist[currentIndex], playlist)
+            playSong(shuffledPlaylist[currentIndex], shuffledPlaylist)
         }
     }
 

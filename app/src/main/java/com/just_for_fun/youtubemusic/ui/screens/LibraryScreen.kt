@@ -1,22 +1,28 @@
 package com.just_for_fun.youtubemusic.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
 import com.just_for_fun.youtubemusic.ui.components.SongCard
+import com.just_for_fun.youtubemusic.ui.components.UserProfileIcon
 import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
 import kotlinx.coroutines.launch
@@ -45,12 +51,14 @@ enum class SortOption(val displayName: String) {
 fun LibraryScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
+    userPreferences: UserPreferences,
     onSearchClick: () -> Unit = {},
     onNavigateToArtist: (String, List<Song>) -> Unit = { _, _ -> },
     onNavigateToAlbum: (String, String, List<Song>) -> Unit = { _, _, _ -> }
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
+    val userInitial = userPreferences.getUserInitial()
     val pagerState = rememberPagerState(pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
@@ -101,14 +109,22 @@ fun LibraryScreen(
                         }
                     }
                     
-                    IconButton(onClick = { playerViewModel.toggleShuffle() }) {
+                    // Shuffle All Songs in current tab
+                    IconButton(onClick = { 
+                        val songsToShuffle = when (pagerState.currentPage) {
+                            0 -> uiState.allSongs // Songs tab
+                            1 -> uiState.allSongs // Artists tab - all songs
+                            2 -> uiState.allSongs // Albums tab - all songs
+                            else -> emptyList()
+                        }
+                        if (songsToShuffle.isNotEmpty()) {
+                            playerViewModel.shufflePlay(songsToShuffle)
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Shuffle",
-                            tint = if (playerState.shuffleEnabled)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                            contentDescription = "Shuffle All",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     IconButton(onClick = onSearchClick) {
@@ -116,6 +132,10 @@ fun LibraryScreen(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search"
                         )
+                    }
+                    // Profile Icon
+                    IconButton(onClick = { }) {
+                        UserProfileIcon(userInitial = userInitial)
                     }
                 }
             )

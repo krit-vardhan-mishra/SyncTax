@@ -31,6 +31,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
 import com.just_for_fun.youtubemusic.service.MusicService
 import com.just_for_fun.youtubemusic.ui.components.PlayerBottomSheet
 import com.just_for_fun.youtubemusic.ui.screens.*
@@ -85,7 +86,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             YoutubeMusicTheme {
-                MusicApp()
+                val userPreferences = remember { UserPreferences(this) }
+                MusicApp(userPreferences = userPreferences)
             }
         }
     }
@@ -137,7 +139,20 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MusicApp() {
+fun MusicApp(userPreferences: UserPreferences) {
+    val isFirstLaunch by userPreferences.isFirstLaunch.collectAsState()
+    val userName by userPreferences.userName.collectAsState()
+    
+    // Show welcome screen on first launch
+    if (isFirstLaunch) {
+        WelcomeScreen(
+            onNameSubmit = { name ->
+                userPreferences.saveUserName(name)
+            }
+        )
+        return
+    }
+    
     val navController = rememberNavController()
     val playerViewModel: PlayerViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
@@ -178,6 +193,7 @@ fun MusicApp() {
                         HomeScreen(
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel,
+                            userPreferences = userPreferences,
                             onSearchClick = { navController.navigate("search") }
                         )
                     }
@@ -193,6 +209,7 @@ fun MusicApp() {
                         LibraryScreen(
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel,
+                            userPreferences = userPreferences,
                             onSearchClick = { navController.navigate("search") },
                             onNavigateToArtist = { artist, songs ->
                                 // Store in ViewModel temporarily

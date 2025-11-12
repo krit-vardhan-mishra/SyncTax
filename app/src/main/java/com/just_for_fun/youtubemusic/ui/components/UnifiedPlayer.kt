@@ -1,9 +1,11 @@
 package com.just_for_fun.youtubemusic.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -65,6 +67,7 @@ fun UnifiedPlayer(
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val haptic = LocalHapticFeedback.current
     
     // Animation progress (0f = mini, 1f = expanded)
     val expansionProgress by animateFloatAsState(
@@ -73,51 +76,11 @@ fun UnifiedPlayer(
         label = "expansion"
     )
     
-    // Overlay states for full screen
-    var seekDirection by remember { mutableStateOf<String?>(null) }
-    var showPlayPause by remember { mutableStateOf(false) }
-    var showVolume by remember { mutableStateOf(false) }
-    var overlayVolume by remember { mutableFloatStateOf(volume) }
     var showUpNext by remember { mutableStateOf(false) }
-    
-    // Swipe gesture state
-    var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
-    val swipeThreshold = 150f
 
-    // Sync overlay volume with actual volume
-    LaunchedEffect(volume) {
-        overlayVolume = volume
-    }
-
-    // Hide overlays after delay
-    LaunchedEffect(seekDirection) {
-        if (seekDirection != null) {
-            delay(1500)
-            seekDirection = null
-        }
-    }
-
-    LaunchedEffect(showPlayPause) {
-        if (showPlayPause) {
-            delay(3000)
-            showPlayPause = false
-        }
-    }
-
-    LaunchedEffect(showVolume) {
-        if (showVolume) {
-            delay(3000)
-            showVolume = false
-        }
-    }
-
-    // Detect play/pause changes
-    var previousIsPlaying by remember { mutableStateOf(isPlaying) }
-    LaunchedEffect(isPlaying) {
-        if (isPlaying != previousIsPlaying && isExpanded) {
-            showPlayPause = true
-            previousIsPlaying = isPlaying
-        }
+    // Handle back button when player is expanded
+    BackHandler(enabled = isExpanded) {
+        onExpandedChange(false)
     }
 
     Box(
@@ -153,22 +116,26 @@ fun UnifiedPlayer(
             modifier = Modifier.fillMaxSize()
         ) {
             if (!isExpanded) {
-                // MINI PLAYER VIEW
+                // MINI PLAYER VIEW - no state hoisting needed
                 MiniPlayerContent(
                     song = song,
                     isPlaying = isPlaying,
                     position = position,
                     duration = duration,
-                    albumArtOffsetX = albumArtOffsetX,
-                    swipeThreshold = swipeThreshold,
-                    onAlbumArtOffsetChange = { albumArtOffsetX = it },
                     onPlayPauseClick = onPlayPauseClick,
-                    onNextClick = onNextClick,
-                    onPreviousClick = onPreviousClick,
-                    onClick = { onExpandedChange(true) }
+                    onNextClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onNextClick()
+                    },
+                    onPreviousClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPreviousClick()
+                    },
+                    onClick = { onExpandedChange(true) },
+                    onSwipeUp = { onExpandedChange(true) }
                 )
             } else {
-                // FULL SCREEN PLAYER VIEW
+                // FULL SCREEN PLAYER VIEW - no state hoisting needed
                 FullScreenPlayerContent(
                     song = song,
                     isPlaying = isPlaying,
@@ -180,18 +147,8 @@ fun UnifiedPlayer(
                     volume = volume,
                     upNext = upNext,
                     playHistory = playHistory,
-                    albumArtOffsetX = albumArtOffsetX,
-                    swipeThreshold = swipeThreshold,
-                    seekDirection = seekDirection,
-                    showPlayPause = showPlayPause,
-                    showVolume = showVolume,
-                    overlayVolume = overlayVolume,
                     showUpNext = showUpNext,
                     snackbarHostState = snackbarHostState,
-                    onAlbumArtOffsetChange = { albumArtOffsetX = it },
-                    onSeekDirectionChange = { seekDirection = it },
-                    onOverlayVolumeChange = { overlayVolume = it },
-                    onShowVolumeChange = { showVolume = it },
                     onShowUpNextChange = { showUpNext = it },
                     onSelectSong = onSelectSong,
                     onPlaceNext = onPlaceNext,
@@ -199,8 +156,14 @@ fun UnifiedPlayer(
                     onReorderQueue = onReorderQueue,
                     onSetVolume = onSetVolume,
                     onPlayPauseClick = onPlayPauseClick,
-                    onNextClick = onNextClick,
-                    onPreviousClick = onPreviousClick,
+                    onNextClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onNextClick()
+                    },
+                    onPreviousClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onPreviousClick()
+                    },
                     onShuffleClick = onShuffleClick,
                     onRepeatClick = onRepeatClick,
                     onSeek = onSeek,
@@ -217,14 +180,16 @@ private fun MiniPlayerContent(
     isPlaying: Boolean,
     position: Long,
     duration: Long,
-    albumArtOffsetX: Float,
-    swipeThreshold: Float,
-    onAlbumArtOffsetChange: (Float) -> Unit,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onSwipeUp: () -> Unit
 ) {
+    // Local state - no callbacks needed
+    var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = 150f
+    
     Column {
         // Progress bar
         if (duration > 0) {
@@ -250,22 +215,68 @@ private fun MiniPlayerContent(
                     .weight(1f)
                     .padding(horizontal = 12.dp, vertical = 8.dp)
                     .offset(x = albumArtOffsetX.dp)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                when {
-                                    albumArtOffsetX > swipeThreshold -> onPreviousClick()
-                                    albumArtOffsetX < -swipeThreshold -> onNextClick()
-                                }
-                                onAlbumArtOffsetChange(0f)
+                    .pointerInput(song.id) {
+                        detectTapGestures(
+                            onTap = { onClick() }
+                        )
+                    }
+                    .pointerInput(song.id) {
+                        var totalDragX = 0f
+                        var totalDragY = 0f
+                        var hasTriggeredAction = false
+                        
+                        detectDragGestures(
+                            onDragStart = {
+                                totalDragX = 0f
+                                totalDragY = 0f
+                                hasTriggeredAction = false
                             },
-                            onHorizontalDrag = { change, dragAmount ->
+                            onDragEnd = {
+                                val absX = kotlin.math.abs(totalDragX)
+                                val absY = kotlin.math.abs(totalDragY)
+                                
+                                // Determine if horizontal or vertical
+                                if (absX > absY && absX > 50f) {
+                                    // Horizontal swipe - change song
+                                    if (!hasTriggeredAction) {
+                                        when {
+                                            totalDragX > swipeThreshold -> {
+                                                hasTriggeredAction = true
+                                                onPreviousClick()
+                                            }
+                                            totalDragX < -swipeThreshold -> {
+                                                hasTriggeredAction = true
+                                                onNextClick()
+                                            }
+                                        }
+                                    }
+                                } else if (absY > absX && absY > 50f && totalDragY < 0) {
+                                    // Vertical swipe up - expand
+                                    if (!hasTriggeredAction) {
+                                        hasTriggeredAction = true
+                                        onSwipeUp()
+                                    }
+                                }
+                                
+                                // Reset visual offset
+                                albumArtOffsetX = 0f
+                            },
+                            onDrag = { change, dragAmount ->
                                 change.consume()
-                                onAlbumArtOffsetChange(albumArtOffsetX + dragAmount)
+                                totalDragX += dragAmount.x
+                                totalDragY += dragAmount.y
+                                
+                                // Update visual offset for horizontal movement
+                                val absX = kotlin.math.abs(totalDragX)
+                                val absY = kotlin.math.abs(totalDragY)
+                                if (absX > absY) {
+                                    albumArtOffsetX += dragAmount.x
+                                }
                             }
                         )
                     }
             ) {
+                // ... rest of the Surface with album art and song info
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
@@ -275,7 +286,6 @@ private fun MiniPlayerContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(onClick = onClick)
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -376,18 +386,8 @@ private fun FullScreenPlayerContent(
     volume: Float,
     upNext: List<Song>,
     playHistory: List<Song>,
-    albumArtOffsetX: Float,
-    swipeThreshold: Float,
-    seekDirection: String?,
-    showPlayPause: Boolean,
-    showVolume: Boolean,
-    overlayVolume: Float,
     showUpNext: Boolean,
     snackbarHostState: SnackbarHostState,
-    onAlbumArtOffsetChange: (Float) -> Unit,
-    onSeekDirectionChange: (String?) -> Unit,
-    onOverlayVolumeChange: (Float) -> Unit,
-    onShowVolumeChange: (Boolean) -> Unit,
     onShowUpNextChange: (Boolean) -> Unit,
     onSelectSong: (Song) -> Unit,
     onPlaceNext: (Song) -> Unit,
@@ -403,6 +403,53 @@ private fun FullScreenPlayerContent(
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+    
+    // Local overlay states
+    var seekDirection by remember { mutableStateOf<String?>(null) }
+    var showPlayPause by remember { mutableStateOf(false) }
+    var showVolume by remember { mutableStateOf(false) }
+    var overlayVolume by remember { mutableFloatStateOf(volume) }
+    
+    // Swipe gesture state - LOCAL to this composable
+    var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = 150f
+    
+    // Sync overlay volume with actual volume
+    LaunchedEffect(volume) {
+        overlayVolume = volume
+    }
+
+    // Hide overlays after delay
+    LaunchedEffect(seekDirection) {
+        if (seekDirection != null) {
+            delay(1500)
+            seekDirection = null
+        }
+    }
+
+    LaunchedEffect(showPlayPause) {
+        if (showPlayPause) {
+            delay(3000)
+            showPlayPause = false
+        }
+    }
+
+    LaunchedEffect(showVolume) {
+        if (showVolume) {
+            delay(3000)
+            showVolume = false
+        }
+    }
+
+    // Detect play/pause changes
+    var previousIsPlaying by remember { mutableStateOf(isPlaying) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying != previousIsPlaying) {
+            showPlayPause = true
+            previousIsPlaying = isPlaying
+        }
+    }
     
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -449,23 +496,37 @@ private fun FullScreenPlayerContent(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Swipeable container with album art, song info
+            // FIXED: Album art container with proper gesture hierarchy
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
                     .offset(x = albumArtOffsetX.dp)
-                    .pointerInput(Unit) {
+                    // HORIZONTAL SWIPE - outermost layer
+                    .pointerInput(song.id) {
+                        var hasTriggered = false
                         detectHorizontalDragGestures(
+                            onDragStart = {
+                                hasTriggered = false
+                            },
                             onDragEnd = {
-                                when {
-                                    albumArtOffsetX > swipeThreshold -> onPreviousClick()
-                                    albumArtOffsetX < -swipeThreshold -> onNextClick()
+                                if (!hasTriggered && kotlin.math.abs(albumArtOffsetX) > swipeThreshold) {
+                                    hasTriggered = true
+                                    when {
+                                        albumArtOffsetX > 0 -> {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onPreviousClick()
+                                        }
+                                        albumArtOffsetX < 0 -> {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onNextClick()
+                                        }
+                                    }
                                 }
-                                onAlbumArtOffsetChange(0f)
+                                albumArtOffsetX = 0f
                             },
                             onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
-                                onAlbumArtOffsetChange(albumArtOffsetX + dragAmount)
+                                // Don't consume here - let inner gestures handle their events
+                                albumArtOffsetX += dragAmount
                             }
                         )
                     }
@@ -474,159 +535,164 @@ private fun FullScreenPlayerContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Album Art with volume gesture
+                    // Album Art Surface with SEPARATE gesture zones
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .pointerInput(volume) {
-                                detectVerticalDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    val volumeChange = -dragAmount * 0.002f
-                                    val newVolume = (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
-                                    onOverlayVolumeChange(newVolume)
-                                    onShowVolumeChange(true)
-                                    onSetVolume(newVolume)
-                                }
-                            },
+                            .aspectRatio(1f),
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f)
                     ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        // Album Art
-                        if (song.albumArtUri.isNullOrEmpty()) {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .wrapContentSize(Alignment.Center)
-                                    .size(120.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            AsyncImage(
-                                model = song.albumArtUri,
-                                contentDescription = "Album Art",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        // Interactive zones for seek and play/pause
-                        val haptic = LocalHapticFeedback.current
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            // Left: Rewind
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .pointerInput(position, duration) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                val target = (position - 10_000L).coerceAtLeast(0L)
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                onSeekDirectionChange("backward")
-                                                onSeek(target)
-                                            }
-                                        )
-                                    }
-                            )
-
-                            // Middle: Play/Pause
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .pointerInput(isPlaying) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                onPlayPauseClick()
-                                            }
-                                        )
-                                    }
-                            )
-
-                            // Right: Forward
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .pointerInput(position, duration) {
-                                        detectTapGestures(
-                                            onTap = {
-                                                val target = (position + 10_000L).coerceAtMost(duration)
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                onSeekDirectionChange("forward")
-                                                onSeek(target)
-                                            }
-                                        )
-                                    }
-                            )
-                        }
-
-                        // Overlays
-                        if (seekDirection != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
-                            ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            // Album Art Image
+                            if (song.albumArtUri.isNullOrEmpty()) {
                                 Icon(
-                                    imageVector = if (seekDirection == "forward") Icons.Default.Forward10 else Icons.Default.Replay10,
+                                    imageVector = Icons.Default.MusicNote,
                                     contentDescription = null,
-                                    modifier = Modifier.size(80.dp),
-                                    tint = Color.White
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .wrapContentSize(Alignment.Center)
+                                        .size(120.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = song.albumArtUri,
+                                    contentDescription = "Album Art",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
-                        }
 
-                        if (showPlayPause) {
+                            // SEPARATE LAYER: Volume control (vertical drag)
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Paused" else "Playing",
-                                    modifier = Modifier.size(80.dp),
-                                    tint = Color.White
+                                    .pointerInput(volume) {
+                                        detectVerticalDragGestures { change, dragAmount ->
+                                            change.consume() // Consume to prevent horizontal swipe
+                                            val volumeChange = -dragAmount * 0.002f
+                                            val newVolume = (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
+                                            overlayVolume = newVolume
+                                            showVolume = true
+                                            onSetVolume(newVolume)
+                                        }
+                                    }
+                            )
+
+                            // SEPARATE LAYER: Tap zones for seek and play/pause
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                // Left: Rewind (double-tap)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .pointerInput(position, duration) {
+                                            detectTapGestures(
+                                                onDoubleTap = {
+                                                    val target = (position - 10_000L).coerceAtLeast(0L)
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    seekDirection = "backward"
+                                                    onSeek(target)
+                                                }
+                                            )
+                                        }
+                                )
+
+                                // Middle: Play/Pause (double-tap)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .pointerInput(isPlaying) {
+                                            detectTapGestures(
+                                                onDoubleTap = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    onPlayPauseClick()
+                                                }
+                                            )
+                                        }
+                                )
+
+                                // Right: Forward (single tap)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .pointerInput(position, duration) {
+                                            detectTapGestures(
+                                                onTap = {
+                                                    val target = (position + 10_000L).coerceAtMost(duration)
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    seekDirection = "forward"
+                                                    onSeek(target)
+                                                }
+                                            )
+                                        }
                                 )
                             }
-                        }
 
-                        if (showVolume) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
+                            // Overlays (same as before)
+                            if (seekDirection != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.VolumeUp,
-                                        contentDescription = "Volume",
-                                        modifier = Modifier.size(60.dp),
+                                        imageVector = if (seekDirection == "forward") Icons.Default.Forward10 else Icons.Default.Replay10,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(80.dp),
                                         tint = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "${(overlayVolume * 100).toInt()}%",
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
+
+                            if (showPlayPause) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (isPlaying) "Paused" else "Playing",
+                                        modifier = Modifier.size(80.dp),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+
+                            if (showVolume) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.VolumeUp,
+                                            contentDescription = "Volume",
+                                            modifier = Modifier.size(60.dp),
+                                            tint = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "${(overlayVolume * 100).toInt()}%",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -678,7 +744,7 @@ private fun FullScreenPlayerContent(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Playback Controls
+            // Playback Controls (same as before)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
