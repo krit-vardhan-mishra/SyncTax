@@ -55,7 +55,7 @@ private val YTMusicLightColorScheme = lightColorScheme(
     primary = Color(0xFFFF0033),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFFFDAD6),
-    onPrimaryContainer = Color(0xFF410002),
+    onPrimaryContainer = Color(0xFF7C1E1F),
 
     secondary = Color(0xFF6A1B9A),
     onSecondary = Color.White,

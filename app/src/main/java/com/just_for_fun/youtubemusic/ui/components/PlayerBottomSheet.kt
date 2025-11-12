@@ -1,11 +1,9 @@
 package com.just_for_fun.youtubemusic.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.youtubemusic.core.data.local.entities.Song
 import kotlinx.coroutines.launch
@@ -44,77 +42,47 @@ fun PlayerBottomSheet(
         )
     )
 
-    val miniPlayerHeight = 80.dp // Approximate height of the MiniPlayer
-
-    val expansionFraction by animateFloatAsState(
-        targetValue = if (scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) 1f else 0f,
-        label = "expansion"
-    )
+    val miniPlayerHeight = 80.dp
+    val isExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
         sheetContent = {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                // MiniPlayer visible when collapsed
-                Box(
-                    modifier = Modifier.graphicsLayer {
-                        alpha = 1f - expansionFraction
-                    }
-                ) {
-                    if (song != null) {
-                        MiniPlayer(
-                            song = song,
-                            isPlaying = isPlaying,
-                            position = position,
-                            duration = duration,
-                            onPlayPauseClick = onPlayPauseClick,
-                            onNextClick = onNextClick,
-                            onClick = {
-                                coroutineScope.launch {
-                                    scaffoldState.bottomSheetState.expand()
-                                }
+            // Use UnifiedPlayer - single component that morphs between states
+            if (song != null) {
+                UnifiedPlayer(
+                    song = song,
+                    isPlaying = isPlaying,
+                    isBuffering = isBuffering,
+                    position = position,
+                    duration = duration,
+                    shuffleEnabled = shuffleEnabled,
+                    repeatEnabled = repeatEnabled,
+                    volume = volume,
+                    upNext = upNext,
+                    playHistory = playHistory,
+                    isExpanded = isExpanded,
+                    onExpandedChange = { expand ->
+                        coroutineScope.launch {
+                            if (expand) {
+                                scaffoldState.bottomSheetState.expand()
+                            } else {
+                                scaffoldState.bottomSheetState.partialExpand()
                             }
-                        )
-                    }
-                }
-
-                // FullScreenPlayer visible when expanded
-                Box(
-                    modifier = Modifier.graphicsLayer {
-                        alpha = expansionFraction
-                    }
-                ) {
-                    if (song != null) {
-                        YTFullScreenPlayer(
-                            song = song,
-                            isPlaying = isPlaying,
-                            isBuffering = isBuffering,
-                            position = position,
-                            duration = duration,
-                            shuffleEnabled = shuffleEnabled,
-                            repeatEnabled = repeatEnabled,
-                            volume = volume,
-                            upNext = upNext,
-                            playHistory = playHistory,
-                            onPlayPauseClick = onPlayPauseClick,
-                            onNextClick = onNextClick,
-                            onPreviousClick = onPreviousClick,
-                            onShuffleClick = onShuffleClick,
-                            onRepeatClick = onRepeatClick,
-                            onSeek = onSeek,
-                            onSelectSong = onSelectSong,
-                            onPlaceNext = onPlaceNext,
-                            onRemoveFromQueue = onRemoveFromQueue,
-                            onReorderQueue = onReorderQueue,
-                            onSetVolume = onSetVolume,
-                            onClose = {
-                                coroutineScope.launch {
-                                    scaffoldState.bottomSheetState.partialExpand()
-                                }
-                            }
-                        )
-                    }
-                }
+                        }
+                    },
+                    onSelectSong = onSelectSong,
+                    onPlaceNext = onPlaceNext,
+                    onRemoveFromQueue = onRemoveFromQueue,
+                    onReorderQueue = onReorderQueue,
+                    onSetVolume = onSetVolume,
+                    onPlayPauseClick = onPlayPauseClick,
+                    onNextClick = onNextClick,
+                    onPreviousClick = onPreviousClick,
+                    onShuffleClick = onShuffleClick,
+                    onRepeatClick = onRepeatClick,
+                    onSeek = onSeek
+                )
             }
         },
         sheetPeekHeight = miniPlayerHeight,

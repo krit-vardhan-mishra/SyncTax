@@ -2,6 +2,7 @@ package com.just_for_fun.youtubemusic.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +25,7 @@ import com.just_for_fun.youtubemusic.ui.components.SongCard
 import com.just_for_fun.youtubemusic.ui.components.QuickPickCard
 import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.youtubemusic.ui.screens.SortOption
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +36,31 @@ fun HomeScreen(
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
+
+    // Sorting state for All Songs section
+    var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
+
+    // Sort songs based on current sort option
+    val sortedSongs = remember(uiState.allSongs, currentSortOption) {
+        when (currentSortOption) {
+            SortOption.TITLE_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
+            SortOption.TITLE_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
+            SortOption.ARTIST_ASC -> uiState.allSongs.sortedBy { it.artist.lowercase() }
+            SortOption.ARTIST_DESC -> uiState.allSongs.sortedByDescending { it.artist.lowercase() }
+            SortOption.RELEASE_YEAR_DESC -> uiState.allSongs.sortedByDescending { it.releaseYear ?: 0 }
+            SortOption.RELEASE_YEAR_ASC -> uiState.allSongs.sortedBy { it.releaseYear ?: 0 }
+            SortOption.ADDED_TIMESTAMP_DESC -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
+            SortOption.ADDED_TIMESTAMP_ASC -> uiState.allSongs.sortedBy { it.addedTimestamp }
+            SortOption.DURATION_DESC -> uiState.allSongs.sortedByDescending { it.duration }
+            SortOption.DURATION_ASC -> uiState.allSongs.sortedBy { it.duration }
+            SortOption.NAME_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
+            SortOption.NAME_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
+            SortOption.ARTIST -> uiState.allSongs.sortedBy { it.artist.lowercase() }
+            SortOption.DATE_ADDED_OLDEST -> uiState.allSongs.sortedBy { it.addedTimestamp }
+            SortOption.DATE_ADDED_NEWEST -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
+            SortOption.CUSTOM -> uiState.allSongs // No sorting for custom
+        }
+    }
 
     // Animation states
     var isVisible by remember { mutableStateOf(false) }
@@ -55,7 +82,7 @@ fun HomeScreen(
                 },
                 actions = {
                     // Notification Icon
-                    IconButton(onClick = {playerViewModel.toggleShuffle()}) {
+                    IconButton(onClick = { playerViewModel.toggleShuffle() }) {
                         Icon(
                             imageVector = Icons.Default.Shuffle,
                             contentDescription = "Shuffle",
@@ -143,10 +170,59 @@ fun HomeScreen(
                                         isGenerating = uiState.isGeneratingRecommendations,
                                         onPlayAll = {
                                             uiState.quickPicks.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playSong(firstSong, uiState.quickPicks)
+                                                playerViewModel.playSong(
+                                                    firstSong,
+                                                    uiState.quickPicks
+                                                )
                                             }
                                         }
                                     )
+                                }
+                            }
+
+                            // All Songs Section
+                            @OptIn(ExperimentalFoundationApi::class)
+                            item {
+                                SectionHeader(
+                                    title = "Listen again",
+                                    subtitle = null,
+                                    onViewAllClick = null
+                                )
+
+                                val songsPerPage = 4
+                                // Shuffle the songs to show random ones each time
+                                val shuffledSongs = remember(uiState.allSongs) {
+                                    uiState.allSongs.shuffled()
+                                }
+                                val pages = shuffledSongs.chunked(songsPerPage)
+
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp)
+                                ) {
+                                    items(pages.size) { pageIndex ->
+                                        Column(
+                                            modifier = Modifier
+                                                .fillParentMaxWidth()
+                                                .padding(vertical = 8.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            pages[pageIndex].forEach { song ->
+                                                SongCard(
+                                                    song = song,
+                                                    onClick = {
+                                                        playerViewModel.playSong(
+                                                            song,
+                                                            uiState.allSongs
+                                                        )
+                                                    },
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .animateItemPlacement()
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -160,16 +236,19 @@ fun HomeScreen(
                                 )
                             }
 
-                            // All Songs Section
+                             // All Songs Section
                             item {
                                 SectionHeader(
-                                    title = "Listen again",
+                                    title = "All Songs",
                                     subtitle = null,
-                                    onViewAllClick = null
+                                    onViewAllClick = null,
+                                    showSortButton = true,
+                                    currentSortOption = currentSortOption,
+                                    onSortOptionChange = { currentSortOption = it }
                                 )
                             }
 
-                            items(uiState.allSongs, key = { it.id }) { song ->
+                            items(sortedSongs, key = { it.id }) { song ->
                                 AnimatedVisibility(
                                     visible = true,
                                     enter = fadeIn(animationSpec = tween(400)) +
@@ -245,7 +324,7 @@ fun HomeScreen(
 
 @Composable
 fun FilterChipsRow() {
-    val chips = listOf("Podcasts", "Romance", "Feel good", "Relax", "Energy")
+    val chips = listOf("All", "Podcasts", "Romance", "Feel good", "Relax", "Energy")
     var selectedChip by remember { mutableStateOf(chips[0]) }
 
     LazyRow(
@@ -406,7 +485,10 @@ fun SpeedDialSection(
 fun SectionHeader(
     title: String,
     subtitle: String? = null,
-    onViewAllClick: (() -> Unit)? = null
+    onViewAllClick: (() -> Unit)? = null,
+    showSortButton: Boolean = false,
+    currentSortOption: SortOption = SortOption.TITLE_ASC,
+    onSortOptionChange: ((SortOption) -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -431,9 +513,104 @@ fun SectionHeader(
             }
         }
 
-        onViewAllClick?.let {
-            TextButton(onClick = it) {
-                Text("View all", fontWeight = FontWeight.Medium)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (showSortButton && onSortOptionChange != null) {
+                var showSortMenu by remember { mutableStateOf(false) }
+
+                IconButton(onClick = { showSortMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Sort,
+                        contentDescription = "Sort songs",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Name (A-Z)") },
+                        onClick = {
+                            onSortOptionChange(SortOption.NAME_ASC)
+                            showSortMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentSortOption == SortOption.NAME_ASC) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Name (Z-A)") },
+                        onClick = {
+                            onSortOptionChange(SortOption.NAME_DESC)
+                            showSortMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentSortOption == SortOption.NAME_DESC) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Artist") },
+                        onClick = {
+                            onSortOptionChange(SortOption.ARTIST)
+                            showSortMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentSortOption == SortOption.ARTIST) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Date Added (Oldest)") },
+                        onClick = {
+                            onSortOptionChange(SortOption.DATE_ADDED_OLDEST)
+                            showSortMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentSortOption == SortOption.DATE_ADDED_OLDEST) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Date Added (Newest)") },
+                        onClick = {
+                            onSortOptionChange(SortOption.DATE_ADDED_NEWEST)
+                            showSortMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentSortOption == SortOption.DATE_ADDED_NEWEST) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Custom") },
+                        onClick = {
+                            onSortOptionChange(SortOption.CUSTOM)
+                            showSortMenu = false
+                        },
+                        leadingIcon = {
+                            if (currentSortOption == SortOption.CUSTOM) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                            }
+                        }
+                    )
+                }
+            }
+
+            onViewAllClick?.let {
+                TextButton(onClick = it) {
+                    Text("View all", fontWeight = FontWeight.Medium)
+                }
             }
         }
     }

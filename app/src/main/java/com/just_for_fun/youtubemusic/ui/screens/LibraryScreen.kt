@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,13 +21,23 @@ import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
 import kotlinx.coroutines.launch
 
-enum class SortOption {
-    NAME_ASC,
-    NAME_DESC,
-    ARTIST,
-    DATE_ADDED_OLDEST,
-    DATE_ADDED_NEWEST,
-    CUSTOM
+enum class SortOption(val displayName: String) {
+    TITLE_ASC("Title (A-Z)"),
+    TITLE_DESC("Title (Z-A)"),
+    ARTIST_ASC("Artist (A-Z)"),
+    ARTIST_DESC("Artist (Z-A)"),
+    RELEASE_YEAR_DESC("Newest First"),
+    RELEASE_YEAR_ASC("Oldest First"),
+    ADDED_TIMESTAMP_DESC("Recently Added"),
+    ADDED_TIMESTAMP_ASC("Added First"),
+    DURATION_DESC("Longest First"),
+    DURATION_ASC("Shortest First"),
+    NAME_ASC("Name (A-Z)"),
+    NAME_DESC("Name (Z-A)"),
+    ARTIST("Artist"),
+    DATE_ADDED_OLDEST("Date Added (Oldest)"),
+    DATE_ADDED_NEWEST("Date Added (Newest)"),
+    CUSTOM("Custom")
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -68,78 +79,25 @@ fun LibraryScreen(
                             expanded = showSortMenu,
                             onDismissRequest = { showSortMenu = false }
                         ) {
-                            DropdownMenuItem(
-                                text = { Text("Name (A-Z)") },
-                                onClick = {
-                                    sortOption = SortOption.NAME_ASC
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    if (sortOption == SortOption.NAME_ASC) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
+                            SortOption.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option.displayName) },
+                                    onClick = {
+                                        sortOption = option
+                                        showSortMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = if (option == sortOption) Icons.Default.Check else Icons.Default.Sort,
+                                            contentDescription = null,
+                                            tint = if (option == sortOption)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Name (Z-A)") },
-                                onClick = {
-                                    sortOption = SortOption.NAME_DESC
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    if (sortOption == SortOption.NAME_DESC) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Artist") },
-                                onClick = {
-                                    sortOption = SortOption.ARTIST
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    if (sortOption == SortOption.ARTIST) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Date Added (Oldest)") },
-                                onClick = {
-                                    sortOption = SortOption.DATE_ADDED_OLDEST
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    if (sortOption == SortOption.DATE_ADDED_OLDEST) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Date Added (Newest)") },
-                                onClick = {
-                                    sortOption = SortOption.DATE_ADDED_NEWEST
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    if (sortOption == SortOption.DATE_ADDED_NEWEST) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Custom") },
-                                onClick = {
-                                    sortOption = SortOption.CUSTOM
-                                    showSortMenu = false
-                                },
-                                leadingIcon = {
-                                    if (sortOption == SortOption.CUSTOM) {
-                                        Icon(Icons.Default.Check, contentDescription = null)
-                                    }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                     
@@ -177,7 +135,7 @@ fun LibraryScreen(
                             pagerState.animateScrollToPage(0)
                         }
                     },
-                    text = { Text("Songs") }
+                    text = { Text("Songs", color = Color(0xFFD80000)) }
                 )
                 Tab(
                     selected = pagerState.currentPage == 1,
@@ -186,7 +144,7 @@ fun LibraryScreen(
                             pagerState.animateScrollToPage(1)
                         }
                     },
-                    text = { Text("Artists") }
+                    text = { Text("Artists", color = Color(0xFFD80000)) }
                 )
                 Tab(
                     selected = pagerState.currentPage == 2,
@@ -195,7 +153,7 @@ fun LibraryScreen(
                             pagerState.animateScrollToPage(2)
                         }
                     },
-                    text = { Text("Albums") }
+                    text = { Text("Albums", color = Color(0xFFD80000)) }
                 )
             }
 
@@ -238,6 +196,16 @@ fun SongsTab(
 ) {
     val sortedSongs = remember(songs, sortOption) {
         when (sortOption) {
+            SortOption.TITLE_ASC -> songs.sortedBy { it.title.lowercase() }
+            SortOption.TITLE_DESC -> songs.sortedByDescending { it.title.lowercase() }
+            SortOption.ARTIST_ASC -> songs.sortedBy { it.artist.lowercase() }
+            SortOption.ARTIST_DESC -> songs.sortedByDescending { it.artist.lowercase() }
+            SortOption.RELEASE_YEAR_DESC -> songs.sortedByDescending { it.releaseYear ?: 0 }
+            SortOption.RELEASE_YEAR_ASC -> songs.sortedBy { it.releaseYear ?: 0 }
+            SortOption.ADDED_TIMESTAMP_DESC -> songs.sortedByDescending { it.addedTimestamp }
+            SortOption.ADDED_TIMESTAMP_ASC -> songs.sortedBy { it.addedTimestamp }
+            SortOption.DURATION_DESC -> songs.sortedByDescending { it.duration }
+            SortOption.DURATION_ASC -> songs.sortedBy { it.duration }
             SortOption.NAME_ASC -> songs.sortedBy { it.title.lowercase() }
             SortOption.NAME_DESC -> songs.sortedByDescending { it.title.lowercase() }
             SortOption.ARTIST -> songs.sortedBy { it.artist.lowercase() }
@@ -266,15 +234,25 @@ fun SongsTab(
                 )
                 Text(
                     text = when (sortOption) {
+                        SortOption.TITLE_ASC -> "Sorted by Title (A-Z)"
+                        SortOption.TITLE_DESC -> "Sorted by Title (Z-A)"
+                        SortOption.ARTIST_ASC -> "Sorted by Artist (A-Z)"
+                        SortOption.ARTIST_DESC -> "Sorted by Artist (Z-A)"
+                        SortOption.RELEASE_YEAR_DESC -> "Sorted by Newest First"
+                        SortOption.RELEASE_YEAR_ASC -> "Sorted by Oldest First"
+                        SortOption.ADDED_TIMESTAMP_DESC -> "Sorted by Recently Added"
+                        SortOption.ADDED_TIMESTAMP_ASC -> "Sorted by Added First"
+                        SortOption.DURATION_DESC -> "Sorted by Longest First"
+                        SortOption.DURATION_ASC -> "Sorted by Shortest First"
                         SortOption.NAME_ASC -> "Sorted by Name (A-Z)"
                         SortOption.NAME_DESC -> "Sorted by Name (Z-A)"
                         SortOption.ARTIST -> "Sorted by Artist"
-                        SortOption.DATE_ADDED_OLDEST -> "Oldest First"
-                        SortOption.DATE_ADDED_NEWEST -> "Newest First"
+                        SortOption.DATE_ADDED_OLDEST -> "Sorted by Oldest First"
+                        SortOption.DATE_ADDED_NEWEST -> "Sorted by Newest First"
                         SortOption.CUSTOM -> "Custom Order"
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFFD80000)
                 )
             }
         }

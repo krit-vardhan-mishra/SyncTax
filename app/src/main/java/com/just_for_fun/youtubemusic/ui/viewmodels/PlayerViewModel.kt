@@ -62,8 +62,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val serviceActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                MusicService.ACTION_PLAY -> togglePlayPause()
-                MusicService.ACTION_PAUSE -> togglePlayPause()
+                MusicService.ACTION_PLAY -> {
+                    if (!_uiState.value.isPlaying) {
+                        togglePlayPause()
+                    }
+                }
+                MusicService.ACTION_PAUSE -> {
+                    if (_uiState.value.isPlaying) {
+                        togglePlayPause()
+                    }
+                }
                 MusicService.ACTION_NEXT -> next()
                 MusicService.ACTION_PREVIOUS -> previous()
                 MusicService.ACTION_STOP -> {
@@ -84,7 +92,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         application.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
         application.startService(intent)
 
-        // Register broadcast receiver
+        // Register broadcast receiver - use EXPORTED to allow service to send broadcasts
         val filter = IntentFilter().apply {
             addAction(MusicService.ACTION_PLAY)
             addAction(MusicService.ACTION_PAUSE)
@@ -93,7 +101,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             addAction(MusicService.ACTION_STOP)
             addAction(MusicService.ACTION_SEEK_TO)
         }
-        application.registerReceiver(serviceActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            application.registerReceiver(serviceActionReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            application.registerReceiver(serviceActionReceiver, filter)
+        }
 
         viewModelScope.launch {
             player.playerState.collect { playerState ->
@@ -113,7 +125,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        // Also collect position updates from player
+        // Collect position updates from player
         viewModelScope.launch {
             player.currentPosition.collect { position ->
                 _uiState.value = _uiState.value.copy(
@@ -138,14 +150,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
 
-        // Collect volume updates from player
-        viewModelScope.launch {
-            player.volume.collect { volume ->
-                _uiState.value = _uiState.value.copy(volume = volume)
-            }
-        }
-
-        // Initialize volume from device
+        // Initialize volume from device and sync UI state
         _uiState.value = _uiState.value.copy(volume = getVolume())
 
         // Restore last playing song
@@ -280,12 +285,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.value.currentSong?.let { song ->
                 playbackCollector.startCollecting(song.id)
             }
+            
+            // Update notification immediately
+            musicService?.updatePlaybackState(
+                _uiState.value.currentSong,
+                true,
+                _uiState.value.position,
+                _uiState.value.duration
+            )
         }
     }
 
     fun seekTo(positionMs: Long) {
         player.seekTo(positionMs)
         _uiState.value = _uiState.value.copy(position = positionMs)
+        
+        // Update notification with new position
+        updateNotification()
     }
 
     fun next() {
@@ -479,14 +495,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setVolume(volume: Float) {
-        val volumeLevel = (volume * maxVolume).toInt().coerceIn(0, maxVolume)
+        // Clamp volume between 0 and 1
+        val clampedVolume = volume.coerceIn(0f, 1f)
+        
+        // Set system volume
+        val volumeLevel = (clampedVolume * maxVolume).toInt().coerceIn(0, maxVolume)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volumeLevel, 0)
-        _uiState.value = _uiState.value.copy(volume = volume)
+        
+        // Update UI state with actual system volume
+        val actualVolume = getVolume()
+        _uiState.value = _uiState.value.copy(volume = actualVolume)
     }
 
     fun getVolume(): Float {
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        return currentVolume.toFloat() / maxVolume
+        return currentVolume.toFloat() / maxVolume.toFloat()
     }
 
     private fun updateNotification() {

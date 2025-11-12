@@ -3,6 +3,7 @@ package com.just_for_fun.youtubemusic.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -70,9 +71,18 @@ fun YTFullScreenPlayer(
     var showVolume by remember { mutableStateOf(false) }
     var overlayVolume by remember { mutableFloatStateOf(volume) }
 
+    // Swipe gesture state for album art container
+    var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = 150f
+
     val scope = rememberCoroutineScope()
 
-    // Hide overlays after 3 seconds
+    // Sync overlay volume with actual volume
+    LaunchedEffect(volume) {
+        overlayVolume = volume
+    }
+
+    // Hide overlays after delay
     LaunchedEffect(seekDirection) {
         if (seekDirection != null) {
             delay(1500)
@@ -103,7 +113,9 @@ fun YTFullScreenPlayer(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
         // --- Dynamic Blurred Background ---
         if (!song.albumArtUri.isNullOrEmpty()) {
             AsyncImage(
@@ -112,18 +124,17 @@ fun YTFullScreenPlayer(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(80.dp) // Heavy blur for the background
-                    .alpha(0.6f) // Slightly transparent
+                    .blur(80.dp)
+                    .alpha(0.6f)
             )
         }
 
-        // Dark overlay to ensure text contrast, regardless of the image brightness
+        // Dark overlay to ensure text contrast
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.6f))
         )
-        // ----------------------------------
 
         // Full screen Scaffold with transparent background
         Scaffold(
@@ -164,7 +175,7 @@ fun YTFullScreenPlayer(
                             painter = painterResource(id = R.drawable.music_logo),
                             contentDescription = "Music Logo",
                             modifier = Modifier.size(32.dp),
-                            tint = Color.Unspecified  // Don't tint the logo to preserve original colors
+                            tint = Color.Unspecified
                         )
                     }
                 }
@@ -172,157 +183,188 @@ fun YTFullScreenPlayer(
                 // 2. Main Content Area
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Album Art (Dominant, centered, large)
-                Surface(
+                // Album Art Container with swipe gestures
+                Box(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .aspectRatio(1f)
+                        .offset(x = albumArtOffsetX.dp)
                         .pointerInput(Unit) {
-                            detectVerticalDragGestures { change, dragAmount ->
-                                change.consume()
-                                // dragAmount is positive when dragging down, negative when dragging up
-                                val volumeChange = -dragAmount * 0.005f // Adjust sensitivity
-                                val newVolume = (volume + volumeChange).coerceIn(0.0f, 1.0f)
-                                overlayVolume = newVolume
-                                showVolume = true
-                                onSetVolume(newVolume)
-                            }
-                        },
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f) // Slight transparency for placeholder
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    when {
+                                        albumArtOffsetX > swipeThreshold -> {
+                                            // Swiped right - Previous song
+                                            onPreviousClick()
+                                        }
+
+                                        albumArtOffsetX < -swipeThreshold -> {
+                                            // Swiped left - Next song
+                                            onNextClick()
+                                        }
+                                    }
+                                    albumArtOffsetX = 0f
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    albumArtOffsetX += dragAmount
+                                }
+                            )
+                        }
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        if (song.albumArtUri.isNullOrEmpty()) {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .wrapContentSize(Alignment.Center)
-                                    .size(120.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        } else {
-                            AsyncImage(
-                                model = song.albumArtUri,
-                                contentDescription = "Album Art",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        // Invisible interaction zones on top of the album art
-                        val haptic = LocalHapticFeedback.current
-                        Row(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            // Left zone: double-tap to rewind 10s
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .pointerInput(position, duration) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                val target = (position - 10_000L).coerceAtLeast(0L)
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                seekDirection = "backward"
-                                                onSeek(target)
-                                            }
-                                        )
-                                    }
-                            )
-
-                            // Middle zone: double-tap to play/pause
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .pointerInput(isPlaying) {
-                                        detectTapGestures(
-                                            onDoubleTap = {
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                onPlayPauseClick()
-                                            }
-                                        )
-                                    }
-                            )
-
-                            // Right zone: single tap to forward 10s
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight()
-                                    .pointerInput(position, duration) {
-                                        detectTapGestures(
-                                            onTap = {
-                                                val target = (position + 10_000L).coerceAtMost(duration)
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                seekDirection = "forward"
-                                                onSeek(target)
-                                            }
-                                        )
-                                    }
-                            )
-                        }
-
-                        // Overlay indicators
-                        if (seekDirection != null) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (seekDirection == "forward") "10 sec +" else "10 sec -",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        if (showPlayPause) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
-                            ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(volume) {
+                                detectVerticalDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    // dragAmount is positive when dragging down, negative when dragging up
+                                    val volumeChange = -dragAmount * 0.002f // Adjusted sensitivity
+                                    val newVolume =
+                                        (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
+                                    overlayVolume = newVolume
+                                    showVolume = true
+                                    onSetVolume(newVolume)
+                                }
+                            },
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f)
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (song.albumArtUri.isNullOrEmpty()) {
                                 Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Paused" else "Playing",
-                                    modifier = Modifier.size(80.dp),
-                                    tint = Color.White
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .wrapContentSize(Alignment.Center)
+                                        .size(120.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = song.albumArtUri,
+                                    contentDescription = "Album Art",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
-                        }
 
-                        if (showVolume) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.5f)),
-                                contentAlignment = Alignment.Center
+                            // Invisible interaction zones on top of the album art
+                            val haptic = LocalHapticFeedback.current
+                            Row(
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
+                                // Left zone: double-tap to rewind 10s
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .pointerInput(position, duration) {
+                                            detectTapGestures(
+                                                onDoubleTap = {
+                                                    val target =
+                                                        (position - 10_000L).coerceAtLeast(0L)
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    seekDirection = "backward"
+                                                    onSeek(target)
+                                                }
+                                            )
+                                        }
+                                )
+
+                                // Middle zone: double-tap to play/pause
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .pointerInput(isPlaying) {
+                                            detectTapGestures(
+                                                onDoubleTap = {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    onPlayPauseClick()
+                                                }
+                                            )
+                                        }
+                                )
+
+                                // Right zone: single tap to forward 10s
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .pointerInput(position, duration) {
+                                            detectTapGestures(
+                                                onTap = {
+                                                    val target =
+                                                        (position + 10_000L).coerceAtMost(duration)
+                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    seekDirection = "forward"
+                                                    onSeek(target)
+                                                }
+                                            )
+                                        }
+                                )
+                            }
+
+                            // Overlay indicators
+                            if (seekDirection != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.VolumeUp,
-                                        contentDescription = "Volume",
-                                        modifier = Modifier.size(60.dp),
-                                        tint = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = "${(overlayVolume * 100).toInt()}%",
-                                        style = MaterialTheme.typography.headlineSmall,
+                                        text = if (seekDirection == "forward") "10 sec +" else "10 sec -",
+                                        style = MaterialTheme.typography.headlineMedium,
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold
                                     )
+                                }
+                            }
+
+                            if (showPlayPause) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (isPlaying) "Paused" else "Playing",
+                                        modifier = Modifier.size(80.dp),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+
+                            if (showVolume) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.5f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.VolumeUp,
+                                            contentDescription = "Volume",
+                                            modifier = Modifier.size(60.dp),
+                                            tint = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "${(overlayVolume * 100).toInt()}%",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -473,7 +515,7 @@ fun YTFullScreenPlayer(
                     ModalBottomSheet(
                         onDismissRequest = { showUpNext = false },
                         sheetState = sheetState,
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow // Slightly darker sheet
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
                         UpNextSheet(
                             upcomingItems = upNext,
@@ -500,7 +542,10 @@ private fun PlayerSlider(
     val safeDuration = maxOf(1L, duration)
     val safePosition = position.coerceIn(0, safeDuration)
 
-    var sliderPosition by remember(safePosition, safeDuration) { mutableFloatStateOf(safePosition.toFloat()) }
+    var sliderPosition by remember(
+        safePosition,
+        safeDuration
+    ) { mutableFloatStateOf(safePosition.toFloat()) }
     var isSeeking by remember { mutableStateOf(false) }
 
     LaunchedEffect(position, duration) {
@@ -568,16 +613,25 @@ private fun UpNextSheet(
     onReorderQueue: (Int, Int) -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 24.dp)
+    ) {
         Text(
             text = "Queue",
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Start
         )
         HorizontalDivider()
-        LazyColumn(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(vertical = 8.dp)
+        ) {
             if (upcomingItems.isNotEmpty()) {
                 item {
                     Text(
@@ -626,8 +680,17 @@ private fun UpNextSheet(
             }
             if (upcomingItems.isEmpty() && historyItems.isEmpty()) {
                 item {
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "No songs in queue", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "No songs in queue",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -657,15 +720,17 @@ private fun UpNextItem(
                     onRemoveFromQueue(song)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     scope.launch { snackbarHostState.showSnackbar("Removed: ${song.title}") }
-                    false // Don't dismiss the item
+                    false
                 }
+
                 SwipeToDismissBoxValue.EndToStart -> {
                     // Right to left swipe - place next
                     onPlaceNext(song)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     scope.launch { snackbarHostState.showSnackbar("Placed next: ${song.title}") }
-                    false // Don't dismiss the item
+                    false
                 }
+
                 SwipeToDismissBoxValue.Settled -> true
             }
         }
@@ -673,7 +738,7 @@ private fun UpNextItem(
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = !isHistory, // Only allow remove for upcoming items
+        enableDismissFromStartToEnd = !isHistory,
         enableDismissFromEndToStart = true,
         backgroundContent = {
             val direction = dismissState.dismissDirection
@@ -715,24 +780,56 @@ private fun UpNextItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow) // Match sheet color
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .clickable { onSelect(song) }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.size(56.dp)) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.size(56.dp)
+            ) {
                 if (song.albumArtUri.isNullOrEmpty()) {
-                    Icon(imageVector = Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.Center), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.Center),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 } else {
-                    AsyncImage(model = song.albumArtUri, contentDescription = song.title, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = song.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = song.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(text = song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Icon(imageVector = Icons.Default.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                imageVector = Icons.Default.DragHandle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

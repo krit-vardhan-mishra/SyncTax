@@ -2,6 +2,7 @@ package com.just_for_fun.youtubemusic.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,11 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import kotlin.math.abs
 
 @Composable
 internal fun MiniPlayer(
@@ -26,6 +29,7 @@ internal fun MiniPlayer(
     duration: Long,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
+    onPreviousClick: () -> Unit = {},
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -37,6 +41,10 @@ internal fun MiniPlayer(
         visible = true
     }
 
+    // Swipe gesture state for album art area
+    var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
+    val swipeThreshold = 150f
+
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -44,7 +52,7 @@ internal fun MiniPlayer(
     ) {
         Surface(
             modifier = modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest, // Slightly darker for better contrast
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
             shape = RectangleShape,
             tonalElevation = 3.dp
         ) {
@@ -55,7 +63,7 @@ internal fun MiniPlayer(
                         progress = { (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().height(2.dp),
                         color = MaterialTheme.colorScheme.primary,
-                        trackColor = Color.Transparent // Cleaner look
+                        trackColor = Color.Transparent
                     )
                 }
 
@@ -63,23 +71,55 @@ internal fun MiniPlayer(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Clickable area for song info (opening full player)
+                    // Clickable area for song info (opening full player) with swipe on album art
                     Row(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable(onClick = onClick)
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        AnimatedAlbumArt(
-                            albumArtUri = song.albumArtUri,
-                            isPlaying = isPlaying,
-                            title = song.title
-                        )
+                        // Album art container with swipe gesture
+                        Box(
+                            modifier = Modifier
+                                .offset(x = albumArtOffsetX.dp)
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures(
+                                        onDragEnd = {
+                                            when {
+                                                albumArtOffsetX > swipeThreshold -> {
+                                                    // Swiped right - Previous song
+                                                    onPreviousClick()
+                                                }
+                                                albumArtOffsetX < -swipeThreshold -> {
+                                                    // Swiped left - Next song
+                                                    onNextClick()
+                                                }
+                                            }
+                                            albumArtOffsetX = 0f
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            albumArtOffsetX += dragAmount
+                                        }
+                                    )
+                                }
+                        ) {
+                            AnimatedAlbumArt(
+                                albumArtUri = song.albumArtUri,
+                                isPlaying = isPlaying,
+                                title = song.title
+                            )
+                        }
 
                         Spacer(modifier = Modifier.width(12.dp))
 
-                        Column(verticalArrangement = Arrangement.Center) {
+                        // Song info - clickable to open full player
+                        Column(
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(onClick = onClick)
+                        ) {
                             Text(
                                 text = song.title,
                                 style = MaterialTheme.typography.bodyMedium,
@@ -106,10 +146,18 @@ internal fun MiniPlayer(
                     ) {
                         AnimatedPlayPauseButton(
                             isPlaying = isPlaying,
-                            onClick = onPlayPauseClick
+                            onClick = {
+                                // Prevent event propagation and ensure click is handled
+                                onPlayPauseClick()
+                            }
                         )
 
-                        IconButton(onClick = onNextClick) {
+                        IconButton(
+                            onClick = {
+                                // Prevent event propagation and ensure click is handled
+                                onNextClick()
+                            }
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.SkipNext,
                                 contentDescription = "Next",
@@ -135,7 +183,12 @@ private fun AnimatedAlbumArt(
     ) {
         if (albumArtUri.isNullOrEmpty()) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(imageVector = Icons.Default.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         } else {
             coil.compose.AsyncImage(

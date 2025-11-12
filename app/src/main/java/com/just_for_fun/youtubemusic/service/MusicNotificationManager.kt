@@ -118,7 +118,7 @@ class MusicNotificationManager(
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(song?.title ?: "YouTube Music")
             .setContentText(song?.artist ?: "No song playing")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(contentIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(isPlaying)
@@ -144,11 +144,6 @@ class MusicNotificationManager(
                 "Next",
                 nextIntent
             )
-
-        // Add progress bar if we have duration
-        if (duration > 0) {
-            builder.setProgress(duration.toInt(), position.toInt(), false)
-        }
 
         // Load album art for large icon
         song?.albumArtUri?.let { uri ->
