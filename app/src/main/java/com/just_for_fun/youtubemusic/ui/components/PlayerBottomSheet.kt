@@ -32,6 +32,7 @@ fun PlayerBottomSheet(
     onRemoveFromQueue: (Song) -> Unit = {},
     onReorderQueue: (Int, Int) -> Unit = { _, _ -> },
     onSetVolume: (Float) -> Unit = {},
+    downloadPercent: Int = 0,
     content: @Composable (PaddingValues) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -76,6 +77,7 @@ fun PlayerBottomSheet(
                     onRemoveFromQueue = onRemoveFromQueue,
                     onReorderQueue = onReorderQueue,
                     onSetVolume = onSetVolume,
+                    downloadPercent = downloadPercent,
                     onPlayPauseClick = onPlayPauseClick,
                     onNextClick = onNextClick,
                     onPreviousClick = onPreviousClick,

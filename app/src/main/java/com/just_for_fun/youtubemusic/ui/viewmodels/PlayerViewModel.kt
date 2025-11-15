@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.just_for_fun.youtubemusic.core.player.ChunkedStreamManager
+import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -29,6 +31,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val player = MusicPlayer(application)
     private val playbackCollector = PlaybackCollector(repository, player)
     private val playerPreferences = PlayerPreferences(application)
+    private val chunkedStreamManager = ChunkedStreamManager(application)
     private val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
@@ -240,6 +243,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun playSong(song: Song, playlist: List<Song> = listOf(song)) {
         viewModelScope.launch {
+            // Stop any streaming downloads and remove cached chunks of previous song
+            chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
             // Stop current song
             if (_uiState.value.currentSong != null) {
                 playbackCollector.stopCollecting(skipped = true)
@@ -272,6 +277,125 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // Save the playlist
             savePlaylistState()
+        }
+    }
+
+    fun playUrl(url: String, title: String, artist: String? = null, durationMs: Long = 0L) {
+        viewModelScope.launch {
+            chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
+            // Create a temporary Song object for playback UI
+            val onlineSong = Song(
+                id = "online:${url.hashCode()}",
+                title = title,
+                artist = artist ?: "Unknown",
+                album = null,
+                duration = durationMs,
+                filePath = url,
+                genre = null,
+                releaseYear = null,
+                albumArtUri = null
+            )
+
+            // Play the online URL
+            currentPlaylist = listOf(onlineSong)
+            currentIndex = 0
+            player.prepare(url, onlineSong.id)
+            player.play()
+
+            playbackCollector.startCollecting(onlineSong.id)
+
+            _uiState.value = _uiState.value.copy(
+                currentSong = onlineSong,
+                isPlaying = true
+            )
+            savePlaylistState()
+            updateNotification()
+        }
+    }
+
+    /** Play a remote stream using chunked progressive download for 30s segments.
+     * This writes to a temp cache file and starts playback as soon as the first chunk is available.
+     */
+    fun playChunkedStream(videoId: String, streamUrl: String, title: String, artist: String? = null, durationMs: Long = 0L) {
+        viewModelScope.launch {
+            // Stop any existing streaming downloads
+            chunkedStreamManager.stopAndCleanup()
+
+            // Create a Song object where filePath will point to growing tmp file so player can read it
+            val tempFile = chunkedStreamManager.startStreaming(videoId, streamUrl, durationMs)
+            // Request first 2 chunks to start playback and have a small buffer
+            chunkedStreamManager.requestNextChunk(2)
+
+            val onlineSong = Song(
+                id = "online:${videoId}",
+                title = title,
+                artist = artist ?: "Unknown",
+                album = null,
+                duration = durationMs,
+                filePath = tempFile.absolutePath,
+                genre = null,
+                releaseYear = null,
+                albumArtUri = null
+            )
+
+            // Stop current collecting and prepare new
+            playbackCollector.stopCollecting(skipped = true)
+
+            currentPlaylist = listOf(onlineSong)
+            currentIndex = 0
+
+            player.prepare(tempFile.absolutePath, onlineSong.id)
+            player.play()
+
+            playbackCollector.startCollecting(onlineSong.id)
+
+            _uiState.value = _uiState.value.copy(
+                currentSong = onlineSong,
+                isPlaying = true,
+                isBuffering = true
+            )
+
+            // Observe chunk download state and update UI; when completed swap file path to final cached file
+            viewModelScope.launch {
+                chunkedStreamManager.state.collect { st ->
+                    _uiState.value = _uiState.value.copy(
+                        isBuffering = !st.isComplete,
+                        duration = if (durationMs > 0) durationMs else _uiState.value.duration
+                        , downloadPercent = st.percent
+                    )
+                    if (st.isComplete) {
+                        // replace currentSong filePath with final cached file if exists
+                        val final = File(getApplication<Application>().cacheDir, "stream_${videoId}.cache")
+                        if (final.exists()) {
+                            _uiState.value.currentSong?.let { song ->
+                                val updated = song.copy(filePath = final.absolutePath)
+                                _uiState.value = _uiState.value.copy(currentSong = updated)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Monitor player position and request more chunks to keep at least 60s buffered
+            viewModelScope.launch {
+                while (true) {
+                    val position = player.getCurrentPosition()
+                    val bufferedSec = chunkedStreamManager.state.value.bufferedSeconds
+                    val posSec = (position / 1000).toLong()
+                    val threshold = 60L
+                    if (bufferedSec - posSec < threshold && !chunkedStreamManager.state.value.isComplete) {
+                        chunkedStreamManager.requestNextChunk(1)
+                    }
+                    // Stop if a different song is now playing or song removed
+                    if (_uiState.value.currentSong == null || _uiState.value.currentSong?.id != onlineSong.id) {
+                        break
+                    }
+                    kotlinx.coroutines.delay(1000)
+                }
+            }
+
+            savePlaylistState()
+            updateNotification()
         }
     }
 
@@ -546,6 +670,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             playbackCollector.stopCollecting()
         }
+        chunkedStreamManager.stopAndCleanup()
         player.release()
     }
 }
@@ -558,5 +683,6 @@ data class PlayerUiState(
     val duration: Long = 0L,
     val shuffleEnabled: Boolean = false,
     val repeatEnabled: Boolean = false,
+    val downloadPercent: Int = 0,
     val volume: Float = 1.0f
 )

@@ -7,14 +7,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+// import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.youtubemusic.ui.components.SongCard
+import com.just_for_fun.youtubemusic.ui.components.OnlineResultCard
 import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,6 +30,25 @@ fun SearchScreen(
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+    var isFocused by remember { mutableStateOf(false) }
+
+    // Kick off online search if no local results
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotEmpty()) {
+            // Only search online from the SearchScreen when local filtered results are empty
+            val hasLocal = uiState.allSongs.any { song ->
+                song.title.contains(searchQuery, ignoreCase = true) ||
+                        song.artist.contains(searchQuery, ignoreCase = true) ||
+                        (song.album?.contains(searchQuery, ignoreCase = true) == true) ||
+                        (song.genre?.contains(searchQuery, ignoreCase = true) == true)
+            }
+            if (!hasLocal) {
+                homeViewModel.searchOnline(searchQuery)
+            }
+        }
+    }
 
     // Filter songs based on search query
     val filteredSongs = remember(searchQuery, uiState.allSongs) {
@@ -67,7 +91,8 @@ fun SearchScreen(
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .onFocusChanged { state -> isFocused = state.isFocused },
                 placeholder = { Text("Search songs, artists, albums...") },
                 leadingIcon = {
                     Icon(
@@ -89,6 +114,27 @@ fun SearchScreen(
                 shape = MaterialTheme.shapes.large
             )
 
+            // Show Listen Again (recently played / most played merged) when search field focused and empty
+            if (searchQuery.isEmpty() && isFocused && uiState.listenAgain.isNotEmpty()) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Text(
+                        text = "Recently Played",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    // show up to 6 recent
+                    val recent = uiState.listenAgain.take(6)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        recent.forEach { song ->
+                            SongCard(song = song, onClick = { playerViewModel.playSong(song) })
+                        }
+                    }
+                }
+                Divider()
+            }
+
             Divider()
 
             // Results
@@ -108,8 +154,150 @@ fun SearchScreen(
                 }
 
                 filteredSongs.isEmpty() -> {
-                    // No results found
-                    NoResultsState(searchQuery = searchQuery)
+                    // No local results - show scrollable container with no results message and online results
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // No local results message
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SearchOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text(
+                                    text = "No Local Results",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "No songs found on your device for \"$searchQuery\"",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                // Show online search status
+                                if (uiState.isSearchingOnline) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Searching online...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Online results section
+                        if (!uiState.isSearchingOnline) {
+                            if (uiState.onlineSearchResults.isNotEmpty()) {
+                                item {
+                                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                                }
+                                item {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudQueue,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Online Results",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                items(uiState.onlineSearchResults) { result ->
+                                    val coroutineScope = rememberCoroutineScope()
+                                    OnlineResultCard(result) { res ->
+                                        // Play online song using chunked progressive streaming
+                                        val url = res.streamUrl
+                                        if (!url.isNullOrEmpty()) {
+                                            playerViewModel.playChunkedStream(res.id, url, res.title, res.author ?: "Unknown", res.duration ?: 0L)
+                                        } else {
+                                            // Try to fetch stream URL then play
+                                            coroutineScope.launch {
+                                                val fetched = homeViewModel.fetchStreamUrl(res.id)
+                                                if (!fetched.isNullOrEmpty()) {
+                                                    playerViewModel.playChunkedStream(res.id, fetched, res.title, res.author ?: "Unknown", res.duration ?: 0L)
+                                                } else {
+                                                    android.util.Log.w("SearchScreen", "No stream url available for ${res.title}")
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // No online results either
+                                item {
+                                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                                }
+                                item {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudOff,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(48.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        Text(
+                                            text = "No Online Results",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = "Try different keywords or check your internet connection",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 else -> {

@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.youtubemusic.core.network.OnlineSearchResult
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -368,4 +370,53 @@ private fun formatDuration(milliseconds: Long): String {
     val minutes = seconds / 60
     val remainingSeconds = seconds % 60
     return String.format("%d:%02d", minutes, remainingSeconds)
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun OnlineResultCard(
+    result: OnlineSearchResult,
+    onPlayClick: (OnlineSearchResult) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(onClick = { onPlayClick(result) })
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(56.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest
+            ) {
+                // Display thumbnail (if present)
+                result.thumbnailUrl?.let { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } ?: Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(28.dp))
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = result.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                Text(text = result.author ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            IconButton(onClick = { onPlayClick(result) }) {
+                Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Play")
+            }
+        }
+        Divider(color = MaterialTheme.colorScheme.outline, thickness = 0.5.dp)
+    }
 }

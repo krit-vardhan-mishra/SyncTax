@@ -6,7 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.just_for_fun.youtubemusic.core.data.local.entities.Song
 import com.just_for_fun.youtubemusic.core.data.repository.MusicRepository
 import com.just_for_fun.youtubemusic.core.ml.MusicRecommendationManager
+import com.just_for_fun.youtubemusic.core.data.cache.ListenAgainManager
 import com.just_for_fun.youtubemusic.core.ml.models.RecommendationResult
+import com.just_for_fun.youtubemusic.core.network.OnlineSearchManager
+import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,10 +22,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    
+    private val onlineManager = OnlineSearchManager()
+    private val listenAgainManager = ListenAgainManager(getApplication())
 
     init {
         loadData()
         observeListeningHistoryForTraining()
+        observeListenAgain()
+    }
+
+    private fun observeListenAgain() {
+        viewModelScope.launch {
+            listenAgainManager.listenAgain.collect { list ->
+                _uiState.value = _uiState.value.copy(listenAgain = list)
+            }
+        }
     }
 
     private fun loadData() {
@@ -61,12 +76,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isScanning = false,
                     scanComplete = true
                 )
+                // Refresh listen again cache after scanning
+                listenAgainManager.refresh()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
                     error = e.message
                 )
             }
+        }
+    }
+
+    fun searchOnline(query: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSearchingOnline = true)
+            try {
+                val apiKey = UserPreferences(getApplication()).getYouTubeApiKey()
+                val results = onlineManager.search(query, apiKey = apiKey)
+                _uiState.value = _uiState.value.copy(
+                    isSearchingOnline = false,
+                    onlineSearchResults = results
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isSearchingOnline = false,
+                    error = e.message
+                )
+            }
+        }
+    }
+
+    suspend fun fetchStreamUrl(videoId: String): String? {
+        return try {
+            onlineManager.getStreamUrl(videoId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
@@ -188,4 +233,11 @@ data class HomeUiState(
     val selectedAlbum: String? = null,
     val selectedAlbumArtist: String? = null,
     val selectedAlbumSongs: List<Song>? = null
+    ,
+    // Online search state (for SearchScreen)
+    val isSearchingOnline: Boolean = false,
+    val onlineSearchResults: List<com.just_for_fun.youtubemusic.core.network.OnlineSearchResult> = emptyList()
+    ,
+    // Listen again cache exposed to UI
+    val listenAgain: List<Song> = emptyList()
 )

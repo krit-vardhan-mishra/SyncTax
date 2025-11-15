@@ -9,3 +9,7 @@ Inspiration
 
 See `Docs/` for the full architecture, component descriptions, and algorithm documentation.
 
+Online search
+- The app can fetch online search results using public third-party frontends (Piped/Invidious) by default and falls back to using the YouTube Data API if you provide an API key.
+- To set a YouTube API key for search, export YOUTUBE_API_KEY in your environment before running the app or set it with the settings UI (coming soon).
+

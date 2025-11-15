@@ -41,6 +41,14 @@ class UserPreferences(context: Context) {
         _showQuickPicksGuide.value = show
     }
 
+    fun getYouTubeApiKey(): String? {
+        return prefs.getString(KEY_YOUTUBE_API_KEY, null)
+    }
+
+    fun setYouTubeApiKey(key: String?) {
+        prefs.edit().putString(KEY_YOUTUBE_API_KEY, key).apply()
+    }
+
     fun getUserName(): String {
         return prefs.getString(KEY_USER_NAME, "") ?: ""
     }
@@ -58,5 +66,6 @@ class UserPreferences(context: Context) {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
         private const val KEY_SHOW_QUICK_PICKS_GUIDE = "show_quick_picks_guide"
+        private const val KEY_YOUTUBE_API_KEY = "youtube_api_key"
     }
 }

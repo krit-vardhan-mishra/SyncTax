@@ -64,6 +64,7 @@ fun UnifiedPlayer(
     onShuffleClick: () -> Unit,
     onRepeatClick: () -> Unit,
     onSeek: (Long) -> Unit
+    , downloadPercent: Int = 0
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -167,7 +168,8 @@ fun UnifiedPlayer(
                     onShuffleClick = onShuffleClick,
                     onRepeatClick = onRepeatClick,
                     onSeek = onSeek,
-                    onClose = { onExpandedChange(false) }
+                    onClose = { onExpandedChange(false) },
+                    downloadPercent = downloadPercent
                 )
             }
         }
@@ -401,6 +403,7 @@ private fun FullScreenPlayerContent(
     onRepeatClick: () -> Unit,
     onSeek: (Long) -> Unit,
     onClose: () -> Unit
+    , downloadPercent: Int = 0
 ) {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
@@ -741,6 +744,14 @@ private fun FullScreenPlayerContent(
                 duration = duration,
                 onSeek = onSeek
             )
+
+            // Download progress for streaming online songs
+            if (downloadPercent > 0 && downloadPercent < 100) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    Text(text = "Downloading: $downloadPercent%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

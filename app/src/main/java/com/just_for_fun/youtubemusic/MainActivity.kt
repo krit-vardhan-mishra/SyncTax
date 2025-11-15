@@ -1,10 +1,7 @@
 package com.just_for_fun.youtubemusic
 
 import android.Manifest
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -30,7 +27,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
 import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
 import com.just_for_fun.youtubemusic.service.MusicService
 import com.just_for_fun.youtubemusic.ui.components.PlayerBottomSheet
@@ -38,8 +34,6 @@ import com.just_for_fun.youtubemusic.ui.screens.*
 import com.just_for_fun.youtubemusic.ui.theme.YoutubeMusicTheme
 import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
-import kotlinx.coroutines.delay
-
 class MainActivity : ComponentActivity() {
 
     private var musicService: MusicService? = null
@@ -183,6 +177,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                 onRemoveFromQueue = { song -> playerViewModel.removeFromQueue(song) },
                 onReorderQueue = { from, to -> playerViewModel.reorderQueue(from, to) },
                 onSetVolume = { playerViewModel.setVolume(it) }
+                , downloadPercent = playerState.downloadPercent
             ) { innerPadding ->
                 NavHost(
                     navController = navController,
