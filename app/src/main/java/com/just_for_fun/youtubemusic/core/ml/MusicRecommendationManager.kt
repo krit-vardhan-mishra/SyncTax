@@ -10,6 +10,12 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.Calendar
 
+/**
+ * Manager that orchestrates the recommendation pipeline.
+ * It coordinates several agents (Statistical, Collaborative, Fusion) and uses the ChaquopyPython
+ * analyzer for additional ML-based scoring. Responsible for training models and generating
+ * final quick picks presented in the UI.
+ */
 class MusicRecommendationManager(private val context: Context) {
 
     private val database = MusicDatabase.getDatabase(context)
@@ -37,6 +43,11 @@ class MusicRecommendationManager(private val context: Context) {
             // Get user's listening history
             val recentHistory = database.listeningHistoryDao().getRecentHistory(100).first()
             val userPreferences = database.userPreferenceDao().getTopPreferences(50).first()
+
+            // If user has no listening history yet, do not generate recommendations
+            if (recentHistory.isEmpty()) {
+                return@withContext QuickPicksResult(emptyList(), "1.0.0")
+            }
 
             // Extract features for each song
             val songFeaturesList = allSongs.map { song ->
@@ -79,6 +90,30 @@ class MusicRecommendationManager(private val context: Context) {
                 // Train Python ML model
                 chaquopyAnalyzer.trainModel(songFeaturesList)
 
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * Clear model data (in-memory vectors, python model state, recent recommendations)
+     * Call this when user clears app data to ensure all ML state is reset
+     */
+    suspend fun clearModelData() {
+        withContext(Dispatchers.IO) {
+            try {
+                // Clear vector DB used by collaborative filtering
+                vectorDb.clear()
+
+                // Clear recommendation history used for diversity filtering
+                recommendationAgent.clearRecommendationHistory()
+
+                // Reset python ML model via Chaquopy analyzer
+                val reset = chaquopyAnalyzer.resetModel()
+                if (!reset) {
+                    // Log if needed - for now, silently continue
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

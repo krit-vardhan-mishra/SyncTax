@@ -83,6 +83,17 @@ class MusicService : Service() {
         super.onDestroy()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Called when the app is removed from recent tasks (swiped away).
+        // Stop playback and ensure the service stops to avoid background drain.
+        // Send a stop broadcast to the ViewModel/receiver so it can clean up playback state.
+        sendBroadcast(Intent(ACTION_STOP))
+        // Remove foreground notification and stop the service
+        stopForeground(true)
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     private fun setupMediaSession() {
         mediaSession = MediaSessionCompat(this, "MusicService").apply {
             // Set media button receiver

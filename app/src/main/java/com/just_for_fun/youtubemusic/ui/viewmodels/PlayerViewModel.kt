@@ -75,8 +75,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 MusicService.ACTION_NEXT -> next()
                 MusicService.ACTION_PREVIOUS -> previous()
                 MusicService.ACTION_STOP -> {
+                    // Stop playback completely and clear song state
+                    viewModelScope.launch {
+                        playbackCollector.stopCollecting(skipped = true)
+                    }
                     player.pause()
-                    updateNotification()
+
+                    _uiState.value = _uiState.value.copy(
+                        currentSong = null,
+                        isPlaying = false
+                    )
+
+                    // Update notification and stop the foreground service
+                    musicService?.updatePlaybackState(null, false, 0L, 0L)
+
+                    // Stop the service hosting playback
+                    try {
+                        getApplication<Application>().stopService(Intent(getApplication(), MusicService::class.java))
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
                 MusicService.ACTION_SEEK_TO -> {
                     val position = intent.getLongExtra("position", 0L)

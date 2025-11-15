@@ -22,6 +22,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadData()
+        observeListeningHistoryForTraining()
     }
 
     private fun loadData() {
@@ -91,6 +92,38 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isGeneratingRecommendations = false,
                     error = e.message
                 )
+            }
+        }
+    }
+
+    private fun observeListeningHistoryForTraining() {
+        viewModelScope.launch {
+            var hasAutoTrained = false
+            repository.getRecentHistory(1).collect { history ->
+                // If history becomes non-empty and we haven't auto-trained yet, train models
+                if (!hasAutoTrained && history.isNotEmpty()) {
+                    hasAutoTrained = true
+                    _uiState.value = _uiState.value.copy(isTraining = true)
+                    try {
+                        recommendationManager.trainModels()
+                        // After training, regenerate quick picks
+                        val result = recommendationManager.generateQuickPicks(20)
+                        val recommendedSongs = result.recommendations.mapNotNull { rec ->
+                            _uiState.value.allSongs.find { it.id == rec.songId }
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            quickPicks = recommendedSongs,
+                            recommendationScores = result.recommendations,
+                            isTraining = false,
+                            trainingComplete = true
+                        )
+                    } catch (e: Exception) {
+                        _uiState.value = _uiState.value.copy(
+                            isTraining = false,
+                            error = e.message
+                        )
+                    }
+                }
             }
         }
     }

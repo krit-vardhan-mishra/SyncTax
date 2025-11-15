@@ -27,6 +27,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
 import com.just_for_fun.youtubemusic.ui.components.SongCard
 import com.just_for_fun.youtubemusic.ui.components.QuickPickCard
+import com.just_for_fun.youtubemusic.ui.components.UserProfileDialog
 import com.just_for_fun.youtubemusic.ui.components.UserProfileIcon
 import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
@@ -38,12 +39,16 @@ fun HomeScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     userPreferences: UserPreferences,
-    onSearchClick: () -> Unit = {}
+    onSearchClick: () -> Unit = {},
+    onTrainClick: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
     val userName by userPreferences.userName.collectAsState()
     val userInitial = userPreferences.getUserInitial()
+    
+    // State for profile dialog
+    var showProfileDialog by remember { mutableStateOf(false) }
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
@@ -110,8 +115,16 @@ fun HomeScreen(
                         )
                     }
                     // Profile Icon
-                    IconButton(onClick = { }) {
+                    IconButton(onClick = { showProfileDialog = true }) {
                         UserProfileIcon(userInitial = userInitial)
+                    }
+                    // Train ML models
+                    IconButton(onClick = onTrainClick) {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = "Train ML Models",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -164,27 +177,26 @@ fun HomeScreen(
                                 FilterChipsRow()
                             }
 
-                            // Quick Picks Section
-                            if (uiState.quickPicks.isNotEmpty()) {
-                                item {
-                                    QuickPicksSection(
-                                        songs = uiState.quickPicks,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.quickPicks)
-                                        },
-                                        onRefreshClick = { homeViewModel.generateQuickPicks() },
-                                        onViewAllClick = { /* Navigate to Quick Picks */ },
-                                        isGenerating = uiState.isGeneratingRecommendations,
-                                        onPlayAll = {
-                                            uiState.quickPicks.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playSong(
-                                                    firstSong,
-                                                    uiState.quickPicks
-                                                )
-                                            }
+
+                            // Quick Picks Section (always visible; if no picks yet, shows learning message)
+                            item {
+                                QuickPicksSection(
+                                    songs = uiState.quickPicks,
+                                    onSongClick = { song ->
+                                        playerViewModel.playSong(song, uiState.quickPicks)
+                                    },
+                                    onRefreshClick = { homeViewModel.generateQuickPicks() },
+                                    onViewAllClick = { /* Navigate to Quick Picks */ },
+                                    isGenerating = uiState.isGeneratingRecommendations,
+                                    onPlayAll = {
+                                        uiState.quickPicks.firstOrNull()?.let { firstSong ->
+                                            playerViewModel.playSong(
+                                                firstSong,
+                                                uiState.quickPicks
+                                            )
                                         }
-                                    )
-                                }
+                                    }
+                                )
                             }
 
                             // All Songs Section
@@ -326,6 +338,17 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+        
+        // User Profile Dialog
+        if (showProfileDialog) {
+            UserProfileDialog(
+                currentUserName = userName,
+                onDismiss = { showProfileDialog = false },
+                onNameUpdate = { newName ->
+                    userPreferences.saveUserName(newName)
+                }
+            )
         }
     }
 }
@@ -482,15 +505,43 @@ fun QuickPicksSection(
             }
         }
 
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp)
-        ) {
-            items(songs) { song ->
-                QuickPickCard(
-                    song = song,
-                    onClick = { onSongClick(song) }
+        if (songs.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isGenerating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp
+                    )
+                }
+                Text(
+                    text = "The app is analyzing your listening habits to find the best songs for you. Listen to songs and we'll find your match.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp),
                 )
+                Text(
+                    text = "Listen to your favorite songs and the app will learn your taste",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp)
+            ) {
+                items(songs) { song ->
+                    QuickPickCard(
+                        song = song,
+                        onClick = { onSongClick(song) }
+                    )
+                }
             }
         }
     }

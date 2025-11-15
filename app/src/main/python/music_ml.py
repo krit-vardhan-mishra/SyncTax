@@ -202,3 +202,10 @@ def get_model_status() -> str:
     """Get current model status"""
     result = _ml_engine.get_status()
     return json.dumps(result)
+
+
+def reset_model() -> str:
+    """Reset the ML engine state"""
+    global _ml_engine
+    _ml_engine = MusicRecommendationML()
+    return json.dumps({"success": True, "message": "Model reset"})

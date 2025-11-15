@@ -194,7 +194,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel,
                             userPreferences = userPreferences,
-                            onSearchClick = { navController.navigate("search") }
+                            onSearchClick = { navController.navigate("search") },
+                            onTrainClick = { navController.navigate("train") }
                         )
                     }
                     composable("search") {
@@ -230,6 +231,12 @@ fun MusicApp(userPreferences: UserPreferences) {
                             playerViewModel = playerViewModel
                         )
                     }
+                        composable("train") {
+                            TrainingScreen(
+                                homeViewModel = homeViewModel,
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
                     composable(
                         route = "artist/{artistName}",
                         arguments = listOf(navArgument("artistName") { type = NavType.StringType })

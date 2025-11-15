@@ -18,6 +18,9 @@ class UserPreferences(context: Context) {
 
     private val _isFirstLaunch = MutableStateFlow(isFirstLaunch())
     val isFirstLaunch: StateFlow<Boolean> = _isFirstLaunch.asStateFlow()
+    
+    private val _showQuickPicksGuide = MutableStateFlow(isQuickPicksGuideEnabled())
+    val showQuickPicksGuide: StateFlow<Boolean> = _showQuickPicksGuide.asStateFlow()
 
     fun saveUserName(name: String) {
         prefs.edit().apply {
@@ -27,6 +30,15 @@ class UserPreferences(context: Context) {
         }
         _userName.value = name
         _isFirstLaunch.value = false
+    }
+
+    fun isQuickPicksGuideEnabled(): Boolean {
+        return prefs.getBoolean(KEY_SHOW_QUICK_PICKS_GUIDE, true)
+    }
+
+    fun setQuickPicksGuide(show: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_QUICK_PICKS_GUIDE, show).apply()
+        _showQuickPicksGuide.value = show
     }
 
     fun getUserName(): String {
@@ -45,5 +57,6 @@ class UserPreferences(context: Context) {
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
+        private const val KEY_SHOW_QUICK_PICKS_GUIDE = "show_quick_picks_guide"
     }
 }

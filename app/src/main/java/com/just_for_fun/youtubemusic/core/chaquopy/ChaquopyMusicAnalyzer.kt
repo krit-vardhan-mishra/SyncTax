@@ -11,6 +11,10 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
+/**
+ * Wrapper over the Python ML engine (Chaquopy)
+ * The analyzer forwards training and inference requests to the Python module (music_ml.py)
+ */
 class ChaquopyMusicAnalyzer private constructor(context: Context) {
 
     private val pythonModule: com.chaquo.python.PyObject
@@ -89,6 +93,19 @@ class ChaquopyMusicAnalyzer private constructor(context: Context) {
             } catch (e: Exception) {
                 Log.e(TAG, "Status check failed", e)
                 ModelStatus(isTrained = false, hasScorer = false, nClusters = 0)
+            }
+        }
+    }
+
+    suspend fun resetModel(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val resultJson = pythonModule.callAttr("reset_model")
+                val result = JSONObject(resultJson.toString())
+                result.optBoolean("success", false)
+            } catch (e: Exception) {
+                Log.e(TAG, "Model reset failed", e)
+                false
             }
         }
     }
