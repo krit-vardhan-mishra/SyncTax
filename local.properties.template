@@ -1,0 +1,13 @@
+## This file is a template for local.properties
+## Copy this file to local.properties and fill in your values
+## DO NOT commit local.properties to version control!
+
+# Location of the Android SDK
+# Replace with your actual Android SDK path
+sdk.dir=/path/to/your/android-sdk
+
+# YouTube API Keys
+# These are required for the app to function properly
+# Get your own API keys from the YouTube API console or use the default ones
+MUSIC_API_KEY=YOUR_MUSIC_API_KEY_HERE
+PLAYER_API_KEY=YOUR_PLAYER_API_KEY_HERE

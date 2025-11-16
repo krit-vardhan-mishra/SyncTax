@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -18,6 +21,17 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Load API keys from local.properties (not committed to git)
+        val localProperties = project.rootProject.file("local.properties")
+        val properties = Properties()
+        if (localProperties.exists()) {
+            properties.load(FileInputStream(localProperties))
+        }
+        
+        // Add API keys to BuildConfig (default to empty strings if not found)
+        buildConfigField("String", "MUSIC_API_KEY", "\"${properties.getProperty("MUSIC_API_KEY") ?: ""}\"")
+        buildConfigField("String", "PLAYER_API_KEY", "\"${properties.getProperty("PLAYER_API_KEY") ?: ""}\"")
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -45,6 +59,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -92,7 +107,13 @@ dependencies {
     implementation("androidx.media3:media3-session:1.2.1")
     implementation("androidx.media:media:1.6.0")
 
+    // AndroidX Startup (explicit to ensure compatible version and resources)
+    implementation("androidx.startup:startup-runtime:1.2.0")
+
 
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+
+    // NewPipe extractor - used to decode signatureCipher-obfuscated stream URLs
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.8")
 }

@@ -62,10 +62,27 @@ class UserPreferences(context: Context) {
         return if (name.isNotEmpty()) name.first().uppercase() else "M"
     }
 
+    // Theme mode: "system" | "light" | "dark"
+    private val _themeMode = MutableStateFlow(getThemeMode())
+    val themeMode: StateFlow<String> = _themeMode.asStateFlow()
+
+    fun setThemeMode(mode: String) {
+        prefs.edit().putString(KEY_THEME_MODE, mode).apply()
+        _themeMode.value = mode
+    }
+
+    fun getThemeMode(): String {
+        return prefs.getString(KEY_THEME_MODE, KEY_THEME_MODE_SYSTEM) ?: KEY_THEME_MODE_SYSTEM
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
         private const val KEY_SHOW_QUICK_PICKS_GUIDE = "show_quick_picks_guide"
         private const val KEY_YOUTUBE_API_KEY = "youtube_api_key"
+        private const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_THEME_MODE_SYSTEM = "system"
+        const val KEY_THEME_MODE_LIGHT = "light"
+        const val KEY_THEME_MODE_DARK = "dark"
     }
 }

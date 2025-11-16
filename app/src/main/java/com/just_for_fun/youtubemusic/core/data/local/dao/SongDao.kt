@@ -23,4 +23,10 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE artist = :artist")
     fun getSongsByArtist(artist: String): Flow<List<Song>>
+
+    @Query("DELETE FROM songs WHERE id NOT IN (:ids)")
+    suspend fun deleteSongsNotIn(ids: List<String>)
+
+    @Query("DELETE FROM songs")
+    suspend fun deleteAll()
 }

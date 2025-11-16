@@ -1,6 +1,11 @@
 package com.just_for_fun.youtubemusic.ui.components
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -15,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -71,8 +77,15 @@ fun YTFullScreenPlayer(
     var showVolume by remember { mutableStateOf(false) }
     var overlayVolume by remember { mutableFloatStateOf(volume) }
 
-    // Swipe gesture state for album art container
+    // Swipe gesture state for album art container (with smoothness)
     var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
+    val albumArtOffsetXSmooth by animateFloatAsState(
+        targetValue = albumArtOffsetX,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    )
     val swipeThreshold = 150f
 
     val scope = rememberCoroutineScope()
@@ -246,7 +259,9 @@ fun YTFullScreenPlayer(
                                     model = song.albumArtUri,
                                     contentDescription = "Album Art",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .offset(x = (albumArtOffsetXSmooth * 0.06f).dp)
                                 )
                             }
 
@@ -331,10 +346,21 @@ fun YTFullScreenPlayer(
                                         .background(Color.Black.copy(alpha = 0.5f)),
                                     contentAlignment = Alignment.Center
                                 ) {
+                                    val playPulse =
+                                        remember { androidx.compose.animation.core.Animatable(1f) }
+                                    LaunchedEffect(showPlayPause) {
+                                        if (showPlayPause) {
+                                            playPulse.animateTo(1.12f, animationSpec = tween(170))
+                                            playPulse.animateTo(1f, animationSpec = tween(160))
+                                        }
+                                    }
+
                                     Icon(
                                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                         contentDescription = if (isPlaying) "Paused" else "Playing",
-                                        modifier = Modifier.size(80.dp),
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .scale(playPulse.value),
                                         tint = Color.White
                                     )
                                 }
@@ -383,149 +409,155 @@ fun YTFullScreenPlayer(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(
-                            text = song.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = song.artist,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 3. Slider and Time
-                PlayerSlider(
-                    position = position,
-                    duration = duration,
-                    onSeek = onSeek
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // 4. Playback Controls
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onShuffleClick) {
-                        Icon(
-                            imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Shuffle",
-                            modifier = Modifier.size(28.dp),
-                            tint = if (shuffleEnabled)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    IconButton(onClick = onPreviousClick) {
-                        Icon(
-                            imageVector = Icons.Default.SkipPrevious,
-                            contentDescription = "Previous",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-
-                    FilledIconButton(
-                        onClick = onPlayPauseClick,
-                        modifier = Modifier.size(72.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.onBackground,
-                            contentColor = MaterialTheme.colorScheme.background
-                        )
-                    ) {
-                        val icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow
-                        val contentDesc = if (isPlaying) "Pause" else "Play"
-
-                        if (isBuffering) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(36.dp),
-                                strokeWidth = 3.dp,
-                                color = MaterialTheme.colorScheme.background
+                        Crossfade(targetState = song.title, label = "song_title") { title ->
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                        } else {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = contentDesc,
-                                modifier = Modifier.size(36.dp),
-                                tint = MaterialTheme.colorScheme.background
+                        }
+                        Crossfade(targetState = song.artist, label = "song_artist") { artist ->
+                            Text(
+                                text = artist,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    IconButton(onClick = onNextClick) {
-                        Icon(
-                            imageVector = Icons.Default.SkipNext,
-                            contentDescription = "Next",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    IconButton(onClick = onRepeatClick) {
-                        Icon(
-                            imageVector = if (repeatEnabled) Icons.Filled.RepeatOne else Icons.Default.Repeat,
-                            contentDescription = "Repeat",
-                            modifier = Modifier.size(28.dp),
-                            tint = if (repeatEnabled)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                    // 3. Slider and Time
+                    PlayerSlider(
+                        position = position,
+                        duration = duration,
+                        onSeek = onSeek
+                    )
 
-                Spacer(modifier = Modifier.height(48.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = { showUpNext = true }) {
-                        Icon(
-                            imageVector = Icons.Default.PlaylistPlay,
-                            contentDescription = "Playlist",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "UP NEXT",
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                }
-
-                if (showUpNext) {
-                    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-                    ModalBottomSheet(
-                        onDismissRequest = { showUpNext = false },
-                        sheetState = sheetState,
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    // 4. Playback Controls
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        UpNextSheet(
-                            upcomingItems = upNext,
-                            historyItems = playHistory,
-                            onSelect = { onSelectSong(it) },
-                            onPlaceNext = { onPlaceNext(it) },
-                            onRemoveFromQueue = { onRemoveFromQueue(it) },
-                            onReorderQueue = { from, to -> onReorderQueue(from, to) },
-                            snackbarHostState = snackbarHostState
-                        )
+                        IconButton(onClick = onShuffleClick) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "Shuffle",
+                                modifier = Modifier.size(28.dp),
+                                tint = if (shuffleEnabled)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        IconButton(onClick = onPreviousClick) {
+                            Icon(
+                                imageVector = Icons.Default.SkipPrevious,
+                                contentDescription = "Previous",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        FilledIconButton(
+                            onClick = onPlayPauseClick,
+                            modifier = Modifier.size(72.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.onBackground,
+                                contentColor = MaterialTheme.colorScheme.background
+                            )
+                        ) {
+                            val icon =
+                                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow
+                            val contentDesc = if (isPlaying) "Pause" else "Play"
+
+                            if (isBuffering) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(36.dp),
+                                    strokeWidth = 3.dp,
+                                    color = MaterialTheme.colorScheme.background
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = contentDesc,
+                                    modifier = Modifier.size(36.dp),
+                                    tint = MaterialTheme.colorScheme.background
+                                )
+                            }
+                        }
+
+                        IconButton(onClick = onNextClick) {
+                            Icon(
+                                imageVector = Icons.Default.SkipNext,
+                                contentDescription = "Next",
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        IconButton(onClick = onRepeatClick) {
+                            Icon(
+                                imageVector = if (repeatEnabled) Icons.Filled.RepeatOne else Icons.Default.Repeat,
+                                contentDescription = "Repeat",
+                                modifier = Modifier.size(28.dp),
+                                tint = if (repeatEnabled)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(48.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { showUpNext = true }) {
+                            Icon(
+                                imageVector = Icons.Default.PlaylistPlay,
+                                contentDescription = "Playlist",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "UP NEXT",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                    }
+
+                    if (showUpNext) {
+                        val sheetState =
+                            rememberModalBottomSheetState(skipPartiallyExpanded = false)
+                        ModalBottomSheet(
+                            onDismissRequest = { showUpNext = false },
+                            sheetState = sheetState,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ) {
+                            UpNextSheet(
+                                upcomingItems = upNext,
+                                historyItems = playHistory,
+                                onSelect = { onSelectSong(it) },
+                                onPlaceNext = { onPlaceNext(it) },
+                                onRemoveFromQueue = { onRemoveFromQueue(it) },
+                                onReorderQueue = { from, to -> onReorderQueue(from, to) },
+                                snackbarHostState = snackbarHostState
+                            )
+                        }
                     }
                 }
             }
@@ -651,7 +683,11 @@ private fun UpNextSheet(
                         onReorderQueue = onReorderQueue,
                         snackbarHostState = snackbarHostState
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                            alpha = 0.4f
+                        )
+                    )
                 }
             }
             if (historyItems.isNotEmpty()) {
@@ -675,7 +711,11 @@ private fun UpNextSheet(
                         snackbarHostState = snackbarHostState,
                         isHistory = true
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                            alpha = 0.4f
+                        )
+                    )
                 }
             }
             if (upcomingItems.isEmpty() && historyItems.isEmpty()) {

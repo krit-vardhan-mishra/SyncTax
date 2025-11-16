@@ -4,6 +4,8 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.just_for_fun.youtubemusic.core.network.NewPipeUtils
+import com.just_for_fun.youtubemusic.BuildConfig
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -18,14 +20,68 @@ class YouTubeInnerTubeClient {
 
     companion object {
         private const val TAG = "YouTubeInnerTube"
-        private const val INNERTUBE_API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
-        private const val BASE_URL = "https://music.youtube.com/youtubei/v1"
         
-        // Client configuration for YouTube Music Web
-        private const val CLIENT_NAME = "WEB_REMIX"
-        private const val CLIENT_VERSION = "1.20240403.01.00"
+        // WEB_REMIX for search (YouTube Music)
+        private const val MUSIC_BASE_URL = "https://music.youtube.com/youtubei/v1"
+        private val MUSIC_API_KEY = BuildConfig.MUSIC_API_KEY
+        private const val MUSIC_CLIENT_NAME = "WEB_REMIX"
+        private const val MUSIC_CLIENT_VERSION = "1.20240918.01.00"
+        
+        // WEB client for player (works with visitor_data, uses NewPipe for cipher)
+        private const val PLAYER_BASE_URL = "https://www.youtube.com/youtubei/v1"
+        private val PLAYER_API_KEY = BuildConfig.PLAYER_API_KEY
+        private const val PLAYER_CLIENT_NAME = "WEB"
+        private const val PLAYER_CLIENT_VERSION = "2.20241111.00.00"
+        
+        // Cache visitor data to avoid fetching on every request
+        @Volatile
+        private var cachedVisitorData: String? = null
+        private var visitorDataExpiry: Long = 0
     }
 
+    /**
+     * Get visitor_data from YouTube to bypass bot detection
+     */
+    private suspend fun getVisitorData(): String? {
+        // Return cached data if still valid (cache for 1 hour)
+        val now = System.currentTimeMillis()
+        if (cachedVisitorData != null && now < visitorDataExpiry) {
+            return cachedVisitorData
+        }
+        
+        return withContext(Dispatchers.IO) {
+            try {
+                val url = URL("https://www.youtube.com/")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                conn.connectTimeout = 10000
+                conn.readTimeout = 10000
+                
+                val html = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                
+                // Extract visitor_data from ytcfg.set or JSON
+                val regex = """"VISITOR_DATA":"([^"]+)""".toRegex()
+                val match = regex.find(html)
+                
+                if (match != null) {
+                    val visitorData = match.groupValues[1]
+                    cachedVisitorData = visitorData
+                    visitorDataExpiry = now + 3600000 // 1 hour
+                    Log.d(TAG, "Fetched visitor_data: ${visitorData.take(20)}...")
+                    return@withContext visitorData
+                }
+                
+                Log.w(TAG, "Could not extract visitor_data from YouTube")
+                null
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch visitor_data", e)
+                null
+            }
+        }
+    }
+    
     /**
      * Search for music on YouTube Music
      */
@@ -37,9 +93,9 @@ class YouTubeInnerTubeClient {
                 // Build search request body
                 val requestBody = buildSearchRequest(query)
                 
-                // Make API call
-                val url = "$BASE_URL/search?key=$INNERTUBE_API_KEY&prettyPrint=false"
-                val response = makePostRequest(url, requestBody)
+                // Make API call to YouTube Music
+                val url = "$MUSIC_BASE_URL/search?key=$MUSIC_API_KEY&prettyPrint=false"
+                val response = makePostRequest(url, requestBody, forPlayer = false)
                 
                 // Parse response
                 val jsonResponse = JSONObject(response)
@@ -88,54 +144,26 @@ class YouTubeInnerTubeClient {
 
     /**
      * Get playable stream URL for a video
+     * 
+     * YouTube InnerTube API now returns incomplete format objects (no URL, no cipher).
+     * Using NewPipe extractor directly which implements YouTube's client logic fully.
      */
     suspend fun getStreamUrl(videoId: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                val requestBody = buildPlayerRequest(videoId)
-                val url = "$BASE_URL/player?key=$INNERTUBE_API_KEY&prettyPrint=false"
-                val response = makePostRequest(url, requestBody)
+                Log.d(TAG, "Getting stream URL for $videoId using NewPipe extractor")
                 
-                val jsonResponse = JSONObject(response)
+                // Use NewPipe extractor - it handles all YouTube client logic internally
+                val result = NewPipeUtils.getStreamUrl(videoId)
                 
-                // Check playability status
-                val playabilityStatus = jsonResponse.optJSONObject("playabilityStatus")
-                val status = playabilityStatus?.optString("status")
-                
-                if (status != "OK") {
-                    Log.w(TAG, "Video $videoId not playable: $status - ${playabilityStatus?.optString("reason")}")
-                    return@withContext null
-                }
-                
-                // Get streaming data
-                val streamingData = jsonResponse.optJSONObject("streamingData")
-                val adaptiveFormats = streamingData?.optJSONArray("adaptiveFormats")
-                
-                if (adaptiveFormats != null) {
-                    // Find best audio stream
-                    var bestAudioUrl: String? = null
-                    var bestBitrate = 0
-                    
-                    for (i in 0 until adaptiveFormats.length()) {
-                        val format = adaptiveFormats.optJSONObject(i)
-                        val mimeType = format?.optString("mimeType") ?: continue
-                        
-                        // Only consider audio formats
-                        if (mimeType.startsWith("audio/")) {
-                            val url = format.optString("url")
-                            val bitrate = format.optInt("bitrate", 0)
-                            
-                            if (url.isNotEmpty() && bitrate > bestBitrate) {
-                                bestAudioUrl = url
-                                bestBitrate = bitrate
-                            }
-                        }
+                if (result.isSuccess) {
+                    val streamUrl = result.getOrNull()
+                    if (streamUrl != null) {
+                        Log.d(TAG, "✅ NewPipe got stream URL for $videoId: ${streamUrl.take(100)}...")
+                        return@withContext streamUrl
                     }
-                    
-                    if (bestAudioUrl != null) {
-                        Log.d(TAG, "Found stream URL for $videoId (bitrate: $bestBitrate)")
-                        return@withContext bestAudioUrl
-                    }
+                } else {
+                    Log.e(TAG, "❌ NewPipe failed for $videoId", result.exceptionOrNull())
                 }
                 
                 Log.w(TAG, "No audio stream found for $videoId")
@@ -152,8 +180,8 @@ class YouTubeInnerTubeClient {
         {
             "context": {
                 "client": {
-                    "clientName": "$CLIENT_NAME",
-                    "clientVersion": "$CLIENT_VERSION",
+                    "clientName": "$MUSIC_CLIENT_NAME",
+                    "clientVersion": "$MUSIC_CLIENT_VERSION",
                     "gl": "US",
                     "hl": "en"
                 }
@@ -163,39 +191,76 @@ class YouTubeInnerTubeClient {
         """.trimIndent()
     }
 
-    private fun buildPlayerRequest(videoId: String): String {
+    private suspend fun buildPlayerRequest(videoId: String): String {
+        // Use WEB client with visitor_data to bypass bot detection
+        // Streams will be cipher-protected but NewPipe handles that
+        val visitorData = getVisitorData()
+        
+        if (visitorData != null) {
+            Log.d(TAG, "Using visitor_data for $videoId")
+        } else {
+            Log.w(TAG, "No visitor_data available for $videoId - may hit bot detection")
+        }
+        
+        val clientContext = if (visitorData != null) {
+            """
+                "clientName": "$PLAYER_CLIENT_NAME",
+                "clientVersion": "$PLAYER_CLIENT_VERSION",
+                "hl": "en",
+                "gl": "US",
+                "visitorData": "$visitorData"
+            """.trimIndent()
+        } else {
+            """
+                "clientName": "$PLAYER_CLIENT_NAME",
+                "clientVersion": "$PLAYER_CLIENT_VERSION",
+                "hl": "en",
+                "gl": "US"
+            """.trimIndent()
+        }
+        
         return """
         {
             "context": {
                 "client": {
-                    "clientName": "$CLIENT_NAME",
-                    "clientVersion": "$CLIENT_VERSION",
-                    "gl": "US",
-                    "hl": "en"
+                    $clientContext
                 }
             },
-            "videoId": "$videoId"
+            "videoId": "$videoId",
+            "contentCheckOk": true,
+            "racyCheckOk": true
         }
         """.trimIndent()
     }
 
-    private fun makePostRequest(urlString: String, body: String): String {
+    private fun makePostRequest(urlString: String, body: String, forPlayer: Boolean = false): String {
         val url = URL(urlString)
         val conn = url.openConnection() as HttpURLConnection
         
         try {
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("X-Goog-Api-Format-Version", "1")
-            conn.setRequestProperty("X-YouTube-Client-Name", "67")
-            conn.setRequestProperty("X-YouTube-Client-Version", CLIENT_VERSION)
-            conn.setRequestProperty("Origin", "https://music.youtube.com")
-            conn.setRequestProperty("Referer", "https://music.youtube.com/")
             conn.doOutput = true
-            conn.connectTimeout = 10000
-            conn.readTimeout = 10000
+            conn.connectTimeout = 15000
+            conn.readTimeout = 15000
+            
+            if (forPlayer) {
+                // WEB client headers for player endpoint
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+                conn.setRequestProperty("X-YouTube-Client-Name", "1")  // WEB = 1
+                conn.setRequestProperty("X-YouTube-Client-Version", PLAYER_CLIENT_VERSION)
+                conn.setRequestProperty("Origin", "https://www.youtube.com")
+                conn.setRequestProperty("Referer", "https://www.youtube.com/")
+            } else {
+                // WEB_REMIX client headers for search
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                conn.setRequestProperty("X-Goog-Api-Format-Version", "1")
+                conn.setRequestProperty("X-YouTube-Client-Name", "67")  // WEB_REMIX = 67
+                conn.setRequestProperty("X-YouTube-Client-Version", MUSIC_CLIENT_VERSION)
+                conn.setRequestProperty("Origin", "https://music.youtube.com")
+                conn.setRequestProperty("Referer", "https://music.youtube.com/")
+            }
             
             // Write request body
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
@@ -218,6 +283,19 @@ class YouTubeInnerTubeClient {
             // Get video ID
             val playlistItemData = listItem.optJSONObject("playlistItemData")
             val videoId = playlistItemData?.optString("videoId") ?: return null
+            
+            // Check if this is a song (has WATCH endpoint, not BROWSE for albums/playlists)
+            val navigationEndpoint = listItem.optJSONObject("overlay")
+                ?.optJSONObject("musicItemThumbnailOverlayRenderer")
+                ?.optJSONObject("content")
+                ?.optJSONObject("musicPlayButtonRenderer")
+                ?.optJSONObject("playNavigationEndpoint")
+            
+            // Only include items with watch endpoint (songs/videos)
+            if (navigationEndpoint == null || !navigationEndpoint.has("watchEndpoint")) {
+                Log.d(TAG, "Skipping non-song result: $videoId")
+                return null
+            }
             
             // Get title
             val flexColumns = listItem.optJSONArray("flexColumns")
@@ -243,13 +321,23 @@ class YouTubeInnerTubeClient {
                 }
             }
             
-            // Get thumbnail
-            val thumbnail = listItem.optJSONObject("thumbnail")
+            // Get thumbnail - use higher quality image (last thumbnail in array)
+            val thumbnails = listItem.optJSONObject("thumbnail")
                 ?.optJSONObject("musicThumbnailRenderer")
                 ?.optJSONObject("thumbnail")
                 ?.optJSONArray("thumbnails")
-                ?.optJSONObject(0)
-                ?.optString("url")
+            
+            var thumbnail: String? = null
+            if (thumbnails != null && thumbnails.length() > 0) {
+                // Get the highest quality thumbnail (last one in array)
+                val thumbnailObj = thumbnails.optJSONObject(thumbnails.length() - 1)
+                thumbnail = thumbnailObj?.optString("url")
+                
+                // Handle protocol-relative URLs (//i.ytimg.com/...)
+                if (thumbnail?.startsWith("//") == true) {
+                    thumbnail = "https:$thumbnail"
+                }
+            }
             
             // Get fixed run (duration)
             val fixedColumns = listItem.optJSONArray("fixedColumns")

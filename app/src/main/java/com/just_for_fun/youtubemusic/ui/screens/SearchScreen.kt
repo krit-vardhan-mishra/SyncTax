@@ -20,6 +20,8 @@ import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
 import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,19 +35,27 @@ fun SearchScreen(
 
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
 
-    // Kick off online search if no local results
+    // Debounced online search - only search after user stops typing for 800ms
     LaunchedEffect(searchQuery) {
+        searchJob?.cancel()
+        
         if (searchQuery.isNotEmpty()) {
-            // Only search online from the SearchScreen when local filtered results are empty
+            // Check if there are local results
             val hasLocal = uiState.allSongs.any { song ->
                 song.title.contains(searchQuery, ignoreCase = true) ||
                         song.artist.contains(searchQuery, ignoreCase = true) ||
                         (song.album?.contains(searchQuery, ignoreCase = true) == true) ||
                         (song.genre?.contains(searchQuery, ignoreCase = true) == true)
             }
+            
+            // Only search online if no local results and after debounce delay
             if (!hasLocal) {
-                homeViewModel.searchOnline(searchQuery)
+                searchJob = launch {
+                    delay(800) // Wait 800ms after user stops typing
+                    homeViewModel.searchOnline(searchQuery)
+                }
             }
         }
     }
@@ -245,13 +255,13 @@ fun SearchScreen(
                                         // Play online song using chunked progressive streaming
                                         val url = res.streamUrl
                                         if (!url.isNullOrEmpty()) {
-                                            playerViewModel.playChunkedStream(res.id, url, res.title, res.author ?: "Unknown", res.duration ?: 0L)
+                                            playerViewModel.playChunkedStream(res.id, url, res.title, res.author ?: "Unknown", res.duration ?: 0L, res.thumbnailUrl)
                                         } else {
                                             // Try to fetch stream URL then play
                                             coroutineScope.launch {
                                                 val fetched = homeViewModel.fetchStreamUrl(res.id)
                                                 if (!fetched.isNullOrEmpty()) {
-                                                    playerViewModel.playChunkedStream(res.id, fetched, res.title, res.author ?: "Unknown", res.duration ?: 0L)
+                                                    playerViewModel.playChunkedStream(res.id, fetched, res.title, res.author ?: "Unknown", res.duration ?: 0L, res.thumbnailUrl)
                                                 } else {
                                                     android.util.Log.w("SearchScreen", "No stream url available for ${res.title}")
                                                 }
@@ -293,6 +303,13 @@ fun SearchScreen(
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(onClick = { homeViewModel.searchOnline(searchQuery) }) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Retry")
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(text = "Retry")
+                                        }
                                     }
                                 }
                             }

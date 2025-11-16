@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -79,8 +80,15 @@ class MainActivity : ComponentActivity() {
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
 
         setContent {
-            YoutubeMusicTheme {
-                val userPreferences = remember { UserPreferences(this) }
+            val userPreferences = remember { UserPreferences(this) }
+            val themeMode by userPreferences.themeMode.collectAsState(initial = UserPreferences.KEY_THEME_MODE_SYSTEM)
+            val darkTheme = when (themeMode) {
+                UserPreferences.KEY_THEME_MODE_DARK -> true
+                UserPreferences.KEY_THEME_MODE_LIGHT -> false
+                else -> isSystemInDarkTheme()
+            }
+
+            YoutubeMusicTheme(darkTheme = darkTheme) {
                 MusicApp(userPreferences = userPreferences)
             }
         }
@@ -190,7 +198,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                             playerViewModel = playerViewModel,
                             userPreferences = userPreferences,
                             onSearchClick = { navController.navigate("search") },
-                            onTrainClick = { navController.navigate("train") }
+                            onTrainClick = { navController.navigate("train") },
+                            onOpenSettings = { navController.navigate("settings") }
                         )
                     }
                     composable("search") {
@@ -229,6 +238,12 @@ fun MusicApp(userPreferences: UserPreferences) {
                         composable("train") {
                             TrainingScreen(
                                 homeViewModel = homeViewModel,
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                        composable("settings") {
+                            SettingsScreen(
+                                userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() }
                             )
                         }

@@ -40,15 +40,17 @@ fun HomeScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     userPreferences: UserPreferences,
     onSearchClick: () -> Unit = {},
-    onTrainClick: () -> Unit = {}
+    onTrainClick: () -> Unit = {},
+    onOpenSettings: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
     val userName by userPreferences.userName.collectAsState()
     val userInitial = userPreferences.getUserInitial()
     
-    // State for profile dialog
+    // State for profile dialog and profile menu
     var showProfileDialog by remember { mutableStateOf(false) }
+    var showProfileMenu by remember { mutableStateOf(false) }
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
@@ -106,6 +108,14 @@ fun HomeScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
+                    // Refresh library (re-scan device)
+                    IconButton(onClick = { homeViewModel.scanMusic() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Library",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     // Search Icon
                     IconButton(onClick = onSearchClick) {
                         Icon(
@@ -114,17 +124,74 @@ fun HomeScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    // Profile Icon
-                    IconButton(onClick = { showProfileDialog = true }) {
-                        UserProfileIcon(userInitial = userInitial)
-                    }
-                    // Train ML models
-                    IconButton(onClick = onTrainClick) {
-                        Icon(
-                            imageVector = Icons.Default.Build,
-                            contentDescription = "Train ML Models",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    // Profile Icon with dropdown menu (like YouTube Music)
+                    Box {
+                        IconButton(onClick = { showProfileMenu = true }) {
+                            UserProfileIcon(userInitial = userInitial)
+                        }
+                        DropdownMenu(
+                            expanded = showProfileMenu,
+                            onDismissRequest = { showProfileMenu = false }
+                        ) {
+                            // Header with profile icon and full name
+                            Column(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                UserProfileIcon(userInitial = userInitial)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = userName.ifEmpty { "User" },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Divider()
+                            // Train model option
+                            DropdownMenuItem(
+                                text = { Text("Train model") },
+                                onClick = {
+                                    showProfileMenu = false
+                                    onTrainClick()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Build,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                            // App settings option
+                            DropdownMenuItem(
+                                text = { Text("App settings") },
+                                onClick = {
+                                    showProfileMenu = false
+                                    onOpenSettings()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                            // Change user name option
+                            DropdownMenuItem(
+                                text = { Text("Change name") },
+                                onClick = {
+                                    showProfileMenu = false
+                                    showProfileDialog = true
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -466,7 +533,7 @@ fun QuickPicksSection(
         ) {
             Column {
                 Text(
-                    text = "Quick picks",
+                    text = "Quick Picks",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -474,25 +541,6 @@ fun QuickPicksSection(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Refresh Button
-                IconButton(
-                    onClick = onRefreshClick,
-                    enabled = !isGenerating,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    if (isGenerating) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
 
                 // Play All Button
                 TextButton(onClick = onPlayAll) {

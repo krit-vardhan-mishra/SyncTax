@@ -5,19 +5,13 @@ import androidx.room.PrimaryKey
 import androidx.room.ForeignKey
 
 @Entity(
-    tableName = "listening_history",
-    foreignKeys = [
-        ForeignKey(
-            entity = Song::class,
-            parentColumns = ["id"],
-            childColumns = ["songId"],
-            onDelete = ForeignKey.CASCADE
-        )
-    ]
+    tableName = "listening_history"
+    // Removed foreign key constraint to allow tracking online songs (online:videoId) 
+    // that don't exist in the Songs table
 )
 data class ListeningHistory(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val songId: String,
+    val songId: String,  // Can be local song ID or "online:videoId" for streamed songs
     val playTimestamp: Long,
     val listenDuration: Long, // How long user listened in milliseconds
     val completionRate: Float, // 0.0 to 1.0

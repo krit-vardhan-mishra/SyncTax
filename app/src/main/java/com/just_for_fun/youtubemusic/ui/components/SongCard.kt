@@ -396,21 +396,44 @@ fun OnlineResultCard(
                 color = MaterialTheme.colorScheme.surfaceContainerHighest
             ) {
                 // Display thumbnail (if present)
-                result.thumbnailUrl?.let { url ->
+                if (!result.thumbnailUrl.isNullOrEmpty()) {
                     AsyncImage(
-                        model = url,
-                        contentDescription = null,
+                        model = result.thumbnailUrl,
+                        contentDescription = "Album Art",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                } ?: Icon(Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(28.dp))
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = result.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
-                Text(text = result.author ?: "", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = result.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = result.author ?: "Unknown Artist",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             IconButton(onClick = { onPlayClick(result) }) {

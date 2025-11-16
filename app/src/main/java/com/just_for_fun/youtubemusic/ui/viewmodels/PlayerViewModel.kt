@@ -243,6 +243,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun playSong(song: Song, playlist: List<Song> = listOf(song)) {
         viewModelScope.launch {
+            // Clean up tmp file from previous stream if safe
+            chunkedStreamManager.cleanupTmpFile()
             // Stop any streaming downloads and remove cached chunks of previous song
             chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
             // Stop current song
@@ -316,8 +318,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Play a remote stream using chunked progressive download for 30s segments.
      * This writes to a temp cache file and starts playback as soon as the first chunk is available.
      */
-    fun playChunkedStream(videoId: String, streamUrl: String, title: String, artist: String? = null, durationMs: Long = 0L) {
+    fun playChunkedStream(videoId: String, streamUrl: String, title: String, artist: String? = null, durationMs: Long = 0L, thumbnailUrl: String? = null) {
         viewModelScope.launch {
+            // Clean up tmp file from previous stream if it's complete
+            chunkedStreamManager.cleanupTmpFile()
             // Stop any existing streaming downloads
             chunkedStreamManager.stopAndCleanup()
 
@@ -335,7 +339,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 filePath = tempFile.absolutePath,
                 genre = null,
                 releaseYear = null,
-                albumArtUri = null
+                albumArtUri = thumbnailUrl  // Use thumbnail from YouTube
             )
 
             // Stop current collecting and prepare new
@@ -364,14 +368,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         , downloadPercent = st.percent
                     )
                     if (st.isComplete) {
-                        // replace currentSong filePath with final cached file if exists
-                        val final = File(getApplication<Application>().cacheDir, "stream_${videoId}.cache")
-                        if (final.exists()) {
-                            _uiState.value.currentSong?.let { song ->
-                                val updated = song.copy(filePath = final.absolutePath)
-                                _uiState.value = _uiState.value.copy(currentSong = updated)
-                            }
-                        }
+                        // Download complete - the tmp file now contains full content
+                        // No need to switch file paths since tmp file is still being used by player
+                        // The .cache file has been copied for future use
+                        _uiState.value = _uiState.value.copy(isBuffering = false)
                     }
                 }
             }
@@ -384,7 +384,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val posSec = (position / 1000).toLong()
                     val threshold = 60L
                     if (bufferedSec - posSec < threshold && !chunkedStreamManager.state.value.isComplete) {
-                        chunkedStreamManager.requestNextChunk(1)
+                        val prefetch = chunkedStreamManager.suggestedPrefetchCount()
+                        chunkedStreamManager.requestNextChunk(prefetch)
                     }
                     // Stop if a different song is now playing or song removed
                     if (_uiState.value.currentSong == null || _uiState.value.currentSong?.id != onlineSong.id) {

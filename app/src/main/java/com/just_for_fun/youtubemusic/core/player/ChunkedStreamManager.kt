@@ -34,12 +34,17 @@ class ChunkedStreamManager(private val context: Context) {
 
     private var currentTmpFile: File? = null
     private var currentFinalFile: File? = null
+    private var lastAvgSpeedBps: Double = 0.0
+    private var lastChunkBytes: Long = 0L
+    private var allowTmpDeletion: Boolean = true  // Only delete tmp when safe
 
     fun stopAndCleanup(removeFinalCache: Boolean = true) {
         downloadJob?.cancel()
         downloadJob = null
-        // Do not delete final cached file; only remove tmp
-        currentTmpFile?.let { if (it.exists()) it.delete() }
+        // Only delete tmp file if allowed (not currently being played)
+        if (allowTmpDeletion) {
+            currentTmpFile?.let { if (it.exists()) it.delete() }
+        }
         currentTmpFile = null
         if (removeFinalCache) {
             currentFinalFile?.let { if (it.exists()) it.delete() }
@@ -50,10 +55,27 @@ class ChunkedStreamManager(private val context: Context) {
             chunkRequest.close()
         } catch (_: Exception) { }
         chunkRequest = kotlinx.coroutines.channels.Channel(kotlinx.coroutines.channels.Channel.CONFLATED)
+        allowTmpDeletion = true  // Reset for next stream
+    }
+    
+    /**
+     * Clean up only the tmp file when it's safe (download complete and player no longer needs it).
+     * This should be called when switching songs or stopping playback.
+     */
+    fun cleanupTmpFile() {
+        if (_state.value.isComplete) {
+            currentTmpFile?.let { 
+                if (it.exists()) {
+                    it.delete()
+                }
+            }
+            currentTmpFile = null
+        }
     }
 
     /**
      * Start downloading stream in chunks. Returns the temporary file that will be growing.
+     * If a complete cached file already exists, it returns that instead.
      */
     fun startStreaming(videoId: String, streamUrl: String, durationMs: Long, chunkSec: Int = 30): File {
         stopAndCleanup()
@@ -63,6 +85,19 @@ class ChunkedStreamManager(private val context: Context) {
         val final = File(cacheDir, "stream_${videoId}.cache")
         currentTmpFile = tmp
         currentFinalFile = final
+
+        // If final cache file already exists and is valid, use it directly
+        if (final.exists() && final.length() > 0) {
+            _state.value = ChunkDownloadState(
+                bufferedBytes = final.length(),
+                totalBytes = final.length(),
+                bufferedSeconds = (durationMs / 1000),
+                isComplete = true,
+                percent = 100
+            )
+            // Return the cached file for playback
+            return final
+        }
 
         // ensure empty tmp file
         if (tmp.exists()) tmp.delete()
@@ -91,7 +126,8 @@ class ChunkedStreamManager(private val context: Context) {
 
                 // Estimate bytes per second if totalBytes known
                 val bytesPerSec = if (totalBytes > 0) (totalBytes / durationSec) else 10000.0
-                val chunkBytes = ceil(bytesPerSec * chunkSeconds).toLong().coerceAtLeast(32_000L)
+                var chunkBytes = ceil(bytesPerSec * chunkSeconds).toLong().coerceAtLeast(32_000L)
+                var avgSpeedBps = 0.0
 
                 var downloaded: Long = 0L
                 var chunkIndex = 0
@@ -146,7 +182,19 @@ class ChunkedStreamManager(private val context: Context) {
                             }
                             val elapsed = (System.currentTimeMillis() - startTime).coerceAtLeast(1)
                             val speedBps = (chunkDownloaded * 1000) / elapsed
-                            // adjust chunkBytes based on speed (simple heuristic)
+                                        // adjust chunkBytes based on speed (simple heuristic)
+                                        // Maintain a rolling average for download speed and scale chunk size accordingly.
+                                        // Smoothing avoids wild changes when speeds fluctuate.
+                                                    avgSpeedBps = if (avgSpeedBps == 0.0) speedBps.toDouble() else (avgSpeedBps * 0.75 + speedBps * 0.25)
+                                        // Target chunk length in seconds should adapt to speed: faster => bigger chunks
+                                        val minChunkSec = 10.0
+                                        val maxChunkSec = 180.0
+                                        val suggestedChunkSec = (chunkSeconds * (avgSpeedBps / 64_000.0)).coerceIn(minChunkSec, maxChunkSec)
+                                        // Convert to bytes and constrain to sensible min/max boundaries
+                                        val suggestedChunkBytes = (avgSpeedBps * suggestedChunkSec).toLong().coerceIn(32_000L, 10_000_000L)
+                                        chunkBytes = suggestedChunkBytes
+                                        lastAvgSpeedBps = avgSpeedBps
+                                        lastChunkBytes = chunkBytes
                             // faster -> prefetch more next iteration
                         }
 
@@ -154,8 +202,11 @@ class ChunkedStreamManager(private val context: Context) {
 
                         // If we've reached totalBytes then finish
                         if (totalBytes > 0 && downloaded >= totalBytes) {
-                            // rename tmp to final
-                            tmp.renameTo(final)
+                            // DO NOT rename yet - let the tmp file remain until playback switches
+                            // Copy to final cache file so it's available for future plays
+                            if (!final.exists()) {
+                                tmp.copyTo(final, overwrite = false)
+                            }
                             _state.value = _state.value.copy(isComplete = true, totalBytes = totalBytes, percent = 100)
                             shouldBreakOuter = true
                         }
@@ -163,7 +214,10 @@ class ChunkedStreamManager(private val context: Context) {
                         // If server returned less than requested and total unknown, assume EOF
                         if (totalBytes <= 0 && conn.contentLengthLong <= 0) {
                             // No more data
-                            tmp.renameTo(final)
+                            // DO NOT rename yet - copy to final cache file instead
+                            if (!final.exists()) {
+                                tmp.copyTo(final, overwrite = false)
+                            }
                             _state.value = _state.value.copy(isComplete = true, totalBytes = downloaded, percent = 100)
                             shouldBreakOuter = true
                         }
@@ -196,7 +250,10 @@ class ChunkedStreamManager(private val context: Context) {
                                     if (!isActive) return@use
                                 }
                                 fallbackConn.disconnect()
-                                tmp.renameTo(final)
+                                // Copy to final cache instead of rename to keep tmp active
+                                if (!final.exists()) {
+                                    tmp.copyTo(final, overwrite = false)
+                                }
                                 _state.value = _state.value.copy(isComplete = true, totalBytes = downloaded, percent = 100)
                                 shouldBreakOuter = true
                                 return@use
@@ -231,5 +288,13 @@ class ChunkedStreamManager(private val context: Context) {
         repeat(count) {
             chunkRequest.trySend(Unit)
         }
+    }
+
+    /** Returns how many chunks to prefetch based on measured average speed. */
+    fun suggestedPrefetchCount(): Int {
+        // Basic heuristic: scale from 1..5 based on avg speed.
+        val base = if (lastAvgSpeedBps <= 0.0) 1.0 else (lastAvgSpeedBps / 64_000.0)
+        val clamped = base.coerceIn(1.0, 5.0)
+        return clamped.toInt()
     }
 }

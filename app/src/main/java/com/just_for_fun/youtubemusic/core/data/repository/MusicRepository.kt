@@ -93,6 +93,12 @@ class MusicRepository(private val context: Context) {
         // Save to database
         songDao.insertSongs(songs)
 
+        // Prune songs that are no longer present on device (by MediaStore id)
+        val scannedIds = songs.map { it.id }
+        if (scannedIds.isNotEmpty()) {
+            songDao.deleteSongsNotIn(scannedIds)
+        }
+
         songs
     }
 

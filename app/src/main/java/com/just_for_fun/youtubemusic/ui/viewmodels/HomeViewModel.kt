@@ -28,6 +28,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadData()
+        // Auto-scan on app open to keep library in sync with device
+        scanMusic()
         observeListeningHistoryForTraining()
         observeListenAgain()
     }

@@ -9,7 +9,7 @@ import com.just_for_fun.youtubemusic.core.data.local.entities.*
 
 @Database(
     entities = [Song::class, ListeningHistory::class, UserPreference::class],
-    version = 1,
+    version = 2,  // Incremented due to removing foreign key constraint from ListeningHistory
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
