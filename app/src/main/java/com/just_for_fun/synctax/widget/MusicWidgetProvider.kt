@@ -40,7 +40,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val componentName = ComponentName(context, MusicWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-            
+
             val intent = Intent(context, MusicWidgetProvider::class.java).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
@@ -52,7 +52,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 putExtra(EXTRA_DURATION, duration)
                 putExtra(EXTRA_SHUFFLE_ON, shuffleOn)
             }
-            
+
             context.sendBroadcast(intent)
         }
     }
@@ -116,7 +116,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MusicWidgetProvider::class.java)
                 val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-                
+
                 val songTitle = intent.getStringExtra(EXTRA_SONG_TITLE)
                 val songArtist = intent.getStringExtra(EXTRA_SONG_ARTIST)
                 val albumArtUri = intent.getStringExtra(EXTRA_SONG_ALBUM_ART)
@@ -124,7 +124,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 val position = intent.getLongExtra(EXTRA_POSITION, 0L)
                 val duration = intent.getLongExtra(EXTRA_DURATION, 0L)
                 val shuffleOn = intent.getBooleanExtra(EXTRA_SHUFFLE_ON, false)
-                
+
                 for (appWidgetId in appWidgetIds) {
                     updateAppWidget(
                         context,
@@ -157,7 +157,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
     ) {
         try {
             val views = RemoteViews(context.packageName, R.layout.widget_music_circular)
-            
+
             // Set gray background when no song is playing
             if (songTitle.isEmpty() || songTitle == context.getString(R.string.app_name)) {
                 // Use proper color integer (ARGB format)
@@ -168,77 +168,77 @@ class MusicWidgetProvider : AppWidgetProvider() {
             }
 
             // Set up click intent to open the app
-        val appIntent = Intent(context, MainActivity::class.java)
-        val appPendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            appIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_container, appPendingIntent)
+            val appIntent = Intent(context, MainActivity::class.java)
+            val appPendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                appIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_container, appPendingIntent)
 
-        // Set up control intents
-        val playPauseIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-            action = ACTION_PLAY_PAUSE
-        }
-        val playPausePendingIntent = PendingIntent.getBroadcast(
-            context,
-            1,
-            playPauseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_play_pause, playPausePendingIntent)
+            // Set up control intents
+            val playPauseIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_PLAY_PAUSE
+            }
+            val playPausePendingIntent = PendingIntent.getBroadcast(
+                context,
+                1,
+                playPauseIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_play_pause, playPausePendingIntent)
 
-        val nextIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-            action = ACTION_NEXT
-        }
-        val nextPendingIntent = PendingIntent.getBroadcast(
-            context,
-            2,
-            nextIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
+            val nextIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_NEXT
+            }
+            val nextPendingIntent = PendingIntent.getBroadcast(
+                context,
+                2,
+                nextIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
 
-        val previousIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-            action = ACTION_PREVIOUS
-        }
-        val previousPendingIntent = PendingIntent.getBroadcast(
-            context,
-            3,
-            previousIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_previous, previousPendingIntent)
+            val previousIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_PREVIOUS
+            }
+            val previousPendingIntent = PendingIntent.getBroadcast(
+                context,
+                3,
+                previousIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_previous, previousPendingIntent)
 
-        val shuffleIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-            action = ACTION_SHUFFLE
-        }
-        val shufflePendingIntent = PendingIntent.getBroadcast(
-            context,
-            4,
-            shuffleIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        views.setOnClickPendingIntent(R.id.widget_shuffle, shufflePendingIntent)
+            val shuffleIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_SHUFFLE
+            }
+            val shufflePendingIntent = PendingIntent.getBroadcast(
+                context,
+                4,
+                shuffleIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(R.id.widget_shuffle, shufflePendingIntent)
 
-        // Update widget content
-        if (songTitle.isNotEmpty()) {
-            views.setTextViewText(R.id.widget_song_title, songTitle)
-            views.setTextViewText(R.id.widget_artist, songArtist)
-            
-            // Update progress
-            val progress = if (duration > 0) ((position.toFloat() / duration.toFloat()) * 100).toInt() else 0
-            views.setProgressBar(R.id.widget_progress, 100, progress, false)
-            
-            // Update duration text
-            views.setTextViewText(R.id.widget_duration, formatTime(duration))
-        } else {
-            views.setTextViewText(R.id.widget_song_title, "No song playing")
-            views.setTextViewText(R.id.widget_artist, "")
-            views.setProgressBar(R.id.widget_progress, 100, 0, false)
-            views.setTextViewText(R.id.widget_duration, "0:00")
-        }
+            // Update widget content
+            if (songTitle.isNotEmpty()) {
+                views.setTextViewText(R.id.widget_song_title, songTitle)
+                views.setTextViewText(R.id.widget_artist, songArtist)
+
+                // Update progress
+                val progress = if (duration > 0) ((position.toFloat() / duration.toFloat()) * 100).toInt() else 0
+                views.setProgressBar(R.id.widget_progress, 100, progress, false)
+
+                // Update duration text
+                views.setTextViewText(R.id.widget_duration, formatTime(duration))
+            } else {
+                views.setTextViewText(R.id.widget_song_title, "No song playing")
+                views.setTextViewText(R.id.widget_artist, "")
+                views.setProgressBar(R.id.widget_progress, 100, 0, false)
+                views.setTextViewText(R.id.widget_duration, "0:00")
+            }
 
             // Update play/pause icon
             views.setImageViewResource(
