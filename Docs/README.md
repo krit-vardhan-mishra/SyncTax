@@ -1,6 +1,6 @@
-# YouTubeMusic App Docs
+# SyncTax App Docs
 
-This folder contains documentation for the YouTubeMusic app, including architecture, algorithms used for recommendations, and a quick guide for users.
+This folder contains documentation for the SyncTax app, including architecture, algorithms used for recommendations, and a quick guide for users.
 
 - StatisticalAgent.md — Explains the statistical scoring algorithm.
 - CollaborativeFilteringAgent.md — Explains the collaborative filtering approach and vector DB usage.

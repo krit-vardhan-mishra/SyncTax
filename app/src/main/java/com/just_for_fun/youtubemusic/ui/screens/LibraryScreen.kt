@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.screens
+package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
@@ -43,13 +43,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
-import com.just_for_fun.youtubemusic.ui.components.SongCard
-import com.just_for_fun.youtubemusic.ui.components.UserProfileDialog
-import com.just_for_fun.youtubemusic.ui.components.UserProfileIcon
-import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
-import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.components.SongCard
+import com.just_for_fun.synctax.ui.components.UserProfileDialog
+import com.just_for_fun.synctax.ui.components.UserProfileIcon
+import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import kotlinx.coroutines.launch
 
 enum class SortOption(val displayName: String) {

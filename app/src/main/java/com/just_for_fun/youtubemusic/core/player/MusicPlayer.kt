@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.core.player
+package com.just_for_fun.synctax.core.player
 
 import android.content.Context
 import android.os.Handler

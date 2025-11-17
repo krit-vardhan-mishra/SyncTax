@@ -1,6 +1,5 @@
-package com.just_for_fun.youtubemusic.service
+package com.just_for_fun.synctax.service
 
-import android.R.attr.description
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,11 +12,10 @@ import android.net.Uri
 import android.os.Build
 import android.support.v4.media.session.MediaSessionCompat
 import androidx.core.app.NotificationCompat
-import java.io.IOException
 import androidx.media.app.NotificationCompat.MediaStyle
-import com.just_for_fun.youtubemusic.MainActivity
-import com.just_for_fun.youtubemusic.R
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.synctax.MainActivity
+import com.just_for_fun.synctax.R
+import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

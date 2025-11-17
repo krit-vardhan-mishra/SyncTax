@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.core.utils
+package com.just_for_fun.synctax.core.utils
 
 import kotlin.math.*
 

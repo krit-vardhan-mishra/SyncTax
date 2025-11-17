@@ -21,13 +21,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.YoutubeMusic"
+        android:theme="@style/Theme.synctax"
         tools:targetApi="31">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.YoutubeMusic"
+            android:theme="@style/Theme.synctax"
             android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -40,6 +40,21 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <receiver
+            android:name=".widget.MusicWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.just_for_fun.synctax.ACTION_PLAY_PAUSE" />
+                <action android:name="com.just_for_fun.synctax.ACTION_NEXT" />
+                <action android:name="com.just_for_fun.synctax.ACTION_PREVIOUS" />
+                <action android:name="com.just_for_fun.synctax.ACTION_SHUFFLE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
     </application>
 
 </manifest>

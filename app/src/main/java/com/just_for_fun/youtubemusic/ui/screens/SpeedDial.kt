@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.screens
+package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -16,7 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.local.entities.Song
 
 /**
  * Speed Dial Component - 3x3 Grid of song thumbnails

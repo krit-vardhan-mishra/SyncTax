@@ -1,11 +1,11 @@
-package com.just_for_fun.youtubemusic.core.data.local
+package com.just_for_fun.synctax.core.data.local
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.just_for_fun.youtubemusic.core.data.local.dao.*
-import com.just_for_fun.youtubemusic.core.data.local.entities.*
+import com.just_for_fun.synctax.core.data.local.dao.*
+import com.just_for_fun.synctax.core.data.local.entities.*
 
 @Database(
     entities = [Song::class, ListeningHistory::class, UserPreference::class],

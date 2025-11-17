@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.core.network
+package com.just_for_fun.synctax.core.network
 
 data class OnlineSearchResult(
     val id: String,

@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.components
+package com.just_for_fun.synctax.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
@@ -18,7 +18,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlin.math.abs
 
 @Composable

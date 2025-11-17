@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.animation
+package com.just_for_fun.synctax.ui.animation
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring

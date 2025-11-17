@@ -1,15 +1,15 @@
-package com.just_for_fun.youtubemusic.ui.viewmodels
+package com.just_for_fun.synctax.ui.viewmodels
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.core.data.repository.MusicRepository
-import com.just_for_fun.youtubemusic.core.ml.MusicRecommendationManager
-import com.just_for_fun.youtubemusic.core.data.cache.ListenAgainManager
-import com.just_for_fun.youtubemusic.core.ml.models.RecommendationResult
-import com.just_for_fun.youtubemusic.core.network.OnlineSearchManager
-import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
+import com.just_for_fun.synctax.core.data.cache.ListenAgainManager
+import com.just_for_fun.synctax.core.ml.models.RecommendationResult
+import com.just_for_fun.synctax.core.network.OnlineSearchManager
+import com.just_for_fun.synctax.data.preferences.UserPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -238,7 +238,7 @@ data class HomeUiState(
     ,
     // Online search state (for SearchScreen)
     val isSearchingOnline: Boolean = false,
-    val onlineSearchResults: List<com.just_for_fun.youtubemusic.core.network.OnlineSearchResult> = emptyList()
+    val onlineSearchResults: List<com.just_for_fun.synctax.core.network.OnlineSearchResult> = emptyList()
     ,
     // Listen again cache exposed to UI
     val listenAgain: List<Song> = emptyList()

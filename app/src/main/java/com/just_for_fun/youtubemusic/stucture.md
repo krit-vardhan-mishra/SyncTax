@@ -1,7 +1,7 @@
 app/
 ├── src/
 │   ├── main/
-│   │   ├── java/com/just_for_fun/youtubemusic/
+│   │   ├── java/com/just_for_fun/synctax/
 │   │   │   ├── MainActivity.kt
 │   │   │   ├── MusicApplication.kt
 │   │   │   ├── core/

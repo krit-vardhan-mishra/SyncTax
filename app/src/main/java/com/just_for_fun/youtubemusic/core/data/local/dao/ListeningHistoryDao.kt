@@ -1,7 +1,7 @@
-package com.just_for_fun.youtubemusic.core.data.local.dao
+package com.just_for_fun.synctax.core.data.local.dao
 
 import androidx.room.*
-import com.just_for_fun.youtubemusic.core.data.local.entities.ListeningHistory
+import com.just_for_fun.synctax.core.data.local.entities.ListeningHistory
 import kotlinx.coroutines.flow.Flow
 
 @Dao

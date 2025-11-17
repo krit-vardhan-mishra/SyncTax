@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.core.data.local.entities
+package com.just_for_fun.synctax.core.data.local.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

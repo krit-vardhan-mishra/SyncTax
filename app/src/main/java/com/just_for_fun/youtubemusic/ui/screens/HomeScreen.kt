@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.screens
+package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -24,14 +24,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
-import com.just_for_fun.youtubemusic.ui.components.SongCard
-import com.just_for_fun.youtubemusic.ui.components.QuickPickCard
-import com.just_for_fun.youtubemusic.ui.components.UserProfileDialog
-import com.just_for_fun.youtubemusic.ui.components.UserProfileIcon
-import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
-import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
-import com.just_for_fun.youtubemusic.ui.screens.SortOption
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.components.SongCard
+import com.just_for_fun.synctax.ui.components.QuickPickCard
+import com.just_for_fun.synctax.ui.components.UserProfileDialog
+import com.just_for_fun.synctax.ui.components.UserProfileIcon
+import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.ui.screens.SortOption
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -304,7 +304,7 @@ fun HomeScreen(
                                                     },
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .animateItemPlacement()
+                                                        .animateItem()
                                                 )
                                             }
                                         }
@@ -513,8 +513,8 @@ fun FilterChipsRow() {
 
 @Composable
 fun QuickPicksSection(
-    songs: List<com.just_for_fun.youtubemusic.core.data.local.entities.Song>,
-    onSongClick: (com.just_for_fun.youtubemusic.core.data.local.entities.Song) -> Unit,
+    songs: List<com.just_for_fun.synctax.core.data.local.entities.Song>,
+    onSongClick: (com.just_for_fun.synctax.core.data.local.entities.Song) -> Unit,
     onRefreshClick: () -> Unit,
     onViewAllClick: () -> Unit,
     isGenerating: Boolean,
@@ -597,8 +597,8 @@ fun QuickPicksSection(
 
 @Composable
 fun SpeedDialSection(
-    songs: List<com.just_for_fun.youtubemusic.core.data.local.entities.Song>,
-    onSongClick: (com.just_for_fun.youtubemusic.core.data.local.entities.Song) -> Unit,
+    songs: List<com.just_for_fun.synctax.core.data.local.entities.Song>,
+    onSongClick: (com.just_for_fun.synctax.core.data.local.entities.Song) -> Unit,
     userInitial: String = "M"
 ) {
     Column(

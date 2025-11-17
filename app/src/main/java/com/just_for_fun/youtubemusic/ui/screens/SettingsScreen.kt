@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.screens
+package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -8,7 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
+import com.just_for_fun.synctax.data.preferences.UserPreferences
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

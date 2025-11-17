@@ -1,11 +1,11 @@
-package com.just_for_fun.youtubemusic.di
+package com.just_for_fun.synctax.di
 
 import android.content.Context
-import com.just_for_fun.youtubemusic.core.chaquopy.ChaquopyMusicAnalyzer
-import com.just_for_fun.youtubemusic.core.data.local.MusicDatabase
-import com.just_for_fun.youtubemusic.core.data.repository.MusicRepository
-import com.just_for_fun.youtubemusic.core.ml.MusicRecommendationManager
-import com.just_for_fun.youtubemusic.core.player.MusicPlayer
+import com.just_for_fun.synctax.core.chaquopy.ChaquopyMusicAnalyzer
+import com.just_for_fun.synctax.core.data.local.MusicDatabase
+import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
+import com.just_for_fun.synctax.core.player.MusicPlayer
 
 /**
  * Simple dependency injection module

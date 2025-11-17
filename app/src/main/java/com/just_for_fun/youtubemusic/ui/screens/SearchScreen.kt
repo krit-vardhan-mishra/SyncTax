@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.screens
+package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,10 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.just_for_fun.youtubemusic.ui.components.SongCard
-import com.just_for_fun.youtubemusic.ui.components.OnlineResultCard
-import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
-import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.ui.components.SongCard
+import com.just_for_fun.synctax.ui.components.OnlineResultCard
+import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.delay

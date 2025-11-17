@@ -1,8 +1,8 @@
-package com.just_for_fun.youtubemusic.core.data.cache
+package com.just_for_fun.synctax.core.data.cache
 
 import android.content.Context
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.repository.MusicRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

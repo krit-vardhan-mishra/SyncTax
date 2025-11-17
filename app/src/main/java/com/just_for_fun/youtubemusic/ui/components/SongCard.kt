@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.components
+package com.just_for_fun.synctax.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -25,8 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.core.network.OnlineSearchResult
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.network.OnlineSearchResult
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

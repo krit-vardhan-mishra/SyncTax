@@ -10,11 +10,11 @@ plugins {
 }
 
 android {
-    namespace = "com.just_for_fun.youtubemusic"
+    namespace = "com.just_for_fun.synctax"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.just_for_fun.youtubemusic"
+        applicationId = "com.just_for_fun.synctax"
         minSdk = 29
         targetSdk = 36
         versionCode = 1
@@ -89,6 +89,9 @@ dependencies {
 
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // Palette for extracting colors from images
+    implementation("androidx.palette:palette-ktx:1.0.0")
 
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")
@@ -116,4 +119,7 @@ dependencies {
 
     // NewPipe extractor - used to decode signatureCipher-obfuscated stream URLs
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.8")
+
+    // Progress bar dependency
+    implementation("ir.mahozad.multiplatform:wavy-slider:2.2.0")
 }

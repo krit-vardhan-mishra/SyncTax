@@ -1,11 +1,11 @@
-package com.just_for_fun.youtubemusic.core.network
+package com.just_for_fun.synctax.core.network
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import com.just_for_fun.youtubemusic.core.network.NewPipeUtils
-import com.just_for_fun.youtubemusic.BuildConfig
+import com.just_for_fun.synctax.core.network.NewPipeUtils
+import com.just_for_fun.synctax.BuildConfig
 import java.net.HttpURLConnection
 import java.net.URL
 

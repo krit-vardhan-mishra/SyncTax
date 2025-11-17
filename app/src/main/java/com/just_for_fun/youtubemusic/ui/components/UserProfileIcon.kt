@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.components
+package com.just_for_fun.synctax.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box

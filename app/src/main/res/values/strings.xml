@@ -18,4 +18,5 @@
     <string name="scanning">Scanning...</string>
     <string name="generating_recommendations">Generating recommendations...</string>
     <string name="training_models">Training ML models...</string>
+    <string name="widget_description">Music player widget with circular progress</string>
 </resources>

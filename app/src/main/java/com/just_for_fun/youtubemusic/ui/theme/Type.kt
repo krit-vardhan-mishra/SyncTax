@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.theme
+package com.just_for_fun.synctax.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

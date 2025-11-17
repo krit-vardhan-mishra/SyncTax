@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic
+package com.just_for_fun.synctax
 
 import android.app.Application
 import android.util.Log

@@ -1,9 +1,9 @@
-package com.just_for_fun.youtubemusic.core.ml.agents
+package com.just_for_fun.synctax.core.ml.agents
 
-import com.just_for_fun.youtubemusic.core.ml.models.RecommendationResult
-import com.just_for_fun.youtubemusic.core.ml.models.SongFeatures
-import com.just_for_fun.youtubemusic.core.utils.MathUtils
-import com.just_for_fun.youtubemusic.core.utils.VectorDatabase
+import com.just_for_fun.synctax.core.ml.models.RecommendationResult
+import com.just_for_fun.synctax.core.ml.models.SongFeatures
+import com.just_for_fun.synctax.core.utils.MathUtils
+import com.just_for_fun.synctax.core.utils.VectorDatabase
 
 /**
  * Collaborative filtering using vector similarity

@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.components.player
+package com.just_for_fun.synctax.ui.components.player
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.local.entities.Song
 
 @Composable
 fun MiniPlayerContent(

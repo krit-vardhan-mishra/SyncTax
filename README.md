@@ -1,8 +1,8 @@
-# YouTubeMusic
+# SyncTax
 
 <img src="assets/app_icon.png" alt="App icon" height="96" />
 
-YouTubeMusic is an offline-first Android music player and recommender app that demonstrates privacy-preserving, on-device personalization and compact ML models. It combines a modern Android UI with background playback, local-first data storage, and a lightweight hybrid recommendation engine that uses Kotlin-based agents and an optional Python model via Chaquopy.
+SyncTax is an offline-first Android music player and recommender app that demonstrates privacy-preserving, on-device personalization and compact ML models. It combines a modern Android UI with background playback, local-first data storage, and a lightweight hybrid recommendation engine that uses Kotlin-based agents and an optional Python model via Chaquopy.
 
 This README gives a quick project overview, usage tips, and developer setup instructions. For a deeper dive into architecture, models, and implementation details, see the `Docs/` folder.
 
@@ -33,8 +33,8 @@ Other screenshots may live in `app/src/main/res/drawable` or the `assets/` folde
 1. Clone the repository
 
 ```
-git clone https://github.com/krit-vardhan-mishra/YoutubeMusic.git
-cd YoutubeMusic
+git clone https://github.com/krit-vardhan-mishra/SyncTax.git
+cd SyncTax
 ```
 
 2. Build and run (command line)
@@ -84,7 +84,7 @@ When contributing:
 
 ## Attribution & license
 
-YouTubeMusic is open source — see the repository license for details. This project is an independent app and is not affiliated with YouTube, Google LLC, or any of their subsidiaries.
+SyncTax is open source — see the repository license for details. This project is an independent app and is not affiliated with YouTube, Google LLC, or any of their subsidiaries.
 
 ---
 
@@ -96,5 +96,5 @@ For architecture and models, consult `Docs/` — it contains additional diagrams
 
 ---
 
-Thanks for checking out YouTubeMusic — contributions and feedback are welcome!
+Thanks for checking out SyncTax — contributions and feedback are welcome!
 

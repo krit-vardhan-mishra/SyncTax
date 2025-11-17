@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.core.ml.models
+package com.just_for_fun.synctax.core.ml.models
 
 data class SongFeatures(
     val songId: String,

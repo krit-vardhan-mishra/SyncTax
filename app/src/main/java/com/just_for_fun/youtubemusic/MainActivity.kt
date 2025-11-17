@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic
+package com.just_for_fun.synctax
 
 import android.Manifest
 import android.content.*
@@ -28,13 +28,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.just_for_fun.youtubemusic.data.preferences.UserPreferences
-import com.just_for_fun.youtubemusic.service.MusicService
-import com.just_for_fun.youtubemusic.ui.components.PlayerBottomSheet
-import com.just_for_fun.youtubemusic.ui.screens.*
-import com.just_for_fun.youtubemusic.ui.theme.YoutubeMusicTheme
-import com.just_for_fun.youtubemusic.ui.viewmodels.HomeViewModel
-import com.just_for_fun.youtubemusic.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.service.MusicService
+import com.just_for_fun.synctax.ui.components.PlayerBottomSheet
+import com.just_for_fun.synctax.ui.screens.*
+import com.just_for_fun.synctax.ui.theme.synctaxTheme
+import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+
 class MainActivity : ComponentActivity() {
 
     private var musicService: MusicService? = null
@@ -88,7 +89,7 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
-            YoutubeMusicTheme(darkTheme = darkTheme) {
+            synctaxTheme(darkTheme = darkTheme) {
                 MusicApp(userPreferences = userPreferences)
             }
         }

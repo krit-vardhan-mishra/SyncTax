@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.viewmodels
+package com.just_for_fun.synctax.ui.viewmodels
 
 import android.app.Application
 import android.content.BroadcastReceiver
@@ -11,18 +11,18 @@ import android.media.AudioManager
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.core.data.preferences.PlayerPreferences
-import com.just_for_fun.youtubemusic.core.data.repository.MusicRepository
-import com.just_for_fun.youtubemusic.core.player.MusicPlayer
-import com.just_for_fun.youtubemusic.core.player.PlaybackCollector
-import com.just_for_fun.youtubemusic.service.MusicService
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.preferences.PlayerPreferences
+import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.player.MusicPlayer
+import com.just_for_fun.synctax.core.player.PlaybackCollector
+import com.just_for_fun.synctax.service.MusicService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import com.just_for_fun.youtubemusic.core.player.ChunkedStreamManager
+import com.just_for_fun.synctax.core.player.ChunkedStreamManager
 import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {

@@ -1,7 +1,7 @@
-package com.just_for_fun.youtubemusic.core.ml.agents
+package com.just_for_fun.synctax.core.ml.agents
 
-import com.just_for_fun.youtubemusic.core.ml.models.QuickPicksResult
-import com.just_for_fun.youtubemusic.core.ml.models.RecommendationResult
+import com.just_for_fun.synctax.core.ml.models.QuickPicksResult
+import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 import kotlin.math.exp
 
 /**

@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.theme
+package com.just_for_fun.synctax.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -89,7 +89,7 @@ private val YTMusicLightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun YoutubeMusicTheme(
+fun synctaxTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Disabled by default for YT Music theme
     content: @Composable () -> Unit

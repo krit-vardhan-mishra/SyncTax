@@ -1,12 +1,12 @@
-package com.just_for_fun.youtubemusic.core.data.repository
+package com.just_for_fun.synctax.core.data.repository
 
 import android.content.ContentUris
 import android.content.Context
 import android.provider.MediaStore
-import com.just_for_fun.youtubemusic.core.data.local.MusicDatabase
-import com.just_for_fun.youtubemusic.core.data.local.entities.ListeningHistory
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.core.data.local.entities.UserPreference
+import com.just_for_fun.synctax.core.data.local.MusicDatabase
+import com.just_for_fun.synctax.core.data.local.entities.ListeningHistory
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.local.entities.UserPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext

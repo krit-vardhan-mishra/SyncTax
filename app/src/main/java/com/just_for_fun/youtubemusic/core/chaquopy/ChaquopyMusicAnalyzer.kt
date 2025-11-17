@@ -1,11 +1,11 @@
-package com.just_for_fun.youtubemusic.core.chaquopy
+package com.just_for_fun.synctax.core.chaquopy
 
 import android.content.Context
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
-import com.just_for_fun.youtubemusic.core.ml.models.RecommendationResult
-import com.just_for_fun.youtubemusic.core.ml.models.SongFeatures
+import com.just_for_fun.synctax.core.ml.models.RecommendationResult
+import com.just_for_fun.synctax.core.ml.models.SongFeatures
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray

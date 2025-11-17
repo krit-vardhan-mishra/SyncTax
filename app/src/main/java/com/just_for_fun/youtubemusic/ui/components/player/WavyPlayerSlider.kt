@@ -2,15 +2,15 @@ package com.just_for_fun.synctax.ui.components.player
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.mahozad.multiplatform.wavyslider.material3.WavySlider
 
 @Composable
-fun PlayerSlider(
+fun WavyPlayerSlider(
     position: Long,
     duration: Long,
     onSeek: (Long) -> Unit
@@ -30,7 +30,7 @@ fun PlayerSlider(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Slider(
+        WavySlider(
             value = sliderPosition,
             onValueChange = { newValue ->
                 isSeeking = true

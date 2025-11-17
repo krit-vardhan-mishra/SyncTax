@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.components
+package com.just_for_fun.synctax.ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
@@ -16,9 +16,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
-import com.just_for_fun.youtubemusic.ui.components.player.FullScreenPlayerContent
-import com.just_for_fun.youtubemusic.ui.components.player.MiniPlayerContent
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.ui.components.player.FullScreenPlayerContent
+import com.just_for_fun.synctax.ui.components.player.MiniPlayerContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

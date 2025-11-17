@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.ui.components.player
+package com.just_for_fun.synctax.ui.components.player
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,8 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.just_for_fun.youtubemusic.R
-import com.just_for_fun.youtubemusic.core.data.local.entities.Song
+import com.just_for_fun.synctax.R
+import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -421,8 +421,8 @@ fun FullScreenPlayerContent(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Slider
-            PlayerSlider(
+            // Wavy Slider
+            WavyPlayerSlider(
                 position = position,
                 duration = duration,
                 onSeek = onSeek

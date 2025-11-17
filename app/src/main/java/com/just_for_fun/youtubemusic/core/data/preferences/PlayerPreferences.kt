@@ -1,4 +1,4 @@
-package com.just_for_fun.youtubemusic.core.data.preferences
+package com.just_for_fun.synctax.core.data.preferences
 
 import android.content.Context
 import android.content.SharedPreferences
