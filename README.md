@@ -18,13 +18,66 @@ This README gives a quick project overview, usage tips, and developer setup inst
 
 ---
 
-## Screenshots
+### App screenshots
 
-You can add images to `assets/` and reference them here. For example:
+Below are screenshots showcasing the app's UI and key features, from initial setup through personalized recommendations.
 
-<img src="assets/app_icon.png" alt="App icon" height="120" />
+#### Getting Started
 
-Other screenshots may live in `app/src/main/res/drawable` or the `assets/` folder depending on the build configuration.
+<div align="center">
+
+| Welcome Screen | Home (Before Training) |
+|:---:|:---:|
+| <img src="assets/screenshot_01_landing.png" alt="Welcome to the app" height="400" /> | <img src="assets/screenshot_02_home_before_training.png" alt="Initial home screen" height="400" /> |
+| Set up your profile | Home screen before the AI learns your taste |
+
+</div>
+
+#### Core Playback Experience
+
+<div align="center">
+
+| Music Player | Queue Management |
+|:---:|:---:|
+| <img src="assets/screenshot_03_player.png" alt="Now playing interface" height="400" /> | <img src="assets/screenshot_04_queue.png" alt="Up next queue" height="400" /> |
+| Full-featured player with offline support | View and manage your play queue |
+
+</div>
+
+#### Library & Search
+
+<div align="center">
+
+| Your Library | Local Search | Online Search Results |
+|:---:|:---:|:---:|
+| <img src="assets/screenshot_05_library.png" alt="Music library" height="400" /> | <img src="assets/screenshot_07_search_screen.png" alt="Search interface" height="400" /> | <img src="assets/screenshot_08_online_search.png" alt="YouTube search results" height="400" /> |
+| Browse your local collection | Search songs, artists, and albums | Find new music via YouTube frontends |
+
+</div>
+
+#### AI-Powered Recommendations
+
+<div align="center">
+
+| Quick Picks (Learning) | Quick Picks (Trained) | Home (After Training) |
+|:---:|:---:|:---:|
+| <img src="assets/screenshot_06_quick_picks_before_training.png" alt="Initial Quick Picks" height="400" /> | <img src="assets/screenshot_09_quick_picks_after_training.png" alt="Personalized recommendations" height="400" /> | <img src="assets/screenshot_10_home_after_training.png" alt="Smart home with recommendations" height="400" /> |
+| App analyzing your preferences | AI-curated picks based on listening habits | Personalized home with mood categories |
+
+</div>
+
+#### Enhanced Home Experience
+
+<div align="center">
+
+| Speed Dial & Collections | All Songs View |
+|:---:|:---:|
+| <img src="assets/screenshot_11_more_home.png" alt="Quick access to favorites" height="400" /> | <img src="assets/screenshot_12_more_home.png" alt="Complete song library" height="400" /> |
+| Quick access to favorite artists and playlists | Browse your complete music collection |
+
+</div>
+
+[View full image gallery](./assets)
 
 ---
 
@@ -97,4 +150,3 @@ For architecture and models, consult `Docs/` — it contains additional diagrams
 ---
 
 Thanks for checking out SyncTax — contributions and feedback are welcome!
-
