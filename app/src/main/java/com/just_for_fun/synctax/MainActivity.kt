@@ -192,8 +192,22 @@ fun MusicApp(userPreferences: UserPreferences) {
                 upNext = playerViewModel.getUpcomingQueue(),
                 playHistory = playerViewModel.getPlayHistory(),
                 onPlayPauseClick = { playerViewModel.togglePlayPause() },
-                onNextClick = { playerViewModel.next() },
-                onPreviousClick = { playerViewModel.previous() },
+                onNextClick = { 
+                    if (playerState.currentSong?.id?.startsWith("online:") == true) {
+                        // For online songs, restart the current song instead of going to next
+                        playerViewModel.seekTo(0L)
+                    } else {
+                        playerViewModel.next()
+                    }
+                },
+                onPreviousClick = { 
+                    if (playerState.currentSong?.id?.startsWith("online:") == true) {
+                        // For online songs, restart the current song instead of going to previous
+                        playerViewModel.seekTo(0L)
+                    } else {
+                        playerViewModel.previous()
+                    }
+                },
                 onShuffleClick = { playerViewModel.toggleShuffle() },
                 onRepeatClick = { playerViewModel.toggleRepeat() },
                 onSeek = { playerViewModel.seekTo(it) },

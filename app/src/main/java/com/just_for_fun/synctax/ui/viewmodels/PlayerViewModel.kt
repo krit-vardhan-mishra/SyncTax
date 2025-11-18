@@ -478,15 +478,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = false)
             val repeat = _uiState.value.repeatEnabled
-            if (currentPlaylist.isEmpty()) {
+            val currentSong = _uiState.value.currentSong
+
+            if (currentPlaylist.isEmpty() || currentSong == null) {
                 _uiState.value = _uiState.value.copy(isPlaying = false)
                 return@launch
             }
 
             if (repeat) {
-                // Repeat current song
-                _uiState.value.currentSong?.let { song ->
-                    playSong(song, currentPlaylist)
+                // Handle repeat differently for online vs offline songs
+                if (currentSong.id.startsWith("online:")) {
+                    // For online songs, just seek back to beginning and continue playing
+                    seekTo(0L)
+                    player.play()
+                    playbackCollector.startCollecting(currentSong.id)
+                } else {
+                    // For offline songs, restart the song normally
+                    playSong(currentSong, currentPlaylist)
                 }
             } else {
                 // Auto-play next song in order (whether playlist is shuffled or not)

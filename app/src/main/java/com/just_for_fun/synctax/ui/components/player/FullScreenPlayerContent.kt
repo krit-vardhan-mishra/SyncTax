@@ -66,6 +66,9 @@ fun FullScreenPlayerContent(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
+    // Player menu state
+    var showPlayerMenu by remember { mutableStateOf(false) }
+
     // Local overlay states
     var seekDirection by remember { mutableStateOf<String?>(null) }
     var showPlayPause by remember { mutableStateOf(false) }
@@ -140,16 +143,17 @@ fun FullScreenPlayerContent(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    text = "OFFLINE MUSIC",
+                    text = if (song.id.startsWith("online:")) "ONLINE MUSIC" else "OFFLINE MUSIC",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = { /* More Options */ }) {
+                IconButton(onClick = { showPlayerMenu = true }) {
                     Icon(
                         imageVector = Icons.Default.GraphicEq,
-                        contentDescription = "Music Logo",
-                        tint = MaterialTheme.colorScheme.onBackground                    )
+                        contentDescription = "Player Menu",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
                 }
             }
 
@@ -391,11 +395,8 @@ fun FullScreenPlayerContent(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
                         shape = MaterialTheme.shapes.medium,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f),
+                        color = Color.Transparent,
                         tonalElevation = 2.dp
-                        // --- BORDER REMOVED ---
-                        // The 'border = BorderStroke(...)' line was removed from here
-                        // to create a softer, submerged look.
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -520,23 +521,25 @@ fun FullScreenPlayerContent(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Up Next Button
-            TextButton(onClick = { onShowUpNextChange(true) }) {
-                Icon(
-                    imageVector = Icons.Default.PlaylistPlay,
-                    contentDescription = "Playlist",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "UP NEXT",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+            // Up Next Button - only show for offline songs
+            if (!song.id.startsWith("online:")) {
+                TextButton(onClick = { onShowUpNextChange(true) }) {
+                    Icon(
+                        imageVector = Icons.Default.PlaylistPlay,
+                        contentDescription = "Playlist",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "UP NEXT",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
             }
 
-            // Up Next Bottom Sheet
-            if (showUpNext) {
+            // Up Next Bottom Sheet - only show for offline songs
+            if (showUpNext && !song.id.startsWith("online:")) {
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
                 ModalBottomSheet(
                     onDismissRequest = { onShowUpNextChange(false) },
@@ -555,6 +558,16 @@ fun FullScreenPlayerContent(
                         snackbarHostState = snackbarHostState
                     )
                 }
+            }
+
+            // Player Menu
+            if (showPlayerMenu) {
+                SimplePlayerMenu(
+                    song = song,
+                    volume = volume,
+                    onVolumeChange = onSetVolume,
+                    onDismiss = { showPlayerMenu = false }
+                )
             }
         }
     }

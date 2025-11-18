@@ -7,21 +7,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-// import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.ui.background.ProfessionalGradientBackground
+import com.just_for_fun.synctax.ui.background.SearchSectionHeader
 import com.just_for_fun.synctax.ui.components.SongCard
 import com.just_for_fun.synctax.ui.components.OnlineResultCard
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.focus.onFocusChanged
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Job
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +81,8 @@ fun SearchScreen(
                     Text(
                         text = "Search",
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -90,7 +91,7 @@ fun SearchScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        ProfessionalGradientBackground (
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -126,20 +127,16 @@ fun SearchScreen(
 
             // Show Listen Again (recently played / most played merged) when search field focused and empty
             if (searchQuery.isEmpty() && isFocused && uiState.listenAgain.isNotEmpty()) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(
-                        text = "Recently Played",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                SearchSectionHeader(text = "Recently Played")
 
-                    // show up to 6 recent
-                    val recent = uiState.listenAgain.take(6)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        recent.forEach { song ->
-                            SongCard(song = song, onClick = { playerViewModel.playSong(song) })
-                        }
+                // show up to 6 recent
+                val recent = uiState.listenAgain.take(6)
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    recent.forEach { song ->
+                        SongCard(song = song, onClick = { playerViewModel.playSong(song) })
                     }
                 }
                 Divider()
@@ -230,24 +227,10 @@ fun SearchScreen(
                                     Divider(modifier = Modifier.padding(vertical = 8.dp))
                                 }
                                 item {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CloudQueue,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Online Results",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
+                                    SearchSectionHeader(
+                                        text = "Online Results",
+                                        icon = Icons.Default.CloudQueue
+                                    )
                                 }
                                 items(uiState.onlineSearchResults) { result ->
                                     val coroutineScope = rememberCoroutineScope()

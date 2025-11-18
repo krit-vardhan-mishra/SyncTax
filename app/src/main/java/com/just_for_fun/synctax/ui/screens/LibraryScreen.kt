@@ -41,10 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.background.ProfessionalGradientBackground
+import com.just_for_fun.synctax.ui.background.TabContentWrapper
 import com.just_for_fun.synctax.ui.components.SongCard
 import com.just_for_fun.synctax.ui.components.UserProfileDialog
 import com.just_for_fun.synctax.ui.components.UserProfileIcon
@@ -90,7 +93,7 @@ fun LibraryScreen(
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
     var showSortMenu by remember { mutableStateOf(false) }
     var showProfileDialog by remember { mutableStateOf(false) }
-    
+
     // Sync pager state with selected tab
     LaunchedEffect(pagerState.currentPage) {
         // Already synced via pager state
@@ -109,7 +112,7 @@ fun LibraryScreen(
                                 contentDescription = "Sort"
                             )
                         }
-                        
+
                         DropdownMenu(
                             expanded = showSortMenu,
                             onDismissRequest = { showSortMenu = false }
@@ -135,9 +138,9 @@ fun LibraryScreen(
                             }
                         }
                     }
-                    
+
                     // Shuffle All Songs in current tab
-                    IconButton(onClick = { 
+                    IconButton(onClick = {
                         val songsToShuffle = when (pagerState.currentPage) {
                             0 -> uiState.allSongs // Songs tab
                             1 -> uiState.allSongs // Artists tab - all songs
@@ -168,7 +171,7 @@ fun LibraryScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        ProfessionalGradientBackground (
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -177,7 +180,7 @@ fun LibraryScreen(
             TabRow(selectedTabIndex = pagerState.currentPage) {
                 Tab(
                     selected = pagerState.currentPage == 0,
-                    onClick = { 
+                    onClick = {
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(0)
                         }
@@ -186,7 +189,7 @@ fun LibraryScreen(
                 )
                 Tab(
                     selected = pagerState.currentPage == 1,
-                    onClick = { 
+                    onClick = {
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(1)
                         }
@@ -195,7 +198,7 @@ fun LibraryScreen(
                 )
                 Tab(
                     selected = pagerState.currentPage == 2,
-                    onClick = { 
+                    onClick = {
                         coroutineScope.launch {
                             pagerState.animateScrollToPage(2)
                         }
@@ -210,29 +213,35 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 when (page) {
-                    0 -> SongsTab(
-                        songs = uiState.allSongs,
-                        sortOption = sortOption,
-                        onSongClick = { song ->
-                            playerViewModel.playSong(song, uiState.allSongs)
-                        }
-                    )
-                    1 -> ArtistsTab(
-                        songs = uiState.allSongs,
-                        onArtistClick = { artist, artistSongs ->
-                            onNavigateToArtist(artist, artistSongs)
-                        }
-                    )
-                    2 -> AlbumsTab(
-                        songs = uiState.allSongs,
-                        onAlbumClick = { album, artist, albumSongs ->
-                            onNavigateToAlbum(album, artist, albumSongs)
-                        }
-                    )
+                    0 -> TabContentWrapper {
+                        SongsTab(
+                            songs = uiState.allSongs,
+                            sortOption = sortOption,
+                            onSongClick = { song ->
+                                playerViewModel.playSong(song, uiState.allSongs)
+                            }
+                        )
+                    }
+                    1 -> TabContentWrapper {
+                        ArtistsTab(
+                            songs = uiState.allSongs,
+                            onArtistClick = { artist, artistSongs ->
+                                onNavigateToArtist(artist, artistSongs)
+                            }
+                        )
+                    }
+                    2 -> TabContentWrapper {
+                        AlbumsTab(
+                            songs = uiState.allSongs,
+                            onAlbumClick = { album, artist, albumSongs ->
+                                onNavigateToAlbum(album, artist, albumSongs)
+                            }
+                        )
+                    }
                 }
             }
         }
-        
+
         // User Profile Dialog
         if (showProfileDialog) {
             UserProfileDialog(
@@ -272,7 +281,7 @@ fun SongsTab(
             SortOption.CUSTOM -> songs // Keep original order
         }
     }
-    
+
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -355,11 +364,15 @@ fun ArtistsTab(
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = artist,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${artistSongs.size} songs",
@@ -400,7 +413,7 @@ fun AlbumsTab(
         items(albumsMap.entries.toList()) { (album, albumSongs) ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { 
+                onClick = {
                     onAlbumClick(album, albumSongs.first().artist, albumSongs)
                 }
             ) {
@@ -410,16 +423,22 @@ fun AlbumsTab(
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = album,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${albumSongs.first().artist} â€¢ ${albumSongs.size} songs",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     Icon(

@@ -3,21 +3,16 @@ package com.just_for_fun.synctax.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -25,13 +20,15 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.components.SongCard
+import com.just_for_fun.synctax.ui.background.ProfessionalGradientBackground
+import com.just_for_fun.synctax.ui.background.SectionBackground
+import com.just_for_fun.synctax.ui.components.EnhancedGreetingSection
 import com.just_for_fun.synctax.ui.components.QuickPickCard
+import com.just_for_fun.synctax.ui.components.SongCard
 import com.just_for_fun.synctax.ui.components.UserProfileDialog
 import com.just_for_fun.synctax.ui.components.UserProfileIcon
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import com.just_for_fun.synctax.ui.screens.SortOption
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,7 +44,7 @@ fun HomeScreen(
     val playerState by playerViewModel.uiState.collectAsState()
     val userName by userPreferences.userName.collectAsState()
     val userInitial = userPreferences.getUserInitial()
-    
+
     // State for profile dialog and profile menu
     var showProfileDialog by remember { mutableStateOf(false) }
     var showProfileMenu by remember { mutableStateOf(false) }
@@ -62,7 +59,10 @@ fun HomeScreen(
             SortOption.TITLE_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
             SortOption.ARTIST_ASC -> uiState.allSongs.sortedBy { it.artist.lowercase() }
             SortOption.ARTIST_DESC -> uiState.allSongs.sortedByDescending { it.artist.lowercase() }
-            SortOption.RELEASE_YEAR_DESC -> uiState.allSongs.sortedByDescending { it.releaseYear ?: 0 }
+            SortOption.RELEASE_YEAR_DESC -> uiState.allSongs.sortedByDescending {
+                it.releaseYear ?: 0
+            }
+
             SortOption.RELEASE_YEAR_ASC -> uiState.allSongs.sortedBy { it.releaseYear ?: 0 }
             SortOption.ADDED_TIMESTAMP_DESC -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
             SortOption.ADDED_TIMESTAMP_ASC -> uiState.allSongs.sortedBy { it.addedTimestamp }
@@ -97,7 +97,7 @@ fun HomeScreen(
                 },
                 actions = {
                     // Shuffle All Songs
-                    IconButton(onClick = { 
+                    IconButton(onClick = {
                         if (uiState.allSongs.isNotEmpty()) {
                             playerViewModel.shufflePlay(uiState.allSongs)
                         }
@@ -200,7 +200,7 @@ fun HomeScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        ProfessionalGradientBackground (
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -235,10 +235,10 @@ fun HomeScreen(
                             // Greeting Section
                             if (userName.isNotEmpty()) {
                                 item {
-                                    GreetingSection(userName = userName)
+                                    EnhancedGreetingSection(userName = userName)
                                 }
                             }
-                           
+
                             // Filter Chips
                             item {
                                 FilterChipsRow()
@@ -247,23 +247,28 @@ fun HomeScreen(
 
                             // Quick Picks Section (always visible; if no picks yet, shows learning message)
                             item {
-                                QuickPicksSection(
-                                    songs = uiState.quickPicks,
-                                    onSongClick = { song ->
-                                        playerViewModel.playSong(song, uiState.quickPicks)
-                                    },
-                                    onRefreshClick = { homeViewModel.generateQuickPicks() },
-                                    onViewAllClick = { /* Navigate to Quick Picks */ },
-                                    isGenerating = uiState.isGeneratingRecommendations,
-                                    onPlayAll = {
-                                        uiState.quickPicks.firstOrNull()?.let { firstSong ->
-                                            playerViewModel.playSong(
-                                                firstSong,
-                                                uiState.quickPicks
-                                            )
+                                SectionBackground(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    useAccent = true
+                                ) {
+                                    QuickPicksSection(
+                                        songs = uiState.quickPicks,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(song, uiState.quickPicks)
+                                        },
+                                        onRefreshClick = { homeViewModel.generateQuickPicks() },
+                                        onViewAllClick = { /* Navigate to Quick Picks */ },
+                                        isGenerating = uiState.isGeneratingRecommendations,
+                                        onPlayAll = {
+                                            uiState.quickPicks.firstOrNull()?.let { firstSong ->
+                                                playerViewModel.playSong(
+                                                    firstSong,
+                                                    uiState.quickPicks
+                                                )
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
 
                             // All Songs Section
@@ -323,7 +328,7 @@ fun HomeScreen(
                                 )
                             }
 
-                             // All Songs Section
+                            // All Songs Section
                             item {
                                 SectionHeader(
                                     title = "All Songs",
@@ -406,7 +411,7 @@ fun HomeScreen(
                 }
             }
         }
-        
+
         // User Profile Dialog
         if (showProfileDialog) {
             UserProfileDialog(
@@ -419,71 +424,6 @@ fun HomeScreen(
         }
     }
 }
-
-@Composable
-fun GreetingSection(userName: String) {
-
-    val greeting = remember {
-        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-
-        when (hour) {
-            in 5..11 -> "Good morning"
-            in 12..16 -> "Good afternoon"
-            in 17..22 -> "Good evening"
-            else -> "Hey there, burning the midnight oil?"
-        }
-    }
-
-    val subGreeting = remember {
-        when (greeting) {
-            "Good morning" -> "Hope your day starts great!"
-            "Good afternoon" -> "Keep going strong!"
-            "Good evening" -> "Hope you had a good day so far!"
-            else -> "Don't forget to rest when you can."
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-    ) {
-        val annotatedString = buildAnnotatedString {
-            withStyle(
-            style = SpanStyle(
-                fontSize = MaterialTheme.typography.headlineMedium.fontSize,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            ) {
-            append("$greeting, ")
-            }
-            withStyle(
-            style = SpanStyle(
-                fontSize = MaterialTheme.typography.headlineLarge.fontSize,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            ) {
-            append(userName)
-            }
-        }
-
-        Text(
-            text = annotatedString,
-            style = MaterialTheme.typography.headlineMedium // Base style, but overridden by spans
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Text(
-            text = subGreeting,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-        )
-    }
-}
-
 
 @Composable
 fun FilterChipsRow() {
@@ -816,5 +756,69 @@ fun EmptyMusicState(
             }
             Text(if (isScanning) "Scanning..." else "Scan Device")
         }
+    }
+}
+
+@Composable
+fun GreetingSection(userName: String) {
+
+    val greeting = remember {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+
+        when (hour) {
+            in 5..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            in 17..22 -> "Good evening"
+            else -> "Hey there, burning the midnight oil?"
+        }
+    }
+
+    val subGreeting = remember {
+        when (greeting) {
+            "Good morning" -> "Hope your day starts great!"
+            "Good afternoon" -> "Keep going strong!"
+            "Good evening" -> "Hope you had a good day so far!"
+            else -> "Don't forget to rest when you can."
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+    ) {
+        val annotatedString = buildAnnotatedString {
+            withStyle(
+                style = SpanStyle(
+                    fontSize = MaterialTheme.typography.headlineMedium.fontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            ) {
+                append("$greeting, ")
+            }
+            withStyle(
+                style = SpanStyle(
+                    fontSize = MaterialTheme.typography.headlineLarge.fontSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                append(userName)
+            }
+        }
+
+        Text(
+            text = annotatedString,
+            style = MaterialTheme.typography.headlineMedium // Base style, but overridden by spans
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = subGreeting,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
     }
 }
