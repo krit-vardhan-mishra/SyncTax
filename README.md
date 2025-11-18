@@ -37,10 +37,10 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 <div align="center">
 
-| Music Player | Queue Management |
-|:---:|:---:|
-| <img src="assets/screenshot_03_player.png" alt="Now playing interface" height="400" /> | <img src="assets/screenshot_04_queue.png" alt="Up next queue" height="400" /> |
-| Full-featured player with offline support | View and manage your play queue |
+| Music Player | Queue Management (Half) | Queue Management (Full) 
+|:---:|:---:|:---:|
+| <img src="assets/screenshot_03_player.png" alt="Now playing interface" height="400" /> | <img src="assets/screenshot_04_queue_semi_opened.png" alt="Up next queue" height="400" /> |  <img src="assets/screenshot_04_queue_opened.png" alt="Up next queue" height="400" />
+| Full-featured player with offline support | View and manage your play queue | Queue fully opened |
 
 </div>
 

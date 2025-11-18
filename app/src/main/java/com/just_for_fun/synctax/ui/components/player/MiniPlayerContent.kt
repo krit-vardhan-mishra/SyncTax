@@ -4,6 +4,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -126,6 +127,9 @@ fun MiniPlayerContent(
                     shape = MaterialTheme.shapes.medium,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     tonalElevation = 2.dp
+                    // --- BORDER REMOVED ---
+                    // The 'border = BorderStroke(...)' line was removed from here
+                    // to create a softer, submerged look.
                 ) {
                     Row(
                         modifier = Modifier

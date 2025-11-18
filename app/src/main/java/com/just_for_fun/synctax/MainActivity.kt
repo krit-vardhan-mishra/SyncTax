@@ -9,6 +9,9 @@ import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.service.MusicService
+import com.just_for_fun.synctax.ui.components.AppNavigationBar
 import com.just_for_fun.synctax.ui.components.PlayerBottomSheet
 import com.just_for_fun.synctax.ui.screens.*
 import com.just_for_fun.synctax.ui.theme.synctaxTheme
@@ -160,11 +164,23 @@ fun MusicApp(userPreferences: UserPreferences) {
     val playerViewModel: PlayerViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
 
+    // --- HOISTED STATE ---
+    // Hoist the scaffold state here to control nav bar visibility
+    val scaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberStandardBottomSheetState(
+            initialValue = SheetValue.PartiallyExpanded,
+            skipHiddenState = true
+        )
+    )
+    val isPlayerExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
+    // --- END HOISTED STATE ---
+
     val playerState by playerViewModel.uiState.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
             PlayerBottomSheet(
+                scaffoldState = scaffoldState, // Pass the hoisted state down
                 song = playerState.currentSong,
                 isPlaying = playerState.isPlaying,
                 isBuffering = playerState.isBuffering,
@@ -306,60 +322,16 @@ fun MusicApp(userPreferences: UserPreferences) {
                 }
             }
         }
-        AppNavigationBar(navController)
-    }
-}
-
-@Composable
-private fun AppNavigationBar(navController: NavController) {
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface
-    ) {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry?.destination?.route
-
-        data class NavItem(val route: String, val label: String, val icon: @Composable () -> Unit)
-
-        val items = listOf(
-            NavItem(
-                "home",
-                "Home",
-                { Icon(Icons.Default.Home, contentDescription = "Home") }),
-            NavItem(
-                "search",
-                "Search",
-                { Icon(Icons.Default.Search, contentDescription = "Search") }),
-            NavItem(
-                "quick_picks",
-                "Picks",
-                { Icon(Icons.Default.PlayCircle, contentDescription = "Quick Picks") }),
-            NavItem(
-                "library",
-                "Library",
-                { Icon(Icons.Default.LibraryMusic, contentDescription = "Library") })
-        )
-
-        items.forEach { item ->
-            NavigationBarItem(
-                icon = item.icon,
-                label = { Text(item.label) },
-                selected = currentRoute == item.route,
-                onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray
-                )
-            )
+        
+        // --- NAVBAR VISIBILITY CHANGE ---
+        // Conditionally show the Nav Bar based on the player's expanded state
+        AnimatedVisibility(
+            visible = !isPlayerExpanded,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it })
+        ) {
+            AppNavigationBar(navController)
         }
+        // --- END NAVBAR VISIBILITY CHANGE ---
     }
 }

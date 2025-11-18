@@ -76,30 +76,35 @@ fun UnifiedPlayer(
             .fillMaxWidth()
             .height(if (isExpanded) (expansionProgress * 1000).dp else 80.dp)
     ) {
-        // Background (only visible when expanded)
-        if (expansionProgress > 0f) {
-            if (!song.albumArtUri.isNullOrEmpty()) {
-                AsyncImage(
-                    model = song.albumArtUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur((80 * expansionProgress).dp)
-                        .alpha(0.6f * expansionProgress)
-                )
-            }
-            Box(
+        // --- BACKGROUND CHANGE ---
+        // This background is now always present, even for mini-player
+        if (!song.albumArtUri.isNullOrEmpty()) {
+            AsyncImage(
+                model = song.albumArtUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f * expansionProgress))
+                    // Always blur, but blur amount increases with expansion
+                    .blur((30 + (50 * expansionProgress)).dp)
+                    // Alpha is lower for mini-player, full for expanded
+                    .alpha(0.5f + (0.1f * expansionProgress))
             )
         }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // Black overlay alpha also scales
+                .background(Color.Black.copy(alpha = 0.3f + (0.3f * expansionProgress)))
+        )
+        // --- END BACKGROUND CHANGE ---
 
         Surface(
-            color = if (isExpanded) Color.Transparent
-            else MaterialTheme.colorScheme.surfaceContainerHighest,
-            tonalElevation = if (isExpanded) 0.dp else 3.dp,
+            // --- COLOR CHANGE ---
+            // The main surface is now always transparent to show the blurred background
+            color = Color.Transparent,
+            // --- END COLOR CHANGE ---
+            tonalElevation = 0.dp, // No elevation, bg provides depth
             shape = if (isExpanded) RectangleShape else RectangleShape,
             modifier = Modifier.fillMaxSize()
         ) {

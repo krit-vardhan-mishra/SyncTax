@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerBottomSheet(
+    scaffoldState: BottomSheetScaffoldState, // Accept the hoisted state
     song: Song?,
     isPlaying: Boolean,
     isBuffering: Boolean,
@@ -36,20 +37,22 @@ fun PlayerBottomSheet(
     content: @Composable (PaddingValues) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val scaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
-        )
-    )
+    // Removed local scaffoldState, using the one from the parameters
 
     val miniPlayerHeight = 80.dp
     val isExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
 
+    // --- THIS IS THE CHANGE ---
+    // Dynamically set peek height. If no song, peek height is 0.
+    val currentPeekHeight = if (song != null) miniPlayerHeight else 0.dp
+    // --- END CHANGE ---
+
     BottomSheetScaffold(
-        scaffoldState = scaffoldState,
+        scaffoldState = scaffoldState, // Use the hoisted state
         sheetContent = {
             // Use UnifiedPlayer - single component that morphs between states
+            // This 'if' check ensures we don't try to render UnifiedPlayer
+            // when the sheet is animating closed after a song becomes null.
             if (song != null) {
                 UnifiedPlayer(
                     song = song,
@@ -87,7 +90,9 @@ fun PlayerBottomSheet(
                 )
             }
         },
-        sheetPeekHeight = miniPlayerHeight,
+        // --- THIS IS THE CHANGE ---
+        sheetPeekHeight = currentPeekHeight, // Use the dynamic height
+        // --- END CHANGE ---
         sheetDragHandle = null,
         sheetShape = MaterialTheme.shapes.extraSmall
     ) {

@@ -3,6 +3,7 @@ package com.just_for_fun.synctax.ui.components.player
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -146,11 +147,9 @@ fun FullScreenPlayerContent(
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = { /* More Options */ }) {
                     Icon(
-                        painter = painterResource(id = R.drawable.music_logo),
+                        imageVector = Icons.Default.GraphicEq,
                         contentDescription = "Music Logo",
-                        modifier = Modifier.size(32.dp),
-                        tint = Color.Unspecified
-                    )
+                        tint = MaterialTheme.colorScheme.onBackground                    )
                 }
             }
 
@@ -203,6 +202,9 @@ fun FullScreenPlayerContent(
                             .aspectRatio(1f),
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f)
+                        // --- BORDER REMOVED ---
+                        // The 'border = BorderStroke(...)' line was removed from here
+                        // to create a softer, submerged look.
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             // Album Art Image
@@ -391,6 +393,9 @@ fun FullScreenPlayerContent(
                         shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.3f),
                         tonalElevation = 2.dp
+                        // --- BORDER REMOVED ---
+                        // The 'border = BorderStroke(...)' line was removed from here
+                        // to create a softer, submerged look.
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -536,7 +541,9 @@ fun FullScreenPlayerContent(
                 ModalBottomSheet(
                     onDismissRequest = { onShowUpNextChange(false) },
                     sheetState = sheetState,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    // --- LIQUID GLASS CHANGE ---
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.9f)
+                    // --- END LIQUID GLASS CHANGE ---
                 ) {
                     UpNextSheet(
                         upcomingItems = upNext,

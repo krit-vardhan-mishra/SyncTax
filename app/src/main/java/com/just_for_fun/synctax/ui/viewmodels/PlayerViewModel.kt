@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.just_for_fun.synctax.core.player.ChunkedStreamManager
-import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 

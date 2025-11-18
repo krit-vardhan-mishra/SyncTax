@@ -28,7 +28,8 @@ fun UpNextItem(
     onPlaceNext: (Song) -> Unit,
     onRemoveFromQueue: (Song) -> Unit,
     snackbarHostState: SnackbarHostState,
-    isHistory: Boolean = false
+    isHistory: Boolean = false,
+    dragHandleModifier: Modifier = Modifier // Modifier for the drag handle
 ) {
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -55,13 +56,13 @@ fun UpNextItem(
     SwipeToDismissBox(
         state = dismissState,
         enableDismissFromStartToEnd = !isHistory,
-        enableDismissFromEndToStart = true,
+        enableDismissFromEndToStart = !isHistory,
         backgroundContent = {
             val direction = dismissState.dismissDirection
             val icon = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> Icons.Default.Delete
-                SwipeToDismissBoxValue.EndToStart -> Icons.Default.PlaylistAdd
-                else -> Icons.Default.Delete
+                SwipeToDismissBoxValue.EndToStart -> Icons.Default.SkipNext
+                else -> null
             }
             val tint = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.error
@@ -77,18 +78,20 @@ fun UpNextItem(
                 contentAlignment = if (direction == SwipeToDismissBoxValue.StartToEnd)
                     Alignment.CenterStart else Alignment.CenterEnd
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tint
-                )
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = tint
+                    )
+                }
             }
         }
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .background(Color.Transparent) // Make item background transparent
                 .clickable { onSelect(song) }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -133,11 +136,14 @@ fun UpNextItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Icon(
-                imageVector = Icons.Default.DragHandle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Apply the dragHandleModifier to a Box around the Icon
+            Box(modifier = dragHandleModifier) {
+                Icon(
+                    imageVector = Icons.Default.DragHandle,
+                    contentDescription = "Drag to reorder",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
