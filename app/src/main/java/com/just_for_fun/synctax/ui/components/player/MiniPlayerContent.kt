@@ -4,7 +4,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -41,14 +41,16 @@ fun MiniPlayerContent(
     var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = 150f
 
-    Column {
+    Column(
+        modifier = Modifier.fillMaxHeight()
+    ) {
         // Progress bar
         if (duration > 0) {
             LinearProgressIndicator(
                 progress = { (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(2.dp),
+                    .height(5.dp),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = Color.Transparent
             )
@@ -60,7 +62,6 @@ fun MiniPlayerContent(
                 .fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Swipeable container with album art, song name, and artist
             Box(
                 modifier = Modifier
                     .weight(1f)

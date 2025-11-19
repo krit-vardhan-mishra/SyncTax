@@ -37,22 +37,15 @@ fun PlayerBottomSheet(
     content: @Composable (PaddingValues) -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    // Removed local scaffoldState, using the one from the parameters
 
     val miniPlayerHeight = 80.dp
     val isExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
 
-    // --- THIS IS THE CHANGE ---
-    // Dynamically set peek height. If no song, peek height is 0.
     val currentPeekHeight = if (song != null) miniPlayerHeight else 0.dp
-    // --- END CHANGE ---
 
     BottomSheetScaffold(
-        scaffoldState = scaffoldState, // Use the hoisted state
+        scaffoldState = scaffoldState,
         sheetContent = {
-            // Use UnifiedPlayer - single component that morphs between states
-            // This 'if' check ensures we don't try to render UnifiedPlayer
-            // when the sheet is animating closed after a song becomes null.
             if (song != null) {
                 UnifiedPlayer(
                     song = song,
@@ -90,9 +83,7 @@ fun PlayerBottomSheet(
                 )
             }
         },
-        // --- THIS IS THE CHANGE ---
-        sheetPeekHeight = currentPeekHeight, // Use the dynamic height
-        // --- END CHANGE ---
+        sheetPeekHeight = currentPeekHeight,
         sheetDragHandle = null,
         sheetShape = MaterialTheme.shapes.extraSmall
     ) {

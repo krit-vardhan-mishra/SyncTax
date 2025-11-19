@@ -48,7 +48,7 @@ fun UnifiedPlayer(
     onSeek: (Long) -> Unit,
     downloadPercent: Int = 0
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
 
     // Animation progress (0f = mini, 1f = expanded)
@@ -66,7 +66,6 @@ fun UnifiedPlayer(
         label = "albumArtMiniScale"
     )
 
-    // Handle back button when player is expanded
     BackHandler(enabled = isExpanded) {
         onExpandedChange(false)
     }
@@ -76,8 +75,6 @@ fun UnifiedPlayer(
             .fillMaxWidth()
             .height(if (isExpanded) (expansionProgress * 1000).dp else 80.dp)
     ) {
-        // --- BACKGROUND CHANGE ---
-        // This background is now always present, even for mini-player
         if (!song.albumArtUri.isNullOrEmpty()) {
             AsyncImage(
                 model = song.albumArtUri,
@@ -85,31 +82,18 @@ fun UnifiedPlayer(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    // Always blur, but blur amount increases with expansion
                     .blur((30 + (50 * expansionProgress)).dp)
-                    // Alpha is lower for mini-player, full for expanded
                     .alpha(0.5f + (0.1f * expansionProgress))
             )
         }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                // Black overlay alpha also scales
-                .background(Color.Black.copy(alpha = 0.3f + (0.3f * expansionProgress)))
-        )
-        // --- END BACKGROUND CHANGE ---
 
         Surface(
-            // --- COLOR CHANGE ---
-            // The main surface is now always transparent to show the blurred background
             color = Color.Transparent,
-            // --- END COLOR CHANGE ---
             tonalElevation = 0.dp, // No elevation, bg provides depth
             shape = if (isExpanded) RectangleShape else RectangleShape,
             modifier = Modifier.fillMaxSize()
         ) {
             if (!isExpanded) {
-                // MINI PLAYER VIEW
                 MiniPlayerContent(
                     song = song,
                     isPlaying = isPlaying,
@@ -142,7 +126,7 @@ fun UnifiedPlayer(
                     upNext = upNext,
                     playHistory = playHistory,
                     showUpNext = showUpNext,
-                    snackbarHostState = snackbarHostState,
+                    snackbarHostState = snackBarHostState,
                     onShowUpNextChange = { showUpNext = it },
                     onSelectSong = onSelectSong,
                     onPlaceNext = onPlaceNext,

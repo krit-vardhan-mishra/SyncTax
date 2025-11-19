@@ -1,89 +1,81 @@
 package com.just_for_fun.synctax.ui.screens
 
-import EnhancedEmptyQuickPicksState
+import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.background.SectionBackground
+import com.just_for_fun.synctax.ui.dynamic.DynamicHorizontalBackground
+import com.just_for_fun.synctax.ui.background.EnhancedEmptyQuickPicksState
 import com.just_for_fun.synctax.ui.components.RecommendationCard
+import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickPicksScreen(
-    onBackClick: () -> Unit,
     homeViewModel: HomeViewModel = viewModel(),
-    playerViewModel: PlayerViewModel = viewModel()
+    playerViewModel: PlayerViewModel = viewModel(),
+    dynamicBgViewModel: DynamicBackgroundViewModel = viewModel()
+
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val userPreferences = remember(context) { UserPreferences(context) }
     val showGuide by userPreferences.showQuickPicksGuide.collectAsState()
     var guideStep by remember { mutableStateOf(0) }
+    val playerState by playerViewModel.uiState.collectAsState()
+    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+
+    LaunchedEffect(playerState.currentSong?.albumArtUri) {
+        dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Quick Picks",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                },
-                actions = {
-                    // Shuffle Quick Picks
-                    IconButton(onClick = {
-                        if (uiState.quickPicks.isNotEmpty()) {
-                            playerViewModel.shufflePlay(uiState.quickPicks)
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Shuffle Quick Picks",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+            SimpleDynamicMusicTopAppBar(
+                title = "Quick Picks",
+                albumColors = albumColors,
+                showShuffleButton = true,
+                onShuffleClick = {
+                    if (uiState.quickPicks.isNotEmpty()) {
+                        playerViewModel.shufflePlay(uiState.quickPicks)
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                }
             )
         }
     ) { paddingValues ->
-        // 1. SectionBackground is just the visual wrapper
-        SectionBackground(
+        DynamicHorizontalBackground(
+            albumColors = albumColors,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 2. Add LazyColumn here to support 'item' and 'itemsIndexed'
             LazyColumn(
-                contentPadding = PaddingValues(vertical = 8.dp),
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 if (uiState.isGeneratingRecommendations) {
                     item {
                         Column(
                             modifier = Modifier
-                                .fillParentMaxSize() // Now valid because it's inside LazyColumn scope
+                                .fillParentMaxSize()
                                 .padding(top = 64.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -99,7 +91,7 @@ fun QuickPicksScreen(
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
-                                text = "Listen to songs and we'll find your match.",
+                                text = "x Listen to songs and we'll find your match.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -109,7 +101,7 @@ fun QuickPicksScreen(
                     }
                 } else if (uiState.quickPicks.isEmpty()) {
                     item {
-                        EnhancedEmptyQuickPicksState()
+                        EnhancedEmptyQuickPicksState(albumColors = albumColors)
                     }
                 } else {
                     // Display the list of recommendations
@@ -134,7 +126,7 @@ fun QuickPicksScreen(
                 }
             }
         }
-
+    
         // Quick tour overlay
         if (showGuide) {
             Box(
@@ -153,7 +145,7 @@ fun QuickPicksScreen(
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Close icon
+                        // Close icon in the top-right of the card
                         Box(modifier = Modifier.fillMaxWidth()) {
                             IconButton(
                                 onClick = { userPreferences.setQuickPicksGuide(false) },

@@ -13,23 +13,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,39 +38,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.background.ProfessionalGradientBackground
-import com.just_for_fun.synctax.ui.background.TabContentWrapper
 import com.just_for_fun.synctax.ui.components.SongCard
-import com.just_for_fun.synctax.ui.components.UserProfileDialog
-import com.just_for_fun.synctax.ui.components.UserProfileIcon
+import com.just_for_fun.synctax.ui.components.section.MusicTopAppBar
+import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
+import com.just_for_fun.synctax.ui.components.section.SortOption
+import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
+import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import kotlinx.coroutines.launch
-
-enum class SortOption(val displayName: String) {
-    TITLE_ASC("Title (A-Z)"),
-    TITLE_DESC("Title (Z-A)"),
-    ARTIST_ASC("Artist (A-Z)"),
-    ARTIST_DESC("Artist (Z-A)"),
-    RELEASE_YEAR_DESC("Newest First"),
-    RELEASE_YEAR_ASC("Oldest First"),
-    ADDED_TIMESTAMP_DESC("Recently Added"),
-    ADDED_TIMESTAMP_ASC("Added First"),
-    DURATION_DESC("Longest First"),
-    DURATION_ASC("Shortest First"),
-    NAME_ASC("Name (A-Z)"),
-    NAME_DESC("Name (Z-A)"),
-    ARTIST("Artist"),
-    DATE_ADDED_OLDEST("Date Added (Oldest)"),
-    DATE_ADDED_NEWEST("Date Added (Newest)"),
-    CUSTOM("Custom")
-}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun LibraryScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
+    dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
     userPreferences: UserPreferences,
     onSearchClick: () -> Unit = {},
     onNavigateToArtist: (String, List<Song>) -> Unit = { _, _ -> },
@@ -91,147 +66,105 @@ fun LibraryScreen(
     val pagerState = rememberPagerState(pageCount = { 3 })
     val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
-    var showSortMenu by remember { mutableStateOf(false) }
-    var showProfileDialog by remember { mutableStateOf(false) }
+    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
 
-    // Sync pager state with selected tab
-    LaunchedEffect(pagerState.currentPage) {
-        // Already synced via pager state
+    // Update colors when current song changes
+    LaunchedEffect(playerState.currentSong?.albumArtUri) {
+        dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Library") },
-                actions = {
-                    // Sort button (only visible on Songs tab)
-                    if (pagerState.currentPage == 0) {
-                        IconButton(onClick = { showSortMenu = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Sort,
-                                contentDescription = "Sort"
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            SortOption.entries.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option.displayName) },
-                                    onClick = {
-                                        sortOption = option
-                                        showSortMenu = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = if (option == sortOption) Icons.Default.Check else Icons.Default.Sort,
-                                            contentDescription = null,
-                                            tint = if (option == sortOption)
-                                                MaterialTheme.colorScheme.primary
-                                            else
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                )
-                            }
-                        }
+            SimpleDynamicMusicTopAppBar(
+                title = "Library",
+                albumColors = albumColors,
+                showSortButton = true,
+                showShuffleButton = true,
+                showSearchButton = true,
+                showProfileButton = true,
+                onShuffleClick = {
+                    val songsToShuffle = when (pagerState.currentPage) {
+                        0 -> uiState.allSongs // Songs tab
+                        1 -> uiState.allSongs // Artists tab - all songs
+                        2 -> uiState.allSongs // Albums tab - all songs
+                        else -> emptyList()
                     }
-
-                    // Shuffle All Songs in current tab
-                    IconButton(onClick = {
-                        val songsToShuffle = when (pagerState.currentPage) {
-                            0 -> uiState.allSongs // Songs tab
-                            1 -> uiState.allSongs // Artists tab - all songs
-                            2 -> uiState.allSongs // Albums tab - all songs
-                            else -> emptyList()
-                        }
-                        if (songsToShuffle.isNotEmpty()) {
-                            playerViewModel.shufflePlay(songsToShuffle)
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Shuffle All",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                    if (songsToShuffle.isNotEmpty()) {
+                        playerViewModel.shufflePlay(songsToShuffle)
                     }
-                    IconButton(onClick = onSearchClick) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search"
-                        )
-                    }
-                    // Profile Icon
-                    IconButton(onClick = { showProfileDialog = true }) {
-                        UserProfileIcon(userInitial = userInitial)
-                    }
-                }
+                },
+                onSearchClick = onSearchClick,
+                onSortOptionChange = { sortOption = it },
+                userPreferences = userPreferences,
+                userName = userName,
+                userInitial = userInitial,
+                sortOption = sortOption,
+                currentTab = pagerState.currentPage
             )
         }
     ) { paddingValues ->
-        ProfessionalGradientBackground (
+        DynamicAlbumBackground(
+            albumColors = albumColors,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Tabs
-            TabRow(selectedTabIndex = pagerState.currentPage) {
-                Tab(
-                    selected = pagerState.currentPage == 0,
-                    onClick = {
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(0)
-                        }
-                    },
-                    text = { Text("Songs", color = Color(0xFFD80000)) }
-                )
-                Tab(
-                    selected = pagerState.currentPage == 1,
-                    onClick = {
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(1)
-                        }
-                    },
-                    text = { Text("Artists", color = Color(0xFFD80000)) }
-                )
-                Tab(
-                    selected = pagerState.currentPage == 2,
-                    onClick = {
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(2)
-                        }
-                    },
-                    text = { Text("Albums", color = Color(0xFFD80000)) }
-                )
-            }
-
-            // Swipeable Content
-            HorizontalPager(
-                state = pagerState,
+            Column(
                 modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> TabContentWrapper {
-                        SongsTab(
+            ) {
+                // Tabs
+                TabRow(selectedTabIndex = pagerState.currentPage) {
+                    Tab(
+                        selected = pagerState.currentPage == 0,
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(0)
+                            }
+                        },
+                        text = { Text("Songs", color = Color(0xFFD80000)) }
+                    )
+                    Tab(
+                        selected = pagerState.currentPage == 1,
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(1)
+                            }
+                        },
+                        text = { Text("Artists", color = Color(0xFFD80000)) }
+                    )
+                    Tab(
+                        selected = pagerState.currentPage == 2,
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(2)
+                            }
+                        },
+                        text = { Text("Albums", color = Color(0xFFD80000)) }
+                    )
+                }
+
+                // Swipeable Content - removed padding modifier
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (page) {
+                        0 -> SongsTab(
                             songs = uiState.allSongs,
                             sortOption = sortOption,
                             onSongClick = { song ->
                                 playerViewModel.playSong(song, uiState.allSongs)
                             }
                         )
-                    }
-                    1 -> TabContentWrapper {
-                        ArtistsTab(
+
+                        1 -> ArtistsTab(
                             songs = uiState.allSongs,
                             onArtistClick = { artist, artistSongs ->
                                 onNavigateToArtist(artist, artistSongs)
                             }
                         )
-                    }
-                    2 -> TabContentWrapper {
-                        AlbumsTab(
+
+                        2 -> AlbumsTab(
                             songs = uiState.allSongs,
                             onAlbumClick = { album, artist, albumSongs ->
                                 onNavigateToAlbum(album, artist, albumSongs)
@@ -240,17 +173,6 @@ fun LibraryScreen(
                     }
                 }
             }
-        }
-
-        // User Profile Dialog
-        if (showProfileDialog) {
-            UserProfileDialog(
-                currentUserName = userName,
-                onDismiss = { showProfileDialog = false },
-                onNameUpdate = { newName ->
-                    userPreferences.saveUserName(newName)
-                }
-            )
         }
     }
 }
@@ -283,7 +205,13 @@ fun SongsTab(
     }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,  // Space below tabs
+            bottom = 100.dp  // Space for mini player
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
@@ -341,7 +269,13 @@ fun ArtistsTab(
     val artistsMap = songs.groupBy { it.artist }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,  // Space below tabs
+            bottom = 100.dp  // Space for mini player
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
@@ -398,7 +332,13 @@ fun AlbumsTab(
     val albumsMap = songs.groupBy { it.album ?: "Unknown Album" }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,  // Space below tabs
+            bottom = 100.dp  // Space for mini player
+        ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
@@ -434,7 +374,7 @@ fun AlbumsTab(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${albumSongs.first().artist} â€¢ ${albumSongs.size} songs",
+                            text = "${albumSongs.first().artist} • ${albumSongs.size} songs",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

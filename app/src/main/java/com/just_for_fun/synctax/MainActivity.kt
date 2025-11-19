@@ -261,7 +261,6 @@ fun MusicApp(userPreferences: UserPreferences) {
                     }
                     composable("quick_picks") {
                         QuickPicksScreen(
-                            onBackClick = { navController.popBackStack() },
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel
                         )

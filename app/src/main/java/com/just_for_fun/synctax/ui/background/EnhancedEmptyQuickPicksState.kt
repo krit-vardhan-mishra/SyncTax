@@ -1,4 +1,4 @@
-
+package com.just_for_fun.synctax.ui.background
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
@@ -7,18 +7,28 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.animation.core.tween
+import com.just_for_fun.synctax.ui.utils.AlbumColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun EnhancedEmptyQuickPicksState() {
+fun EnhancedEmptyQuickPicksState(
+    albumColors: AlbumColors
+) {
+    val bg = animateColorAsState(
+        targetValue = albumColors.vibrant.copy(alpha = 0.25f),
+        animationSpec = tween(durationMillis = 400),
+        label = "EmptyQuickPicksBg"
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 24.dp),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
+        color = bg.value
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
