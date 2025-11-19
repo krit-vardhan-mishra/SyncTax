@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -10,7 +10,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -28,22 +27,7 @@ fun UserProfileIcon(
             .size(size)
             .clip(CircleShape)
             .background(
-                if (useGradient) {
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFFE57373),
-                            Color(0xFFBA68C8)
-                        )
-                    )
-                } else {
-                    Brush.linearGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.primary
-                        )
-                    )
-                }
-            ),
+                color = Color.Red,),
         contentAlignment = Alignment.Center
     ) {
         Text(

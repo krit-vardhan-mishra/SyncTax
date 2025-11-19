@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -16,7 +18,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 @Composable
 fun UpNextSheet(
@@ -26,7 +27,10 @@ fun UpNextSheet(
     onPlaceNext: (Song) -> Unit,
     onRemoveFromQueue: (Song) -> Unit,
     onReorderQueue: (Int, Int) -> Unit,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    modifier: Modifier,
+    shape: CornerBasedShape,
+    color: Color
 ) {
     // --- DRAG AND DROP STATE ---
     val scope = rememberCoroutineScope()

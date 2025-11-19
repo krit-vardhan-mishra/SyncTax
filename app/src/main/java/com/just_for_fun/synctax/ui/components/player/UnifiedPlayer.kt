@@ -1,8 +1,7 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,8 +16,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.ui.components.player.FullScreenPlayerContent
-import com.just_for_fun.synctax.ui.components.player.MiniPlayerContent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +43,7 @@ fun UnifiedPlayer(
     onShuffleClick: () -> Unit,
     onRepeatClick: () -> Unit,
     onSeek: (Long) -> Unit,
-    downloadPercent: Int = 0
+    downloadPercent: Int = 0,
 ) {
     val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
@@ -89,7 +86,7 @@ fun UnifiedPlayer(
 
         Surface(
             color = Color.Transparent,
-            tonalElevation = 0.dp, // No elevation, bg provides depth
+            tonalElevation = 0.dp,
             shape = if (isExpanded) RectangleShape else RectangleShape,
             modifier = Modifier.fillMaxSize()
         ) {

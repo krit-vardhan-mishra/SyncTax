@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 

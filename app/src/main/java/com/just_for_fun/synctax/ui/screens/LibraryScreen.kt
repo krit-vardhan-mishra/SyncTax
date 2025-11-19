@@ -38,10 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.components.SongCard
-import com.just_for_fun.synctax.ui.components.section.MusicTopAppBar
+import com.just_for_fun.synctax.ui.components.card.SongCard
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
-import com.just_for_fun.synctax.ui.components.section.SortOption
+import com.just_for_fun.synctax.ui.components.utils.SortOption
 import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel

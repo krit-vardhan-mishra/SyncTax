@@ -1,26 +1,40 @@
 package com.just_for_fun.synctax.ui.screens
 
-import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.dynamic.DynamicHorizontalBackground
 import com.just_for_fun.synctax.ui.background.EnhancedEmptyQuickPicksState
-import com.just_for_fun.synctax.ui.components.RecommendationCard
+import com.just_for_fun.synctax.ui.components.card.RecommendationCard
+import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
+import com.just_for_fun.synctax.ui.dynamic.DynamicHorizontalBackground
+import com.just_for_fun.synctax.ui.guide.GuideContent
+import com.just_for_fun.synctax.ui.guide.GuideOverlay
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
@@ -36,8 +50,7 @@ fun QuickPicksScreen(
     val uiState by homeViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val userPreferences = remember(context) { UserPreferences(context) }
-    val showGuide by userPreferences.showQuickPicksGuide.collectAsState()
-    var guideStep by remember { mutableStateOf(0) }
+    var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(UserPreferences.GUIDE_QUICK_PICKS)) }
     val playerState by playerViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
 
@@ -127,74 +140,15 @@ fun QuickPicksScreen(
             }
         }
     
-        // Quick tour overlay
+        // Guide overlay
         if (showGuide) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
-            ) {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(24.dp)
-                        .fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Close icon in the top-right of the card
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            IconButton(
-                                onClick = { userPreferences.setQuickPicksGuide(false) },
-                                modifier = Modifier.align(Alignment.TopEnd)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Close Quick Tour",
-                                    tint = MaterialTheme.colorScheme.onBackground
-                                )
-                            }
-                        }
-                        Text(
-                            text = "Quick Picks Tour",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        val steps = listOf(
-                            "This section shows recommendations we think you'll love.",
-                            "Tap a song to start playing or view more details.",
-                            "Use the shuffle button to play the picks in random order."
-                        )
-                        Text(
-                            text = steps.getOrNull(guideStep) ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Button(onClick = {
-                                if (guideStep < steps.size - 1) {
-                                    guideStep++
-                                } else {
-                                    userPreferences.setQuickPicksGuide(false)
-                                }
-                            }) {
-                                Text("Next")
-                            }
-                            Spacer(modifier = Modifier.weight(1f))
-                            TextButton(onClick = { userPreferences.setQuickPicksGuide(false) }) {
-                                Text("Skip")
-                            }
-                        }
-                    }
+            GuideOverlay(
+                steps = GuideContent.quickPicksScreenGuide,
+                onDismiss = {
+                    showGuide = false
+                    userPreferences.setGuideShown(UserPreferences.GUIDE_QUICK_PICKS)
                 }
-            }
+            )
         }
     }
 }

@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.app
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions

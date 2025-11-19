@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.app
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -16,11 +16,12 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import java.util.Calendar
 
 @Composable
 fun EnhancedGreetingSection(userName: String) {
     val greeting = remember {
-        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when (hour) {
             in 5..11 -> "Good morning"
             in 12..16 -> "Good afternoon"

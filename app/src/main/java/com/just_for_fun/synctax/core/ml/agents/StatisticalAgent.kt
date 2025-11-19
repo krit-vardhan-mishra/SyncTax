@@ -12,15 +12,20 @@ import kotlin.math.pow
 class StatisticalAgent {
 
     private val featureWeights = doubleArrayOf(
-        0.15, // playFrequency
-        0.20, // avgCompletionRate
-        0.10, // skipRate (inverted)
-        0.15, // recencyScore
-        0.10, // timeOfDayMatch
-        0.10, // genreAffinity
-        0.10, // artistAffinity
-        0.05, // consecutivePlays
-        0.05  // sessionContext
+        0.12, // playFrequency
+        0.18, // avgCompletionRate
+        0.08, // skipRate (inverted)
+        0.12, // recencyScore
+        0.08, // timeOfDayMatch
+        0.08, // genreAffinity
+        0.08, // artistAffinity
+        0.04, // consecutivePlays
+        0.04, // sessionContext
+        0.06, // durationScore
+        0.06, // albumAffinity
+        0.03, // releaseYearScore
+        0.02, // songPopularity
+        0.01  // tempoEnergy
     )
 
     suspend fun analyze(songFeatures: SongFeatures): RecommendationResult {

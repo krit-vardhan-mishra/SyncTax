@@ -87,8 +87,34 @@ class RecommendationScorer:
             similarity = 1.0 / (1.0 + z_score)
             similarity_scores.append(similarity)
 
-        # Weighted average (different weights for different features)
-        weights = [0.15, 0.20, 0.10, 0.15, 0.10, 0.10, 0.10, 0.05, 0.05]
+        # Weighted average with updated weights for 14 features
+        # Added: durationScore, albumAffinity, releaseYearScore, songPopularity, tempoEnergy
+        weights = [
+            0.12,  # playFrequency
+            0.18,  # avgCompletionRate
+            0.08,  # skipRate
+            0.12,  # recencyScore
+            0.08,  # timeOfDayMatch
+            0.08,  # genreAffinity
+            0.08,  # artistAffinity
+            0.04,  # consecutivePlays
+            0.04,  # sessionContext
+            0.06,  # durationScore
+            0.06,  # albumAffinity
+            0.03,  # releaseYearScore
+            0.02,  # songPopularity
+            0.01   # tempoEnergy
+        ]
+        
+        # Pad weights if feature count doesn't match (backward compatibility)
+        if len(similarity_scores) < len(weights):
+            weights = weights[:len(similarity_scores)]
+        elif len(similarity_scores) > len(weights):
+            # Distribute remaining weight equally
+            remaining_weight = 1.0 - sum(weights)
+            extra_features = len(similarity_scores) - len(weights)
+            weights.extend([remaining_weight / extra_features] * extra_features)
+        
         weighted_score = sum(s * w for s, w in zip(similarity_scores, weights))
 
         return weighted_score

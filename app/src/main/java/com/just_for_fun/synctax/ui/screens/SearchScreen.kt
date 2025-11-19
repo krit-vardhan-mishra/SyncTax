@@ -13,12 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.just_for_fun.synctax.ui.components.SongCard
-import com.just_for_fun.synctax.ui.components.OnlineResultCard
+import com.just_for_fun.synctax.ui.components.card.SongCard
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.onFocusChanged
+import com.just_for_fun.synctax.ui.components.app.EmptySearchState
+import com.just_for_fun.synctax.ui.components.card.OnlineResultCard
+import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.ui.dynamic.DynamicRadialBackground
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
@@ -82,6 +84,10 @@ fun SearchScreen(
             }
         }
     }
+
+    // Guide Overlay
+    val userPreferences = remember(context) { com.just_for_fun.synctax.data.preferences.UserPreferences(context) }
+    var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(com.just_for_fun.synctax.data.preferences.UserPreferences.GUIDE_SEARCH)) }
 
     Scaffold(
         topBar = {
@@ -362,13 +368,10 @@ fun SearchScreen(
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                             }
-
                             items(filteredSongs) { song ->
                                 SongCard(
                                     song = song,
-                                    onClick = {
-                                        playerViewModel.playSong(song, filteredSongs)
-                                    }
+                                    onClick = { playerViewModel.playSong(song, filteredSongs) }
                                 )
                             }
                         }
@@ -377,80 +380,15 @@ fun SearchScreen(
             }
         }
     }
-}
 
-@Composable
-fun EmptySearchState() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Search,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Search Your Music",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Find songs, artists, albums, and more",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-fun NoResultsState(searchQuery: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.SearchOff,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "No Results Found",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "No songs match \"$searchQuery\"",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Try different keywords or check your spelling",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+    if (showGuide) {
+        com.just_for_fun.synctax.ui.guide.GuideOverlay(
+            steps = com.just_for_fun.synctax.ui.guide.GuideContent.searchScreenGuide,
+            onDismiss = {
+                showGuide = false
+                userPreferences.setGuideShown(com.just_for_fun.synctax.data.preferences.UserPreferences.GUIDE_SEARCH)
+            }
         )
     }
 }

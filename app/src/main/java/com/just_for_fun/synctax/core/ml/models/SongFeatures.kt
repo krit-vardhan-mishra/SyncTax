@@ -10,7 +10,12 @@ data class SongFeatures(
     val genreAffinity: Double,        // User's affinity to this genre
     val artistAffinity: Double,       // User's affinity to this artist
     val consecutivePlays: Double,     // How many times played in a row
-    val sessionContext: Double        // Context similarity score
+    val sessionContext: Double,       // Context similarity score
+    val durationScore: Double,        // Song duration preference match (0-1)
+    val albumAffinity: Double,        // User's affinity to this album
+    val releaseYearScore: Double,     // Preference for song release year
+    val songPopularity: Double,       // How popular this song is for the user
+    val tempoEnergy: Double           // Estimated tempo/energy level (0-1)
 ) {
     fun toVector(): DoubleArray = doubleArrayOf(
         playFrequency,
@@ -21,6 +26,11 @@ data class SongFeatures(
         genreAffinity,
         artistAffinity,
         consecutivePlays,
-        sessionContext
+        sessionContext,
+        durationScore,
+        albumAffinity,
+        releaseYearScore,
+        songPopularity,
+        tempoEnergy
     )
 }

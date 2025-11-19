@@ -47,7 +47,8 @@ fun DynamicGreetingSection(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 12.dp),
         shape = MaterialTheme.shapes.large,
-        color = albumColors.vibrant.copy(alpha = 0.25f)
+        // Use lighter vibrant color (black fallback when no album colors)
+        color = albumColors.blackColor.copy(alpha = 0.20f)
     ) {
         Column(
             modifier = Modifier.padding(20.dp)

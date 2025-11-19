@@ -27,8 +27,9 @@ import androidx.core.net.toUri
 import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.ui.components.SongCard
+import com.just_for_fun.synctax.ui.components.card.SongCard
 import kotlinx.coroutines.Dispatchers
+import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,7 +96,10 @@ fun ArtistDetailScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    TooltipIconButton(
+                        onClick = onBackClick,
+                        tooltipText = "Go back"
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",

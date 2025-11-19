@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.animation.core.tween
 import com.just_for_fun.synctax.ui.utils.AlbumColors
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
@@ -39,7 +40,7 @@ fun EnhancedEmptyQuickPicksState(
                 imageVector = Icons.Default.AutoAwesome,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.tertiary
+                tint = Color.LightGray
             )
             Text(
                 text = "The app is analyzing your listening habits to find the best songs for you.",

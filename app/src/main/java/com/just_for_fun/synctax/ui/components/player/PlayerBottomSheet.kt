@@ -1,9 +1,8 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.player
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlinx.coroutines.launch

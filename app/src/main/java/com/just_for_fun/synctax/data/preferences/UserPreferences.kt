@@ -75,6 +75,19 @@ class UserPreferences(context: Context) {
         return prefs.getString(KEY_THEME_MODE, KEY_THEME_MODE_SYSTEM) ?: KEY_THEME_MODE_SYSTEM
     }
 
+    // Guide preferences
+    fun isGuideShown(screen: String): Boolean {
+        return prefs.getBoolean("guide_shown_$screen", false)
+    }
+    
+    fun setGuideShown(screen: String, shown: Boolean = true) {
+        prefs.edit().putBoolean("guide_shown_$screen", shown).apply()
+    }
+    
+    fun shouldShowGuide(screen: String): Boolean {
+        return !isGuideShown(screen)
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -84,5 +97,12 @@ class UserPreferences(context: Context) {
         const val KEY_THEME_MODE_SYSTEM = "system"
         const val KEY_THEME_MODE_LIGHT = "light"
         const val KEY_THEME_MODE_DARK = "dark"
+        
+        // Guide screen identifiers
+        const val GUIDE_HOME = "home"
+        const val GUIDE_PLAYER = "player"
+        const val GUIDE_SEARCH = "search"
+        const val GUIDE_LIBRARY = "library"
+        const val GUIDE_QUICK_PICKS = "quick_picks"
     }
 }

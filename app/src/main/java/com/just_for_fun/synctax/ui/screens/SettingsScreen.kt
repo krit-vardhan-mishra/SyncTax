@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,7 +24,10 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    TooltipIconButton(
+                        onClick = onBackClick,
+                        tooltipText = "Go back"
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }

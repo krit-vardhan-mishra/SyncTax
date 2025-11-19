@@ -13,28 +13,24 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.ui.components.AppNavigationBar
-import com.just_for_fun.synctax.ui.components.PlayerBottomSheet
+import com.just_for_fun.synctax.ui.components.app.AppNavigationBar
+import com.just_for_fun.synctax.ui.components.player.PlayerBottomSheet
 import com.just_for_fun.synctax.ui.screens.*
 import com.just_for_fun.synctax.ui.theme.synctaxTheme
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
@@ -141,6 +137,17 @@ class MainActivity : ComponentActivity() {
                 requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+
+        // Request audio recording permission (optional - for audio visualization)
+        // Note: This is optional and the app will work without it using fallback visualization
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // We don't force request this permission as it's not critical
+            // The AudioAnalyzer will gracefully handle missing permission
+        }
     }
 }
 
@@ -163,6 +170,7 @@ fun MusicApp(userPreferences: UserPreferences) {
     val navController = rememberNavController()
     val playerViewModel: PlayerViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
+    val dynamicBgViewModel: com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel = viewModel()
 
     // --- HOISTED STATE ---
     // Hoist the scaffold state here to control nav bar visibility
@@ -176,6 +184,12 @@ fun MusicApp(userPreferences: UserPreferences) {
     // --- END HOISTED STATE ---
 
     val playerState by playerViewModel.uiState.collectAsState()
+    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+    
+    // Update album colors when current song changes
+    LaunchedEffect(playerState.currentSong?.albumArtUri) {
+        dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
@@ -221,7 +235,12 @@ fun MusicApp(userPreferences: UserPreferences) {
                 NavHost(
                     navController = navController,
                     startDestination = "home",
-                    modifier = Modifier.padding(innerPadding)
+                    modifier = Modifier.padding(
+                        top = innerPadding.calculateTopPadding(),
+                        start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
+                        end = innerPadding.calculateEndPadding(LayoutDirection.Ltr),
+                        bottom = if (playerState.currentSong != null) 0.dp else innerPadding.calculateBottomPadding()
+                    )
                 ) {
                     composable("home") {
                         HomeScreen(
@@ -336,15 +355,15 @@ fun MusicApp(userPreferences: UserPreferences) {
             }
         }
         
-        // --- NAVBAR VISIBILITY CHANGE ---
-        // Conditionally show the Nav Bar based on the player's expanded state
         AnimatedVisibility(
             visible = !isPlayerExpanded,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it })
         ) {
-            AppNavigationBar(navController)
+            AppNavigationBar(
+                navController = navController,
+                albumColors = albumColors
+            )
         }
-        // --- END NAVBAR VISIBILITY CHANGE ---
     }
 }

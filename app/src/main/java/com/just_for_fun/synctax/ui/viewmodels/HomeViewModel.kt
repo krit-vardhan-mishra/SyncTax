@@ -13,7 +13,9 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.schabi.newpipe.extractor.timeago.patterns.it
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -25,6 +27,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
     private val onlineManager = OnlineSearchManager()
     private val listenAgainManager = ListenAgainManager(getApplication())
+    
+    private var lastQuickPicksRefresh = 0L
+    private val quickPicksRefreshInterval = 15 * 60 * 1000L // 15 minutes in milliseconds
 
     init {
         loadData()
@@ -32,6 +37,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         scanMusic()
         observeListeningHistoryForTraining()
         observeListenAgain()
+        // Start periodic refresh for deleted songs check
+        startPeriodicRefresh()
     }
 
     private fun observeListenAgain() {
@@ -211,6 +218,45 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             selectedAlbumArtist = artist,
             selectedAlbumSongs = songs
         )
+    }
+
+    private fun startPeriodicRefresh() {
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(quickPicksRefreshInterval)
+                
+                // Check for deleted songs and cleanup ML data
+                cleanupDeletedSongs()
+                
+                // Refresh Quick Picks if there's listening history
+                if (_uiState.value.allSongs.isNotEmpty()) {
+                    generateQuickPicks()
+                }
+            }
+        }
+    }
+    
+    private fun cleanupDeletedSongs() {
+        viewModelScope.launch {
+            try {
+                // Get all song IDs from database
+                val dbSongIds = _uiState.value.allSongs.map { it.id }.toSet()
+                
+                // Get all song IDs from listening history and preferences
+                val historyIds = repository.getRecentHistory(1000).first().map { it.songId }.toSet()
+                val preferenceIds = repository.getTopPreferences(1000).first().map { it.songId }.toSet()
+                
+                // Find deleted song IDs (in history/preferences but not in songs table)
+                val deletedIds = (historyIds + preferenceIds) - dbSongIds
+                
+                if (deletedIds.isNotEmpty()) {
+                    // Remove deleted songs from listening history and preferences
+                    repository.cleanupDeletedSongsData(deletedIds.toList())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onCleared() {

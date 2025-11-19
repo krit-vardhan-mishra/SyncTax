@@ -222,4 +222,16 @@ class MusicRepository(private val context: Context) {
         val ninetyDaysAgo = System.currentTimeMillis() - (90 * 24 * 60 * 60 * 1000L)
         historyDao.deleteOldHistory(ninetyDaysAgo)
     }
+    
+    /**
+     * Clean up listening history and preferences for deleted songs
+     */
+    suspend fun cleanupDeletedSongsData(deletedSongIds: List<String>) = withContext(Dispatchers.IO) {
+        deletedSongIds.forEach { songId ->
+            // Remove from listening history
+            historyDao.deleteBySongId(songId)
+            // Remove from user preferences
+            preferenceDao.deleteBySongId(songId)
+        }
+    }
 }

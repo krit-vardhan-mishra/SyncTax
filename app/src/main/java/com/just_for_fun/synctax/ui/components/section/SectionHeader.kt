@@ -24,7 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.just_for_fun.synctax.ui.components.section.SortOption
+import com.just_for_fun.synctax.ui.components.utils.SortOption
 
 @Composable
 fun SectionHeader(

@@ -23,6 +23,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import android.media.AudioManager
+import android.media.AudioFocusRequest
+import android.os.Build
+import android.media.AudioAttributes
 
 /**
  * Foreground service to keep music playing even when the app is in the background.
@@ -35,11 +39,35 @@ class MusicService : Service() {
 
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var notificationManager: MusicNotificationManager
+    private lateinit var audioManager: AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     private var currentSong: Song? = null
     private var isPlaying = false
     private var currentPosition = 0L
     private var duration = 0L
+    
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                // Permanent loss of audio focus - pause playback
+                onPause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // Temporary loss of audio focus - pause playback
+                onPause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // Temporary loss with ducking allowed - lower volume (handled by system)
+                // We'll just pause to avoid conflict
+                onPause()
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                // Regained audio focus - optionally resume playback
+                // We won't auto-resume, user needs to press play
+            }
+        }
+    }
 
     companion object {
         const val CHANNEL_ID = "music_playback_channel"
@@ -59,6 +87,7 @@ class MusicService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         setupMediaSession()
         notificationManager = MusicNotificationManager(this, mediaSession, serviceScope)
     }
@@ -79,6 +108,7 @@ class MusicService : Service() {
     }
 
     override fun onDestroy() {
+        abandonAudioFocus()
         serviceScope.cancel()
         mediaSession.release()
         super.onDestroy()
@@ -194,6 +224,19 @@ class MusicService : Service() {
     }
 
     fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long) {
+        // Request audio focus when starting playback
+        if (isPlaying && !this.isPlaying) {
+            if (!requestAudioFocus()) {
+                // If we can't get audio focus, don't start playback
+                return
+            }
+        }
+        
+        // Abandon audio focus when stopping playback
+        if (!isPlaying && this.isPlaying) {
+            abandonAudioFocus()
+        }
+
         this.currentSong = song
         this.isPlaying = isPlaying
         this.currentPosition = position
@@ -246,5 +289,42 @@ class MusicService : Service() {
         sendBroadcast(Intent(ACTION_SEEK_TO).apply {
             putExtra("position", position)
         })
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(audioAttributes)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .setAcceptsDelayedFocusGain(true)
+                .build()
+
+            val result = audioManager.requestAudioFocus(audioFocusRequest!!)
+            result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            @Suppress("DEPRECATION")
+            val result = audioManager.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+            result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let {
+                audioManager.abandonAudioFocusRequest(it)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
     }
 }

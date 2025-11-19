@@ -20,4 +20,10 @@ interface ListeningHistoryDao {
 
     @Query("DELETE FROM listening_history WHERE playTimestamp < :timestamp")
     suspend fun deleteOldHistory(timestamp: Long)
+    
+    @Query("DELETE FROM listening_history WHERE songId = :songId")
+    suspend fun deleteBySongId(songId: String)
+
+    @Query("DELETE FROM listening_history WHERE songId IN (:songIds)")
+    suspend fun deleteHistoryForSongs(songIds: List<String>)
 }

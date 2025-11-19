@@ -3,7 +3,6 @@ package com.just_for_fun.synctax.ui.components.player
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,17 +19,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.guide.GuideContent
+import com.just_for_fun.synctax.ui.guide.GuideOverlay
+import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +80,13 @@ fun FullScreenPlayerContent(
     // Swipe gesture state - LOCAL to this composable
     var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = 150f
+
+    // Guide Overlay
+    val context = LocalContext.current
+    val userPreferences =
+        remember(context) { UserPreferences(context) }
+    var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(UserPreferences.GUIDE_PLAYER)) }
+
 
     // Sync overlay volume with actual volume
     LaunchedEffect(volume) {
@@ -134,7 +143,10 @@ fun FullScreenPlayerContent(
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onClose) {
+                TooltipIconButton(
+                    onClick = onClose,
+                    tooltipText = "Minimize player"
+                ) {
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = "Close Player",
@@ -148,7 +160,10 @@ fun FullScreenPlayerContent(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = { showPlayerMenu = true }) {
+                TooltipIconButton(
+                    onClick = { showPlayerMenu = true },
+                    tooltipText = "Song details & options"
+                ) {
                     Icon(
                         imageVector = Icons.Default.GraphicEq,
                         contentDescription = "Player Menu",
@@ -172,7 +187,7 @@ fun FullScreenPlayerContent(
                                 hasTriggered = false
                             },
                             onDragEnd = {
-                                if (!hasTriggered && kotlin.math.abs(albumArtOffsetX) > swipeThreshold) {
+                                if (!hasTriggered && abs(albumArtOffsetX) > swipeThreshold) {
                                     hasTriggered = true
                                     when {
                                         albumArtOffsetX > 0 -> {
@@ -457,7 +472,10 @@ fun FullScreenPlayerContent(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onShuffleClick) {
+                TooltipIconButton(
+                    onClick = onShuffleClick,
+                    tooltipText = if (shuffleEnabled) "Shuffle is ON" else "Shuffle is OFF"
+                ) {
                     Icon(
                         imageVector = Icons.Default.Shuffle,
                         contentDescription = "Shuffle",
@@ -467,7 +485,10 @@ fun FullScreenPlayerContent(
                     )
                 }
 
-                IconButton(onClick = onPreviousClick) {
+                TooltipIconButton(
+                    onClick = onPreviousClick,
+                    tooltipText = "Previous song"
+                ) {
                     Icon(
                         imageVector = Icons.Default.SkipPrevious,
                         contentDescription = "Previous",
@@ -499,7 +520,10 @@ fun FullScreenPlayerContent(
                     }
                 }
 
-                IconButton(onClick = onNextClick) {
+                TooltipIconButton(
+                    onClick = onNextClick,
+                    tooltipText = "Next song"
+                ) {
                     Icon(
                         imageVector = Icons.Default.SkipNext,
                         contentDescription = "Next",
@@ -508,7 +532,10 @@ fun FullScreenPlayerContent(
                     )
                 }
 
-                IconButton(onClick = onRepeatClick) {
+                TooltipIconButton(
+                    onClick = onRepeatClick,
+                    tooltipText = if (repeatEnabled) "Repeat is ON" else "Repeat is OFF"
+                ) {
                     Icon(
                         imageVector = if (repeatEnabled) Icons.Default.RepeatOne else Icons.Default.Repeat,
                         contentDescription = "Repeat",
@@ -555,20 +582,45 @@ fun FullScreenPlayerContent(
                         onPlaceNext = onPlaceNext,
                         onRemoveFromQueue = onRemoveFromQueue,
                         onReorderQueue = onReorderQueue,
-                        snackbarHostState = snackbarHostState
+                        snackbarHostState = snackbarHostState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        shape = MaterialTheme.shapes.medium,
+                        color = Color.Transparent
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
-
-            // Player Menu
-            if (showPlayerMenu) {
-                SimplePlayerMenu(
-                    song = song,
-                    volume = volume,
-                    onVolumeChange = onSetVolume,
-                    onDismiss = { showPlayerMenu = false }
-                )
-            }
         }
+    }
+
+    Spacer(modifier = Modifier.height(48.dp))
+
+    // Player Menu
+    if (showPlayerMenu) {
+        SimplePlayerMenu(
+            song = song,
+            volume = volume,
+            onVolumeChange = onSetVolume,
+            onDismiss = { }
+        )
+    }
+
+    if (showGuide) {
+        GuideOverlay(
+            steps = GuideContent.playerScreenGuide,
+            onDismiss = {
+                userPreferences.setGuideShown(UserPreferences.GUIDE_PLAYER)
+            }
+        )
     }
 }

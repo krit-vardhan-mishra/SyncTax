@@ -17,13 +17,13 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.dynamic.DynamicGreetingSection
 import com.just_for_fun.synctax.ui.dynamic.DynamicSectionBackground
-import com.just_for_fun.synctax.ui.components.SongCard
+import com.just_for_fun.synctax.ui.components.card.SongCard
 import com.just_for_fun.synctax.ui.components.section.EmptyMusicState
 import com.just_for_fun.synctax.ui.components.section.FilterChipsRow
 import com.just_for_fun.synctax.ui.components.section.QuickPicksSection
 import com.just_for_fun.synctax.ui.components.section.SectionHeader
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
-import com.just_for_fun.synctax.ui.components.section.SortOption
+import com.just_for_fun.synctax.ui.components.utils.SortOption
 import com.just_for_fun.synctax.ui.components.section.SpeedDialSection
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
@@ -87,257 +87,310 @@ fun HomeScreen(
         isVisible = true
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            SimpleDynamicMusicTopAppBar (
-                title = "Music",
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                SimpleDynamicMusicTopAppBar(
+                    title = "Music",
+                    albumColors = albumColors,
+                    showShuffleButton = true,
+                    showRefreshButton = true,
+                    showSearchButton = true,
+                    showProfileButton = true,
+                    onShuffleClick = {
+                        if (uiState.allSongs.isNotEmpty()) {
+                            playerViewModel.shufflePlay(uiState.allSongs)
+                        }
+                    },
+                    onRefreshClick = { homeViewModel.scanMusic() },
+                    onSearchClick = onSearchClick,
+                    onTrainClick = onTrainClick,
+                    onOpenSettings = onOpenSettings,
+                    userPreferences = userPreferences,
+                    userName = userName,
+                    userInitial = userInitial
+                )
+            }
+        ) { paddingValues ->
+            DynamicAlbumBackground(
                 albumColors = albumColors,
-                showShuffleButton = true,
-                showRefreshButton = true,
-                showSearchButton = true,
-                showProfileButton = true,
-                onShuffleClick = {
-                    if (uiState.allSongs.isNotEmpty()) {
-                        playerViewModel.shufflePlay(uiState.allSongs)
-                    }
-                },
-                onRefreshClick = { homeViewModel.scanMusic() },
-                onSearchClick = onSearchClick,
-                onTrainClick = onTrainClick,
-                onOpenSettings = onOpenSettings,
-                userPreferences = userPreferences,
-                userName = userName,
-                userInitial = userInitial
-            )
-        }
-    ) { paddingValues ->
-        DynamicAlbumBackground(
-            albumColors = albumColors,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                uiState.allSongs.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        EmptyMusicState(
-                            onScanClick = { homeViewModel.scanMusic() },
-                            isScanning = uiState.isScanning
-                        )
-                    }
-                }
-
-                else -> {
-                    AnimatedVisibility(
-                        visible = isVisible,
-                        enter = fadeIn(animationSpec = tween(600)) +
-                                slideInVertically(animationSpec = tween(600)) { it / 4 }
-                    ) {
-                        LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                when {
+                    uiState.isLoading -> {
+                        Box(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                            contentAlignment = Alignment.Center
                         ) {
-                            // Greeting Section with dynamic colors
-                            if (userName.isNotEmpty()) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    uiState.allSongs.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyMusicState(
+                                onScanClick = { homeViewModel.scanMusic() },
+                                isScanning = uiState.isScanning
+                            )
+                        }
+                    }
+
+                    else -> {
+                        AnimatedVisibility(
+                            visible = isVisible,
+                            enter = fadeIn(animationSpec = tween(600)) +
+                                    slideInVertically(animationSpec = tween(600)) { it / 4 }
+                        ) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                            ) {
+                                // Greeting Section with dynamic colors
+                                if (userName.isNotEmpty()) {
+                                    item {
+                                        DynamicGreetingSection (
+                                            userName = userName,
+                                            albumColors = albumColors
+                                        )
+                                    }
+                                }
+
+                                // Filter Chips
                                 item {
-                                    DynamicGreetingSection(
-                                        userName = userName,
-                                        albumColors = albumColors
-                                    )
+                                    FilterChipsRow()
                                 }
-                            }
 
-                            // Filter Chips
-                            item {
-                                FilterChipsRow()
-                            }
-
-                            // Quick Picks Section with dynamic background
-                            item {
-                                DynamicSectionBackground(
-                                    albumColors = albumColors,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 12.dp),
-                                    useAccent = true
-                                ) {
-                                    QuickPicksSection(
-                                        songs = uiState.quickPicks,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.quickPicks)
-                                        },
-                                        onRefreshClick = { homeViewModel.generateQuickPicks() },
-                                        onViewAllClick = { /* Navigate to Quick Picks */ },
-                                        isGenerating = uiState.isGeneratingRecommendations,
-                                        onPlayAll = {
-                                            uiState.quickPicks.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playSong(
-                                                    firstSong,
-                                                    uiState.quickPicks
-                                                )
+                                // Quick Picks Section with dynamic background
+                                item {
+                                    DynamicSectionBackground(
+                                        albumColors = albumColors,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                                        useAccent = true
+                                    ) {
+                                        QuickPicksSection(
+                                            songs = uiState.quickPicks,
+                                            onSongClick = { song ->
+                                                playerViewModel.playSong(song, uiState.quickPicks)
+                                            },
+                                            onRefreshClick = { homeViewModel.generateQuickPicks() },
+                                            onViewAllClick = { /* Navigate to Quick Picks */ },
+                                            isGenerating = uiState.isGeneratingRecommendations,
+                                            onPlayAll = {
+                                                uiState.quickPicks.firstOrNull()?.let { firstSong ->
+                                                    playerViewModel.playSong(
+                                                        firstSong,
+                                                        uiState.quickPicks
+                                                    )
+                                                }
                                             }
-                                        }
+                                        )
+                                    }
+                                }
+
+                                // Listen Again Section
+                                @OptIn(ExperimentalFoundationApi::class)
+                                item {
+                                    SectionHeader(
+                                        title = "Listen again",
+                                        subtitle = null,
+                                        onViewAllClick = null
                                     )
-                                }
-                            }
 
-                            // Listen Again Section
-                            @OptIn(ExperimentalFoundationApi::class)
-                            item {
-                                SectionHeader(
-                                    title = "Listen again",
-                                    subtitle = null,
-                                    onViewAllClick = null
-                                )
+                                    val songsPerPage = 4
+                                    val shuffledSongs = remember(uiState.allSongs) {
+                                        uiState.allSongs.take(16).shuffled()
+                                    }
+                                    val pages = shuffledSongs.chunked(songsPerPage)
 
-                                val songsPerPage = 4
-                                val shuffledSongs = remember(uiState.allSongs) {
-                                    uiState.allSongs.take(16).shuffled()
-                                }
-                                val pages = shuffledSongs.chunked(songsPerPage)
-
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 16.dp)
-                                ) {
-                                    items(pages.size) { pageIndex ->
-                                        Column(
-                                            modifier = Modifier
-                                                .fillParentMaxWidth()
-                                                .padding(vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            pages[pageIndex].forEach { song ->
-                                                SongCard(
-                                                    song = song,
-                                                    onClick = {
-                                                        playerViewModel.playSong(
-                                                            song,
-                                                            uiState.allSongs
-                                                        )
-                                                    },
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .animateItem()
-                                                )
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp)
+                                    ) {
+                                        items(pages.size) { pageIndex ->
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillParentMaxWidth()
+                                                    .padding(vertical = 8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                pages[pageIndex].forEach { song ->
+                                                    SongCard(
+                                                        song = song,
+                                                        onClick = {
+                                                            playerViewModel.playSong(
+                                                                song,
+                                                                uiState.allSongs
+                                                            )
+                                                        },
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .animateItem()
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            // Speed Dial Section
-                            item {
-                                SpeedDialSection(
-                                    songs = uiState.allSongs,
-                                    onSongClick = { song ->
-                                        playerViewModel.playSong(song, uiState.allSongs)
-                                    },
-                                    userInitial = userInitial
-                                )
-                            }
+                                // Speed Dial Section
+                                item {
+                                    SpeedDialSection(
+                                        songs = uiState.allSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(song, uiState.allSongs)
+                                        },
+                                        userInitial = userInitial
+                                    )
+                                }
 
-                            // All Songs Section
-                            item {
-                                SectionHeader(
-                                    title = "All Songs",
-                                    subtitle = null,
-                                    onViewAllClick = null,
-                                    showSortButton = true,
-                                    currentSortOption = currentSortOption,
-                                    onSortOptionChange = { currentSortOption = it }
-                                )
-                            }
+                                // All Songs Section
+                                item {
+                                    SectionHeader(
+                                        title = "All Songs",
+                                        subtitle = null,
+                                        onViewAllClick = null,
+                                        showSortButton = true,
+                                        currentSortOption = currentSortOption,
+                                        onSortOptionChange = { currentSortOption = it }
+                                    )
+                                }
 
-                            items(sortedSongs, key = { it.id }) { song ->
-                                AnimatedVisibility(
-                                    visible = true,
-                                    enter = fadeIn(animationSpec = tween(400)) +
-                                            expandVertically(animationSpec = tween(400))
-                                ) {
-                                    SongCard(
-                                        song = song,
-                                        onClick = {
+                                items(sortedSongs, key = { it.id }) { song ->
+                                    AnimatedVisibility(
+                                        visible = true,
+                                        enter = fadeIn(animationSpec = tween(400)) +
+                                                expandVertically(animationSpec = tween(400))
+                                    ) {
+                                        SongCard(
+                                            song = song,
+                                            onClick = {
+                                                playerViewModel.playSong(song, uiState.allSongs)
+                                            }
+                                        )
+                                    }
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                }
+
+                                item {
+                                    Divider(
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                }
+
+                                item {
+                                    SpeedDialGrid(
+                                        songs = uiState.allSongs,
+                                        onSongClick = { song ->
                                             playerViewModel.playSong(song, uiState.allSongs)
                                         }
                                     )
                                 }
-                            }
 
-                            // Bottom padding for mini player
-                            item {
-                                Spacer(modifier = Modifier.height(96.dp))
+                                item {
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                }
+
+                                item {
+                                    Divider(
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                }
+
+                                // Bottom padding for mini player
+                                item {
+                                    Spacer(modifier = Modifier.height(96.dp))
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            // Snackbar for errors
-            uiState.error?.let { error ->
-                Snackbar(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp),
-                    action = {
-                        TextButton(onClick = { homeViewModel.dismissError() }) {
-                            Text("Dismiss")
-                        }
-                    }
-                ) {
-                    Text(error)
-                }
-            }
-
-            // Training indicator
-            AnimatedVisibility(
-                visible = uiState.isTraining,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-                modifier = Modifier.align(Alignment.BottomCenter)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                Card(
-                    modifier = Modifier.padding(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                // Snackbar for errors
+                uiState.error?.let { error ->
+                    Snackbar(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp),
+                        action = {
+                            TextButton(onClick = { homeViewModel.dismissError() }) {
+                                Text("Dismiss")
+                            }
+                        }
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            "Training ML models...",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Text(error)
                     }
+                }
+
+                // Training indicator
+                AnimatedVisibility(
+                    visible = uiState.isTraining,
+                    enter = fadeIn() + slideInVertically { it },
+                    exit = fadeOut() + slideOutVertically { it },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                ) {
+                    Card(
+                        modifier = Modifier.padding(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                "Training ML models...",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                // Guide Overlay
+                var showGuide by remember {
+                    mutableStateOf(
+                        userPreferences.shouldShowGuide(
+                            UserPreferences.GUIDE_HOME
+                        )
+                    )
+                }
+                if (showGuide) {
+                    com.just_for_fun.synctax.ui.guide.GuideOverlay(
+                        steps = com.just_for_fun.synctax.ui.guide.GuideContent.homeScreenGuide,
+                        onDismiss = {
+                            showGuide = false
+                            userPreferences.setGuideShown(UserPreferences.GUIDE_HOME)
+                        }
+                    )
                 }
             }
         }

@@ -23,4 +23,10 @@ interface UserPreferenceDao {
 
     @Query("UPDATE user_preferences SET skipCount = skipCount + 1 WHERE songId = :songId")
     suspend fun incrementSkipCount(songId: String)
+    
+    @Query("DELETE FROM user_preferences WHERE songId = :songId")
+    suspend fun deleteBySongId(songId: String)
+
+    @Query("DELETE FROM user_preferences WHERE songId IN (:songIds)")
+    suspend fun deletePreferencesForSongs(songIds: List<String>)
 }

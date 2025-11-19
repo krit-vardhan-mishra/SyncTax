@@ -17,8 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.just_for_fun.synctax.ui.components.QuickPickCard
-import com.just_for_fun.synctax.ui.components.UserProfileIcon
+import com.just_for_fun.synctax.ui.components.app.UserProfileIcon
+import com.just_for_fun.synctax.ui.components.card.QuickPickCard
 
 
 @Composable

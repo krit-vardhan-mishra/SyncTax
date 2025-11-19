@@ -10,8 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.components.UserProfileDialog
-import com.just_for_fun.synctax.ui.components.UserProfileIcon
+import com.just_for_fun.synctax.ui.components.app.UserProfileDialog
+import com.just_for_fun.synctax.ui.components.app.UserProfileIcon
+import com.just_for_fun.synctax.ui.components.utils.SortOption
+import com.just_for_fun.synctax.ui.components.utils.TooltipBox
 import com.just_for_fun.synctax.ui.utils.AlbumColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,34 +59,40 @@ fun SimpleDynamicMusicTopAppBar(
         actions = {
             // Shuffle button
             if (showShuffleButton && onShuffleClick != null) {
-                IconButton(onClick = onShuffleClick) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = accentIconColor
-                    )
+                TooltipBox(tooltip = "Shuffle songs") {
+                    IconButton(onClick = onShuffleClick) {
+                        Icon(
+                            imageVector = Icons.Default.Shuffle,
+                            contentDescription = "Shuffle",
+                            tint = accentIconColor
+                        )
+                    }
                 }
             }
 
             // Refresh button
             if (showRefreshButton && onRefreshClick != null) {
-                IconButton(onClick = onRefreshClick) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh",
-                        tint = dynamicIconColor
-                    )
+                TooltipBox(tooltip = "Refresh library") {
+                    IconButton(onClick = onRefreshClick) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = dynamicIconColor
+                        )
+                    }
                 }
             }
 
             // Sort button
             if (showSortButton && onSortClick != null && currentTab == 0) {
-                IconButton(onClick = { showSortMenu = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Sort,
-                        contentDescription = "Sort",
-                        tint = dynamicIconColor
-                    )
+                TooltipBox(tooltip = "Sort songs") {
+                    IconButton(onClick = { showSortMenu = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Sort,
+                            contentDescription = "Sort",
+                            tint = dynamicIconColor
+                        )
+                    }
                 }
 
                 DropdownMenu(
@@ -115,20 +123,24 @@ fun SimpleDynamicMusicTopAppBar(
 
             // Search button
             if (showSearchButton && onSearchClick != null) {
-                IconButton(onClick = onSearchClick) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        tint = dynamicIconColor
-                    )
+                TooltipBox(tooltip = "Search music") {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = dynamicIconColor
+                        )
+                    }
                 }
             }
 
             // Profile button
             if (showProfileButton && userInitial != null) {
                 Box {
-                    IconButton(onClick = { showProfileMenu = true }) {
-                        UserProfileIcon(userInitial = userInitial)
+                    TooltipBox(tooltip = "Profile & Settings") {
+                        IconButton(onClick = { showProfileMenu = true }) {
+                            UserProfileIcon(userInitial = userInitial)
+                        }
                     }
                     DropdownMenu(
                         expanded = showProfileMenu,
@@ -193,7 +205,8 @@ fun SimpleDynamicMusicTopAppBar(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = albumColors.vibrant.copy(alpha = 0.2f)
+            // Use lighter vibrant color (black fallback when no album colors)
+            containerColor = albumColors.blackColor
         )
     )
 

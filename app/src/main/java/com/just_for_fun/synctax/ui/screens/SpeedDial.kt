@@ -28,12 +28,6 @@ fun SpeedDialGrid(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        Text(
-            text = "Speed Dial",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
 
         if (songs.isEmpty()) {
             Card(
