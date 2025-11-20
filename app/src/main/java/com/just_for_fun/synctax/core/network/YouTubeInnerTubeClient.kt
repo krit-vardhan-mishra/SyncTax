@@ -337,6 +337,11 @@ class YouTubeInnerTubeClient {
                 if (thumbnail?.startsWith("//") == true) {
                     thumbnail = "https:$thumbnail"
                 }
+                
+                // Upgrade to higher quality thumbnail
+                thumbnail = thumbnail?.replace("/default.jpg", "/hqdefault.jpg")
+                    ?.replace("/mqdefault.jpg", "/hqdefault.jpg")
+                    ?.replace("/sddefault.jpg", "/hqdefault.jpg")
             }
             
             // Get fixed run (duration)

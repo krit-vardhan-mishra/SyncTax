@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import com.just_for_fun.synctax.ui.utils.AlbumColors
+import com.just_for_fun.synctax.ui.theme.MainBackground
 
 @Composable
 fun DynamicAlbumBackground(
@@ -16,15 +17,7 @@ fun DynamicAlbumBackground(
     Box(
         modifier = modifier
             .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        albumColors.lightVibrant,
-                        albumColors.muted,
-                        albumColors.darkVibrant.copy(alpha = 0.05f)
-                    ),
-                    startY = 0f,
-                    endY = 1800f
-                )
+                MainBackground
             )
     ) {
         content()

@@ -14,9 +14,9 @@ import androidx.core.view.WindowCompat
 
 // YouTube Music Dark Theme Colors
 private val YTMusicDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFF0033), // YouTube Music Red
+    primary = AccentPrimary, // Accent primary
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF330000),
+    primaryContainer = AccentPressed, // Pressed / hover tone
     onPrimaryContainer = Color(0xFFFFDAD6),
 
     secondary = Color(0xFFE1BEE7),
@@ -34,20 +34,20 @@ private val YTMusicDarkColorScheme = darkColorScheme(
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6),
 
-    background = Color(0xFF0F0F0F), // Very dark, almost black
-    onBackground = Color(0xFFF5F5F5),
+    background = MainBackground, // Main screen background
+    onBackground = Color(0xFFFFFFFF),
 
-    surface = Color(0xFF1A1A1A),
-    onSurface = Color(0xFFF5F5F5),
-    surfaceVariant = Color(0xFF2A2A2A),
-    onSurfaceVariant = Color(0xFFAAAAAA),
+    surface = AppBarBackground, // App bar & bottom nav
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = CardBackground, // Cards / sections
+    onSurfaceVariant = TextBody, // Body text
 
-    surfaceContainer = Color(0xFF212121),
-    surfaceContainerHigh = Color(0xFF2A2A2A),
-    surfaceContainerHighest = Color(0xFF333333),
+    surfaceContainer = CardBackground,
+    surfaceContainerHigh = CardBackground,
+    surfaceContainerHighest = CardBackground,
 
-    outline = Color(0xFF444444),
-    outlineVariant = Color(0xFF666666)
+    outline = CardBorder, // Optional border
+    outlineVariant = ProgressUnfilled // Progress track / tertiary usage
 )
 
 // YouTube Music Light Theme Colors

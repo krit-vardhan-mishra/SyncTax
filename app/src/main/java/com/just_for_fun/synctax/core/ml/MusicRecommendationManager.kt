@@ -21,7 +21,7 @@ import java.util.Calendar
 class MusicRecommendationManager(private val context: Context) {
 
     private val database = MusicDatabase.getDatabase(context)
-    private val vectorDb = VectorDatabase()
+    private val vectorDb = VectorDatabase(context)
 
     private val statisticalAgent = StatisticalAgent()
     private val collaborativeAgent = CollaborativeFilteringAgent(vectorDb)
@@ -46,8 +46,8 @@ class MusicRecommendationManager(private val context: Context) {
             val recentHistory = database.listeningHistoryDao().getRecentHistory(100).first()
             val userPreferences = database.userPreferenceDao().getTopPreferences(50).first()
 
-            // If user has no listening history yet, do not generate recommendations
-            if (recentHistory.isEmpty()) {
+            // If user has no songs, do not generate recommendations
+            if (allSongs.isEmpty()) {
                 return@withContext QuickPicksResult(emptyList(), "1.0.0")
             }
 
@@ -115,6 +115,12 @@ class MusicRecommendationManager(private val context: Context) {
                 val reset = chaquopyAnalyzer.resetModel()
                 if (!reset) {
                     // Log if needed - for now, silently continue
+                }
+
+                // Delete persisted model files
+                val modelFile = File(context.filesDir, "ml_model.json")
+                if (modelFile.exists()) {
+                    modelFile.delete()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

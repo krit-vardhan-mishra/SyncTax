@@ -16,14 +16,7 @@ fun DynamicRadialBackground(
     Box(
         modifier = modifier
             .background(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        albumColors.vibrant,
-                        albumColors.muted.copy(alpha = 0.08f),
-                        albumColors.darkVibrant.copy(alpha = 0.03f)
-                    ),
-                    radius = 1500f
-                )
+                androidx.compose.ui.graphics.Color(0xFF2a2a2a) // Fixed screen background
             )
     ) {
         content()

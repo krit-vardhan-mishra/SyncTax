@@ -50,23 +50,23 @@ fun WavyPlayerSlider(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatDuration(sliderPosition.toLong().coerceIn(0L, safeDuration)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = formatDuration(duration),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 4.dp),
+//            horizontalArrangement = Arrangement.SpaceBetween
+//        ) {
+//            Text(
+//                text = formatDuration(sliderPosition.toLong().coerceIn(0L, safeDuration)),
+//                style = MaterialTheme.typography.labelSmall,
+//                color = MaterialTheme.colorScheme.onSurfaceVariant
+//            )
+//            Text(
+//                text = formatDuration(duration),
+//                style = MaterialTheme.typography.labelSmall,
+//                color = MaterialTheme.colorScheme.onSurfaceVariant
+//            )
+//        }
     }
 }
 

@@ -1,29 +1,25 @@
 package com.just_for_fun.synctax.ui.components.player
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
+import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -31,9 +27,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
-import com.just_for_fun.synctax.ui.components.utils.AudioAnalyzer
+import com.just_for_fun.synctax.ui.theme.*
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayerContent(
     song: Song,
@@ -41,7 +37,7 @@ fun MiniPlayerContent(
     position: Long,
     duration: Long,
     albumArtScale: Float = 1f,
-    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    backgroundColor: Color = PlayerSurface,
     onPlayPauseClick: () -> Unit,
     onNextClick: () -> Unit,
     onPreviousClick: () -> Unit,
@@ -51,69 +47,48 @@ fun MiniPlayerContent(
     var albumArtOffsetX by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = 150f
 
-    // AudioAnalyzer instance with proper error handling
-    val audioAnalyzer = remember { 
-        try {
-            AudioAnalyzer().takeIf { it.isReady() }
-        } catch (e: Exception) {
-            null
-        }
-    }
+    // Check if we are in "transparent" mode (Unified Player handling background)
+    val isTransparentMode = backgroundColor == Color.Transparent
 
-    // Clean up when composable is disposed
-    DisposableEffect(Unit) {
-        onDispose {
-            audioAnalyzer?.stop()
-        }
-    }
-
-    // Check if we should use real audio analysis or fake animation
-    val useRealAudioAnalysis = audioAnalyzer != null
-
-    // Create gradient background with the dynamic color
-    val gradientColors = listOf(
-        backgroundColor.copy(alpha = 0.9f),
-        backgroundColor.copy(alpha = 0.7f)
-    )
-
-    Box(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
-            .background(
-                brush = Brush.horizontalGradient(gradientColors)
-            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        color = if (isTransparentMode) Color.Transparent else backgroundColor,
+        tonalElevation = if (isTransparentMode) 0.dp else 3.dp,
+        shadowElevation = if (isTransparentMode) 0.dp else 4.dp
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Progress bar
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Progress Indicator at the top
             if (duration > 0) {
                 LinearProgressIndicator(
                     progress = { (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(4.dp),
-                    color = Color.White.copy(alpha = 0.9f),
+                        .height(2.dp),
+                    color = PlayerAccent,
                     trackColor = Color.White.copy(alpha = 0.2f)
                 )
             }
 
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Album Art & Text (Swipeable Area)
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
                         .offset(x = albumArtOffsetX.dp)
                         .pointerInput(song.id) {
-                            detectTapGestures(
-                                onTap = { onClick() }
-                            )
+                            detectTapGestures(onTap = { onClick() })
                         }
                         .pointerInput(song.id) {
                             var totalDragX = 0f
@@ -129,168 +104,131 @@ fun MiniPlayerContent(
                                 onDragEnd = {
                                     val absX = kotlin.math.abs(totalDragX)
                                     val absY = kotlin.math.abs(totalDragY)
-
-                                    if (absX > absY && absX > 50f) {
-                                        if (!hasTriggeredAction) {
-                                            when {
-                                                totalDragX > swipeThreshold -> {
-                                                    hasTriggeredAction = true
-                                                    onPreviousClick()
-                                                }
-                                                totalDragX < -swipeThreshold -> {
-                                                    hasTriggeredAction = true
-                                                    onNextClick()
-                                                }
-                                            }
-                                        }
-                                    } else if (absY > absX && absY > 50f && totalDragY < 0) {
-                                        if (!hasTriggeredAction) {
-                                            hasTriggeredAction = true
-                                            onSwipeUp()
-                                        }
+                                    if (absX > absY && absX > 50f && !hasTriggeredAction) {
+                                        if (totalDragX > swipeThreshold) onPreviousClick()
+                                        else if (totalDragX < -swipeThreshold) onNextClick()
+                                        hasTriggeredAction = true
+                                    } else if (absY > absX && absY > 50f && totalDragY < 0 && !hasTriggeredAction) {
+                                        onSwipeUp()
+                                        hasTriggeredAction = true
                                     }
-
                                     albumArtOffsetX = 0f
                                 },
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     totalDragX += dragAmount.x
                                     totalDragY += dragAmount.y
-
-                                    val absX = kotlin.math.abs(totalDragX)
-                                    val absY = kotlin.math.abs(totalDragY)
-                                    if (absX > absY) {
+                                    if (kotlin.math.abs(totalDragX) > kotlin.math.abs(totalDragY)) {
                                         albumArtOffsetX += dragAmount.x
                                     }
                                 }
                             )
                         }
+                        .graphicsLayer {
+                            shadowElevation = 10.dp.toPx()
+                            shape = RectangleShape
+                            clip = true
+                        }
                 ) {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .fillMaxSize()
+                            .padding(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Album Art with elevated styling
+                        // Small Album Art Card
                         Surface(
                             modifier = Modifier
-                                .size(56.dp)
-                                .scale(albumArtScale)
-                                .clip(MaterialTheme.shapes.medium),
-                            color = Color.White.copy(alpha = 0.1f),
-                            shadowElevation = 8.dp
+                                .size(48.dp)
+                                .scale(albumArtScale),
+                            shape = RoundedCornerShape(8.dp),
+                            color = PlayerSurfaceVariant,
+                            tonalElevation = 2.dp
                         ) {
                             if (song.albumArtUri.isNullOrEmpty()) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.MusicNote,
-                                        contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(12.dp),
+                                    tint = PlayerTextSecondary
+                                )
                             } else {
                                 AsyncImage(
                                     model = song.albumArtUri,
-                                    contentDescription = song.title,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.width(16.dp))
 
-                        // Song Info
+                        // Song Info Column
                         Column(
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Crossfade(targetState = song.title, label = "song_title") { title ->
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    color = Color.White
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Crossfade(targetState = song.artist, label = "song_artist") { artist ->
-                                Text(
-                                    text = artist,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.8f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                            Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = PlayerTextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.basicMarquee()
+                            )
+                            Text(
+                                text = song.artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = PlayerTextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.basicMarquee()
+                            )
                         }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // Visualizer (Moved here)
+                        if (isPlaying) {
+                            AnimatedWaveform()
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
                     }
                 }
 
-                // Controls on the right side
-                Row(
-                    modifier = Modifier.padding(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Waveform indicator when playing
-                    if (isPlaying) {
-                        Box(
-                            modifier = Modifier
-                                .width(32.dp)
-                                .height(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (useRealAudioAnalysis) {
-                                // Use real audio analysis data
-                                val amplitudeData = audioAnalyzer?.getAmplitudeData() ?: floatArrayOf(0.4f, 0.6f, 0.7f, 0.8f)
-                                WaveformAnimation(amplitudeData = amplitudeData)
-                            } else {
-                                // Use fake animated waveform
-                                AnimatedWaveform()
-                            }
-                        }
-                    }
 
-                    TooltipIconButton(
+                // Controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Play/Pause
+                    IconButton(
                         onClick = onPlayPauseClick,
-                        tooltipText = if (isPlaying) "Pause" else "Play"
+                        modifier = Modifier.size(40.dp)
                     ) {
-                        val playScale = animateFloatAsState(
-                            targetValue = if (isPlaying) 1.0f else 1.0f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            ),
-                            label = "play_scale"
-                        )
-                        Crossfade(targetState = isPlaying, label = "play_pause") { playing ->
+                        Crossfade(targetState = isPlaying, label = "mini_play_pause") { playing ->
                             Icon(
                                 imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (playing) "Pause" else "Play",
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .scale(playScale.value)
-                                    .size(32.dp)
+                                contentDescription = "Play/Pause",
+                                tint = PlayerTextPrimary,
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }
 
-                    TooltipIconButton(
+                    // Next
+                    IconButton(
                         onClick = onNextClick,
-                        tooltipText = "Next song"
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.SkipNext,
+                            imageVector = Icons.Rounded.SkipNext,
                             contentDescription = "Next",
-                            tint = Color.White,
+                            tint = PlayerTextPrimary,
                             modifier = Modifier.size(28.dp)
                         )
                     }

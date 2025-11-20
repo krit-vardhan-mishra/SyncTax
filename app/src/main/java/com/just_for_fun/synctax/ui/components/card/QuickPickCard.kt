@@ -1,10 +1,8 @@
 package com.just_for_fun.synctax.ui.components.card
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,13 +30,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.ui.components.player.AnimatedWaveform
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -45,7 +46,7 @@ fun QuickPickCard(
     song: Song,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isPlaying: Boolean = false
+    isPlaying: Boolean = false // Defaulted to false for safety
 ) {
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -57,62 +58,93 @@ fun QuickPickCard(
         label = "scale"
     )
 
-    // Animate alpha for non-playing cards
-    val alpha by animateFloatAsState(
-        targetValue = if (isPlaying) 1f else 0.5f,
-        animationSpec = tween(durationMillis = 300),
-        label = "alpha"
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val waveScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "waveScale"
     )
+
+    // Determine the active color (Primary if playing, otherwise transparent/default)
+    val activeColor = MaterialTheme.colorScheme.primary
+    val activeShape = RoundedCornerShape(8.dp)
 
     Column(
         modifier = modifier
             .width(160.dp)
             .scale(scale)
-            .combinedClickable(onClick = onClick)
-            .padding(4.dp)
-            .graphicsLayer {
-                this.alpha = alpha
-            },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { isPressed = true } // Added interaction state logic
+            )
+            .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Album art with border
+        // Album art container
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
+                // 1. Add a Border if playing
                 .then(
                     if (isPlaying) {
-                        Modifier.border(
-                            width = 3.dp,
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(8.dp)
-                        )
+                        Modifier
+                            .shadow(
+                                elevation = 12.dp,
+                                shape = activeShape,
+                                ambientColor = activeColor,
+                                spotColor = activeColor
+                            )
+                            .border(
+                                width = 2.dp,
+                                color = activeColor,
+                                shape = activeShape
+                            )
                     } else {
                         Modifier
                     }
                 ),
-            shape = RoundedCornerShape(8.dp),
+            shape = activeShape,
             color = MaterialTheme.colorScheme.surfaceContainerHighest
         ) {
-            if (song.albumArtUri.isNullOrEmpty()) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+            Box(modifier = Modifier.fillMaxSize()) {
+                // The Image Layer
+                if (song.albumArtUri.isNullOrEmpty()) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = "Album Art",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-            } else {
-                AsyncImage(
-                    model = song.albumArtUri,
-                    contentDescription = "Album Art",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+
+                // 2. Overlay Layer: If playing, darken image and show Icon
+                if (isPlaying) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f)), // Dim effect
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AnimatedWaveform(activeColor)
+                    }
+                }
             }
         }
 
@@ -122,7 +154,8 @@ fun QuickPickCard(
                 text = song.title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                // 3. Text Color: Change to Primary if playing, stay White if not
+                color = if (isPlaying) activeColor else Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )

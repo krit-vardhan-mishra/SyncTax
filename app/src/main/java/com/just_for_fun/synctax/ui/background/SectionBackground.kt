@@ -13,11 +13,7 @@ fun SectionBackground(
 ) {
     Surface(
         modifier = modifier,
-        color = if (useAccent) {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.1f)
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f)
-        },
+        color = androidx.compose.ui.graphics.Color(0xFF8e8a8aff), // Fixed section color
         shape = MaterialTheme.shapes.medium
     ) {
         content()

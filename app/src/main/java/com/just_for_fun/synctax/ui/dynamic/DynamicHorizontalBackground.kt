@@ -16,13 +16,7 @@ fun DynamicHorizontalBackground(
     Box(
         modifier = modifier
             .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        albumColors.vibrant.copy(alpha = 0.12f),
-                        albumColors.dominant.copy(alpha = 0.08f),
-                        albumColors.muted.copy(alpha = 0.05f)
-                    )
-                )
+                androidx.compose.ui.graphics.Color(0xFF2a2a2a) // Fixed screen background
             )
     ) {
         content()

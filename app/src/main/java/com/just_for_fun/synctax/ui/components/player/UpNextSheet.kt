@@ -23,7 +23,7 @@ import kotlinx.coroutines.Job
 fun UpNextSheet(
     upcomingItems: List<Song>,
     historyItems: List<Song>,
-    onSelect: (Song) -> Unit,
+    onSelect: (Song) -> Unit,  // This should now call playFromQueue
     onPlaceNext: (Song) -> Unit,
     onRemoveFromQueue: (Song) -> Unit,
     onReorderQueue: (Int, Int) -> Unit,

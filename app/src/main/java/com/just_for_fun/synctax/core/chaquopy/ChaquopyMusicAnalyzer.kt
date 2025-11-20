@@ -18,6 +18,7 @@ import org.json.JSONObject
 class ChaquopyMusicAnalyzer private constructor(context: Context) {
 
     private val pythonModule: com.chaquo.python.PyObject
+    private val modelDir = context.filesDir.absolutePath
 
     init {
         if (!Python.isStarted()) {
@@ -25,7 +26,7 @@ class ChaquopyMusicAnalyzer private constructor(context: Context) {
         }
         val python = Python.getInstance()
         pythonModule = python.getModule("music_ml")
-        Log.d(TAG, "Chaquopy Music Analyzer initialized")
+        Log.d(TAG, "Chaquopy Music Analyzer initialized with model dir: $modelDir")
     }
 
     suspend fun trainModel(userHistory: List<SongFeatures>): Boolean {
@@ -40,7 +41,7 @@ class ChaquopyMusicAnalyzer private constructor(context: Context) {
                     }
                 }
 
-                val resultJson = pythonModule.callAttr("train_model", historyJson.toString())
+                val resultJson = pythonModule.callAttr("train_model", historyJson.toString(), modelDir)
                 val result = JSONObject(resultJson.toString())
 
                 val success = result.optBoolean("success", false)
@@ -58,7 +59,7 @@ class ChaquopyMusicAnalyzer private constructor(context: Context) {
         return withContext(Dispatchers.IO) {
             try {
                 val featuresJson = JSONArray(songFeatures.toVector().toList()).toString()
-                val resultJson = pythonModule.callAttr("get_recommendation", featuresJson)
+                val resultJson = pythonModule.callAttr("get_recommendation", featuresJson, modelDir)
                 val result = JSONObject(resultJson.toString())
 
                 RecommendationResult(
@@ -82,7 +83,7 @@ class ChaquopyMusicAnalyzer private constructor(context: Context) {
     suspend fun getModelStatus(): ModelStatus {
         return withContext(Dispatchers.IO) {
             try {
-                val resultJson = pythonModule.callAttr("get_model_status")
+                val resultJson = pythonModule.callAttr("get_model_status", modelDir)
                 val result = JSONObject(resultJson.toString())
 
                 ModelStatus(
@@ -100,7 +101,7 @@ class ChaquopyMusicAnalyzer private constructor(context: Context) {
     suspend fun resetModel(): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val resultJson = pythonModule.callAttr("reset_model")
+                val resultJson = pythonModule.callAttr("reset_model", modelDir)
                 val result = JSONObject(resultJson.toString())
                 result.optBoolean("success", false)
             } catch (e: Exception) {

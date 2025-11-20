@@ -26,7 +26,7 @@ class CollaborativeFilteringAgent(
 
         // Find similar songs from vector database
         val similarSongs = vectorDb.findSimilar(songVector, topK = 5)
-        val avgSimilarityScore = similarSongs.map { it.second }.average()
+        val avgSimilarityScore = if (similarSongs.isNotEmpty()) similarSongs.map { it.second }.average() else 0.0
 
         // Combine direct similarity and neighborhood similarity
         val combinedScore = (similarity * 0.7 + avgSimilarityScore * 0.3) * 100

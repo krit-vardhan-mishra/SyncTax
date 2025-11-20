@@ -2,31 +2,29 @@ package com.just_for_fun.synctax.service
 
 import android.app.Service
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.net.Uri
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
-import java.io.IOException
-// import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.just_for_fun.synctax.MainActivity
-import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.core.player.MusicPlayer
 import com.just_for_fun.synctax.widget.MusicWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import android.media.AudioManager
-import android.media.AudioFocusRequest
-import android.os.Build
-import android.media.AudioAttributes
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * Foreground service to keep music playing even when the app is in the background.
@@ -175,55 +173,92 @@ class MusicService : Service() {
             .build()
     }
 
-    private fun updateMediaMetadata(song: Song?) {
+    private fun updateMediaMetadata(song: Song?, duration: Long = 0L) {
         if (song == null) {
             mediaSession.setMetadata(null)
             return
         }
 
-        val metadata = MediaMetadataCompat.Builder()
+        // Use the provided duration, or placeholder for online songs if duration is unknown
+        val effectiveDuration = if (song.id.startsWith("online:") && duration == 0L) {
+            240000L // 4 minutes placeholder
+        } else {
+            duration
+        }
+
+        val metadataBuilder = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, song.title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, song.artist)
             .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, song.album ?: "")
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, song.duration)
-            .build()
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, effectiveDuration)
 
-        // Load album art asynchronously
-        serviceScope.launch {
-            val bitmap = loadAlbumArt(song.albumArtUri)
-            if (bitmap != null) {
-                val metadataWithArt = MediaMetadataCompat.Builder(metadata)
-                    .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
-                    .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, bitmap)
-                    .build()
-                mediaSession.setMetadata(metadataWithArt)
-            } else {
-                mediaSession.setMetadata(metadata)
+        // Set low-quality art using URI if available
+        if (!song.albumArtUri.isNullOrEmpty()) {
+            metadataBuilder
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, song.albumArtUri)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, song.albumArtUri)
+        }
+
+        val initialMetadata = metadataBuilder.build()
+        mediaSession.setMetadata(initialMetadata)
+
+        // Load high-quality album art asynchronously
+        if (!song.albumArtUri.isNullOrEmpty()) {
+            serviceScope.launch {
+                val bitmap = loadAlbumArt(song.albumArtUri)
+                if (bitmap != null) {
+                    val metadataWithArt = MediaMetadataCompat.Builder(initialMetadata)
+                        .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
+                        .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, bitmap)
+                        .build()
+                    mediaSession.setMetadata(metadataWithArt)
+                }
             }
         }
     }
 
-    private fun loadAlbumArt(albumArtUri: String?): Bitmap? {
+    private suspend fun loadAlbumArt(albumArtUri: String?): Bitmap? {
         if (albumArtUri.isNullOrEmpty()) return null
 
-        return try {
-            val uri = Uri.parse(albumArtUri)
-            val inputStream = contentResolver.openInputStream(uri)
-            BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                // Resize bitmap for metadata
-                val maxSize = 512
-                val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
-                val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
-                val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+        return withContext(Dispatchers.IO) {
+            try {
+                if (albumArtUri.startsWith("http")) {
+                    // Handle HTTP URLs for online songs
+                    val url = URL(albumArtUri)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.connectTimeout = 5000
+                    conn.readTimeout = 5000
+                    conn.inputStream.use { inputStream ->
+                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                            // Resize bitmap for metadata
+                            val maxSize = 512
+                            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                            val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+                            val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
 
-                Bitmap.createScaledBitmap(bitmap, width, height, true)
+                            Bitmap.createScaledBitmap(bitmap, width, height, true)
+                        }
+                    }
+                } else {
+                    // Handle content URIs for local songs
+                    val uri = Uri.parse(albumArtUri)
+                    contentResolver.openInputStream(uri)?.use { inputStream ->
+                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                            // Resize bitmap for metadata
+                            val maxSize = 512
+                            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+                            val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+                            val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+
+                            Bitmap.createScaledBitmap(bitmap, width, height, true)
+                        }
+                    }
+                }
+            } catch (e: IOException) {
+                null
             }
-        } catch (e: IOException) {
-            null
         }
-    }
-
-    fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long) {
+    }    fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long) {
         // Request audio focus when starting playback
         if (isPlaying && !this.isPlaying) {
             if (!requestAudioFocus()) {
@@ -242,7 +277,7 @@ class MusicService : Service() {
         this.currentPosition = position
         this.duration = duration
 
-        updateMediaMetadata(song)
+        updateMediaMetadata(song, duration)
         mediaSession.setPlaybackState(createPlaybackState())
 
         if (song != null) {

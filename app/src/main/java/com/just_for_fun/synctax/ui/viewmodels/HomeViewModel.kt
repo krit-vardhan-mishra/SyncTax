@@ -31,6 +31,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var lastQuickPicksRefresh = 0L
     private val quickPicksRefreshInterval = 15 * 60 * 1000L // 15 minutes in milliseconds
 
+    // Callback for refreshing downloaded songs check
+    var onSongsRefreshed: ((List<Song>) -> Unit)? = null
+
     init {
         loadData()
         // Auto-scan on app open to keep library in sync with device
@@ -81,10 +84,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             try {
                 val songs = repository.scanDeviceMusic()
+                
+                // Force refresh the song list by updating the state
                 _uiState.value = _uiState.value.copy(
+                    allSongs = songs,
                     isScanning = false,
                     scanComplete = true
                 )
+                
+                // Notify listeners that songs have been refreshed
+                onSongsRefreshed?.invoke(songs)
+                
+                // Regenerate quick picks with the updated song list
+                if (songs.isNotEmpty()) {
+                    generateQuickPicks()
+                }
+                
                 // Refresh listen again cache after scanning
                 listenAgainManager.refresh()
             } catch (e: Exception) {
@@ -137,7 +152,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 _uiState.value = _uiState.value.copy(
-                    quickPicks = recommendedSongs,
+                    quickPicks = recommendedSongs.shuffled(),
                     recommendationScores = result.recommendations,
                     isGeneratingRecommendations = false
                 )
@@ -154,6 +169,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             var hasAutoTrained = false
             repository.getRecentHistory(1).collect { history ->
+                // Update training data size
+                val allHistory = repository.getRecentHistory(1000).first()
+                _uiState.value = _uiState.value.copy(trainingDataSize = allHistory.size)
+
                 // If history becomes non-empty and we haven't auto-trained yet, train models
                 if (!hasAutoTrained && history.isNotEmpty()) {
                     hasAutoTrained = true
@@ -166,7 +185,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             _uiState.value.allSongs.find { it.id == rec.songId }
                         }
                         _uiState.value = _uiState.value.copy(
-                            quickPicks = recommendedSongs,
+                            quickPicks = recommendedSongs.shuffled(),
                             recommendationScores = result.recommendations,
                             isTraining = false,
                             trainingComplete = true
@@ -259,9 +278,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        recommendationManager.cleanup()
+    fun cleanupAndRefresh() {
+        viewModelScope.launch {
+            try {
+                recommendationManager.cleanupDeletedSongs()
+                generateQuickPicks()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message)
+            }
+        }
     }
 }
 
@@ -275,6 +300,7 @@ data class HomeUiState(
     val isTraining: Boolean = false,
     val scanComplete: Boolean = false,
     val trainingComplete: Boolean = false,
+    val trainingDataSize: Int = 0,
     val error: String? = null,
     val selectedArtist: String? = null,
     val selectedArtistSongs: List<Song>? = null,

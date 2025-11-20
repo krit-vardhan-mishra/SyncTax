@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -15,6 +16,7 @@ import com.just_for_fun.synctax.ui.components.app.UserProfileIcon
 import com.just_for_fun.synctax.ui.components.utils.SortOption
 import com.just_for_fun.synctax.ui.components.utils.TooltipBox
 import com.just_for_fun.synctax.ui.utils.AlbumColors
+import com.just_for_fun.synctax.ui.theme.AppBarBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -205,8 +207,7 @@ fun SimpleDynamicMusicTopAppBar(
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            // Use lighter vibrant color (black fallback when no album colors)
-            containerColor = albumColors.blackColor
+            containerColor = AppBarBackground
         )
     )
 

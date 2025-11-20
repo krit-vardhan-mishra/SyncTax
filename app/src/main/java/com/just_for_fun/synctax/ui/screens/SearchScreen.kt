@@ -22,7 +22,7 @@ import com.just_for_fun.synctax.ui.components.app.EmptySearchState
 import com.just_for_fun.synctax.ui.components.card.OnlineResultCard
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
-import com.just_for_fun.synctax.ui.dynamic.DynamicRadialBackground
+import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -97,7 +97,7 @@ fun SearchScreen(
             )
         }
     ) { paddingValues ->
-        DynamicRadialBackground(
+        DynamicAlbumBackground(
             albumColors = albumColors,
             modifier = Modifier
                 .fillMaxSize()

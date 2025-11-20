@@ -2,12 +2,14 @@ package com.just_for_fun.synctax.ui.components.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -16,6 +18,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.ui.theme.PlayerBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,27 +70,49 @@ fun UnifiedPlayer(
         onExpandedChange(false)
     }
 
+    // Main Container
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            // Calculate height precisely: Min 80dp, Max expands to full screen
             .height(if (isExpanded) (expansionProgress * 1000).dp else 80.dp)
+            .background(PlayerBackground)
     ) {
+        // --- 1. ALIVE BACKGROUND LAYER ---
         if (!song.albumArtUri.isNullOrEmpty()) {
+            // Blur Logic: Less blur when mini (to see texture), more when expanded (ambient)
+            val blurRadius = if (isExpanded) 50.dp else 20.dp
+
             AsyncImage(
                 model = song.albumArtUri,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur((30 + (50 * expansionProgress)).dp)
-                    .alpha(0.5f + (0.1f * expansionProgress))
+                    .blur(blurRadius)
+                    .alpha(0.6f)
+            )
+
+            // Gradient Overlay for contrast
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.2f),
+                                Color.Black.copy(alpha = 0.6f)
+                            )
+                        )
+                    )
             )
         }
 
+        // --- 2. CONTENT LAYER ---
         Surface(
-            color = Color.Transparent,
-            tonalElevation = 0.dp,
-            shape = if (isExpanded) RectangleShape else RectangleShape,
+            color = Color.Transparent, // Must be transparent for background to show
+            tonalElevation = 0.dp,     // Must be 0 to prevent M3 surface tint
+            shape = RectangleShape,
             modifier = Modifier.fillMaxSize()
         ) {
             if (!isExpanded) {
@@ -97,6 +122,8 @@ fun UnifiedPlayer(
                     position = position,
                     duration = duration,
                     albumArtScale = albumArtMiniScale,
+                    // Pass Transparent here to trigger the fix in MiniPlayerContent
+                    backgroundColor = Color.Transparent,
                     onPlayPauseClick = onPlayPauseClick,
                     onNextClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -110,7 +137,6 @@ fun UnifiedPlayer(
                     onSwipeUp = { onExpandedChange(true) }
                 )
             } else {
-                // FULL SCREEN PLAYER VIEW
                 FullScreenPlayerContent(
                     song = song,
                     isPlaying = isPlaying,

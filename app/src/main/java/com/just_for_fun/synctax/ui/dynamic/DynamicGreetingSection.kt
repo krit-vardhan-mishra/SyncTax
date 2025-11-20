@@ -47,8 +47,7 @@ fun DynamicGreetingSection(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 12.dp),
         shape = MaterialTheme.shapes.large,
-        // Use lighter vibrant color (black fallback when no album colors)
-        color = albumColors.blackColor.copy(alpha = 0.20f)
+        color = androidx.compose.ui.graphics.Color.Transparent
     ) {
         Column(
             modifier = Modifier.padding(20.dp)

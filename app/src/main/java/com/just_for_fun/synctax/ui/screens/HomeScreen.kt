@@ -7,16 +7,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.dynamic.DynamicGreetingSection
-import com.just_for_fun.synctax.ui.dynamic.DynamicSectionBackground
 import com.just_for_fun.synctax.ui.components.card.SongCard
 import com.just_for_fun.synctax.ui.components.section.EmptyMusicState
 import com.just_for_fun.synctax.ui.components.section.FilterChipsRow
@@ -48,6 +49,24 @@ fun HomeScreen(
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
+
+    val listState = rememberLazyListState()
+    var hasScrolledToBottom by remember { mutableStateOf(false) }
+
+    // Detect scroll to bottom
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo }
+            .collect { layoutInfo ->
+                val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val totalItems = layoutInfo.totalItemsCount
+                if (lastVisibleItemIndex >= totalItems - 1 && !hasScrolledToBottom && totalItems > 0) {
+                    hasScrolledToBottom = true
+                    homeViewModel.cleanupAndRefresh()
+                } else if (lastVisibleItemIndex < totalItems - 2) {
+                    hasScrolledToBottom = false
+                }
+            }
+    }
 
     // Sort songs based on current sort option
     val sortedSongs = remember(uiState.allSongs, currentSortOption) {
@@ -82,9 +101,18 @@ fun HomeScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
-    // FIXED: Trigger animation after composition
-    LaunchedEffect(Unit) {
-        isVisible = true
+    // Set up callback for refreshing downloaded songs check
+    LaunchedEffect(homeViewModel, playerViewModel) {
+        homeViewModel.onSongsRefreshed = { songs ->
+            playerViewModel.refreshDownloadedSongsCheck(songs)
+        }
+    }
+
+    // Show content when songs are loaded
+    LaunchedEffect(uiState.allSongs) {
+        if (uiState.allSongs.isNotEmpty()) {
+            isVisible = true
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -96,7 +124,6 @@ fun HomeScreen(
                     albumColors = albumColors,
                     showShuffleButton = true,
                     showRefreshButton = true,
-                    showSearchButton = true,
                     showProfileButton = true,
                     onShuffleClick = {
                         if (uiState.allSongs.isNotEmpty()) {
@@ -104,7 +131,6 @@ fun HomeScreen(
                         }
                     },
                     onRefreshClick = { homeViewModel.scanMusic() },
-                    onSearchClick = onSearchClick,
                     onTrainClick = onTrainClick,
                     onOpenSettings = onOpenSettings,
                     userPreferences = userPreferences,
@@ -150,6 +176,7 @@ fun HomeScreen(
                                     slideInVertically(animationSpec = tween(600)) { it / 4 }
                         ) {
                             LazyColumn(
+                                state = listState,
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(0.dp)
                             ) {
@@ -168,33 +195,27 @@ fun HomeScreen(
                                     FilterChipsRow()
                                 }
 
-                                // Quick Picks Section with dynamic background
+                                // Quick Picks Section
                                 item {
-                                    DynamicSectionBackground(
-                                        albumColors = albumColors,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 12.dp),
-                                        useAccent = true
-                                    ) {
-                                        QuickPicksSection(
-                                            songs = uiState.quickPicks,
-                                            onSongClick = { song ->
-                                                playerViewModel.playSong(song, uiState.quickPicks)
-                                            },
-                                            onRefreshClick = { homeViewModel.generateQuickPicks() },
-                                            onViewAllClick = { /* Navigate to Quick Picks */ },
-                                            isGenerating = uiState.isGeneratingRecommendations,
-                                            onPlayAll = {
-                                                uiState.quickPicks.firstOrNull()?.let { firstSong ->
-                                                    playerViewModel.playSong(
-                                                        firstSong,
-                                                        uiState.quickPicks
-                                                    )
-                                                }
+                                    QuickPicksSection(
+                                        songs = uiState.quickPicks,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(song, uiState.quickPicks)
+                                        },
+                                        onRefreshClick = { homeViewModel.generateQuickPicks() },
+                                        onViewAllClick = { /* Navigate to Quick Picks */ },
+                                        isGenerating = uiState.isGeneratingRecommendations,
+                                        onPlayAll = {
+                                            uiState.quickPicks.firstOrNull()?.let { firstSong ->
+                                                playerViewModel.playSong(
+                                                    firstSong,
+                                                    uiState.quickPicks
+                                                )
                                             }
-                                        )
-                                    }
+                                        },
+                                        currentSong = playerState.currentSong,
+                                        trainingDataSize = uiState.trainingDataSize
+                                    )
                                 }
 
                                 // Listen Again Section
@@ -244,12 +265,17 @@ fun HomeScreen(
 
                                 // Speed Dial Section
                                 item {
+                                    val excludedIds = uiState.quickPicks.map { it.id }.toSet()
+                                    val speedDialSongs = remember(uiState.allSongs, excludedIds) {
+                                        uiState.allSongs.filter { it.id !in excludedIds }.shuffled().take(9)
+                                    }
                                     SpeedDialSection(
-                                        songs = uiState.allSongs,
+                                        songs = speedDialSongs,
                                         onSongClick = { song ->
                                             playerViewModel.playSong(song, uiState.allSongs)
                                         },
-                                        userInitial = userInitial
+                                        userInitial = userInitial,
+                                        currentSong = playerState.currentSong
                                     )
                                 }
 
@@ -295,11 +321,12 @@ fun HomeScreen(
                                 }
 
                                 item {
-                                    SpeedDialGrid(
+                                    QuickAccessGrid(
                                         songs = uiState.allSongs,
                                         onSongClick = { song ->
                                             playerViewModel.playSong(song, uiState.allSongs)
-                                        }
+                                        },
+                                        currentSong = playerState.currentSong
                                     )
                                 }
 
@@ -354,7 +381,7 @@ fun HomeScreen(
                     Card(
                         modifier = Modifier.padding(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = Color.DarkGray
                         )
                     ) {
                         Row(

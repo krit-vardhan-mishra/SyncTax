@@ -50,6 +50,21 @@ fun TrainingScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
 
+            Text(
+                text = "Training data size: ${uiState.trainingDataSize} plays",
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            val progress = (uiState.trainingDataSize.toFloat() / 100f).coerceIn(0f, 1f)
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier.fillMaxWidth(0.8f)
+            )
+            Text(
+                text = "${(progress * 100).toInt()}% trained",
+                style = MaterialTheme.typography.bodySmall
+            )
+
             if (uiState.isTraining) {
                 CircularProgressIndicator()
                 Text("Training models...", style = MaterialTheme.typography.bodyMedium)

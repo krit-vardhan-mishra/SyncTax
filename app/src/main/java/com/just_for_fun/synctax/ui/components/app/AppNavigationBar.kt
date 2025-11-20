@@ -25,30 +25,23 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.just_for_fun.synctax.ui.utils.AlbumColors
+import com.just_for_fun.synctax.ui.theme.BottomNavBackground
+import com.just_for_fun.synctax.ui.theme.AccentPrimary
+import com.just_for_fun.synctax.ui.theme.IconSecondary
 
 @Composable
 fun AppNavigationBar(
     navController: NavController,
     albumColors: AlbumColors = AlbumColors.default()
 ) {
-    val backgroundColor = albumColors.blackColor.copy(alpha = 0.98f)
-    val glowColor = albumColors.vibrant
-    val backgroundLuminance = backgroundColor.luminance()
-    val unselectedIconColor = if (backgroundLuminance > 0.5f) {
-        Color.Black.copy(alpha = 0.65f)
-    } else {
-        Color.White.copy(alpha = 0.65f)
-    }
-
-    val unselectedTextColor = if (backgroundLuminance > 0.5f) {
-        Color.Black.copy(alpha = 0.75f)
-    } else {
-        Color.White.copy(alpha = 0.75f)
-    }
+    val backgroundColor = BottomNavBackground
+    val glowColor = AccentPrimary
+    val unselectedIconColor = IconSecondary
+    val unselectedTextColor = IconSecondary
 
     NavigationBar(
         containerColor = backgroundColor,
-        contentColor = if (backgroundLuminance > 0.5f) Color.Black else Color.White
+        contentColor = Color.White
     ) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route

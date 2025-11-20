@@ -1,7 +1,9 @@
 package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,15 +14,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,10 +36,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -111,38 +118,64 @@ fun LibraryScreen(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Tabs
-                TabRow(selectedTabIndex = pagerState.currentPage) {
-                    Tab(
-                        selected = pagerState.currentPage == 0,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(0)
-                            }
-                        },
-                        text = { Text("Songs", color = Color(0xFFD80000)) }
-                    )
-                    Tab(
-                        selected = pagerState.currentPage == 1,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(1)
-                            }
-                        },
-                        text = { Text("Artists", color = Color(0xFFD80000)) }
-                    )
-                    Tab(
-                        selected = pagerState.currentPage == 2,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(2)
-                            }
-                        },
-                        text = { Text("Albums", color = Color(0xFFD80000)) }
-                    )
+                // --- CUSTOM SEGMENTED/PILL TAB ROW ---
+                val tabs = listOf("Songs", "Artists", "Albums")
+
+                TabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    // Container color: Slightly lighter than background for contrast
+                    containerColor = Color(0xFF252525),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    divider = {}, // Remove the default bottom line
+                    indicator = { tabPositions ->
+                        if (pagerState.currentPage < tabPositions.size) {
+                            // The floating pill indicator
+                            Box(
+                                modifier = Modifier
+                                    .tabIndicatorOffset(tabPositions[pagerState.currentPage])
+                                    .fillMaxSize()
+                                    .padding(4.dp) // Inset slightly
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary,
+                                        shape = CircleShape
+                                    )
+                                    .zIndex(-1f) // Behind the text
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .fillMaxWidth()
+                        .clip(CircleShape) // Round the entire tab row
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        val isSelected = pagerState.currentPage == index
+
+                        Tab(
+                            selected = isSelected,
+                            onClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            },
+                            text = {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    // Text color changes based on selection for contrast
+                                    color = if (isSelected)
+                                        MaterialTheme.colorScheme.onPrimary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            },
+                            modifier = Modifier.zIndex(1f)
+                        )
+                    }
                 }
 
-                // Swipeable Content - removed padding modifier
+                // Swipeable Content
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize()
@@ -151,8 +184,8 @@ fun LibraryScreen(
                         0 -> SongsTab(
                             songs = uiState.allSongs,
                             sortOption = sortOption,
-                            onSongClick = { song ->
-                                playerViewModel.playSong(song, uiState.allSongs)
+                            onSongClick = { song, queue ->
+                                playerViewModel.playSong(song, queue)
                             }
                         )
 
@@ -180,7 +213,7 @@ fun LibraryScreen(
 fun SongsTab(
     songs: List<Song>,
     sortOption: SortOption,
-    onSongClick: (Song) -> Unit
+    onSongClick: (Song, List<Song>) -> Unit
 ) {
     val sortedSongs = remember(songs, sortOption) {
         when (sortOption) {
@@ -208,8 +241,8 @@ fun SongsTab(
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
-            top = 16.dp,  // Space below tabs
-            bottom = 100.dp  // Space for mini player
+            top = 8.dp,
+            bottom = 100.dp
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -254,7 +287,11 @@ fun SongsTab(
         items(sortedSongs) { song ->
             SongCard(
                 song = song,
-                onClick = { onSongClick(song) }
+                onClick = { 
+                    val index = sortedSongs.indexOf(song)
+                    val queue = sortedSongs.drop(index)
+                    onSongClick(song, queue)
+                }
             )
         }
     }
@@ -272,8 +309,8 @@ fun ArtistsTab(
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
-            top = 16.dp,  // Space below tabs
-            bottom = 100.dp  // Space for mini player
+            top = 8.dp,
+            bottom = 100.dp
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -289,7 +326,10 @@ fun ArtistsTab(
         items(artistsMap.entries.toList()) { (artist, artistSongs) ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { onArtistClick(artist, artistSongs) }
+                onClick = { onArtistClick(artist, artistSongs) },
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF151515)
+                )
             ) {
                 Row(
                     modifier = Modifier
@@ -305,7 +345,7 @@ fun ArtistsTab(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${artistSongs.size} songs",
@@ -335,8 +375,8 @@ fun AlbumsTab(
         contentPadding = PaddingValues(
             start = 16.dp,
             end = 16.dp,
-            top = 16.dp,  // Space below tabs
-            bottom = 100.dp  // Space for mini player
+            top = 8.dp,
+            bottom = 100.dp
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -354,7 +394,10 @@ fun AlbumsTab(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     onAlbumClick(album, albumSongs.first().artist, albumSongs)
-                }
+                },
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF151515)
+                )
             ) {
                 Row(
                     modifier = Modifier

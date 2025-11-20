@@ -1,35 +1,35 @@
 package com.just_for_fun.synctax.ui.background
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.animation.core.tween
-import com.just_for_fun.synctax.ui.utils.AlbumColors
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.just_for_fun.synctax.ui.utils.AlbumColors
 
 @Composable
 fun EnhancedEmptyQuickPicksState(
-    albumColors: AlbumColors
+    albumColors: AlbumColors,
+    trainingDataSize: Int = 0
 ) {
-    val bg = animateColorAsState(
-        targetValue = albumColors.vibrant.copy(alpha = 0.25f),
-        animationSpec = tween(durationMillis = 400),
-        label = "EmptyQuickPicksBg"
-    )
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 24.dp),
         shape = MaterialTheme.shapes.large,
-        color = bg.value
+        color = Color(0x8E252526) // Fixed section color
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -43,7 +43,7 @@ fun EnhancedEmptyQuickPicksState(
                 tint = Color.LightGray
             )
             Text(
-                text = "The app is analyzing your listening habits to find the best songs for you.",
+                text = "The app is analyzing your listening habits to find the best songs for you. Training data: $trainingDataSize plays.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

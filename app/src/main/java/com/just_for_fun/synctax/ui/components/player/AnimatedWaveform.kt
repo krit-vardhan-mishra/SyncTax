@@ -21,37 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-// Static waveform with amplitude data (for real audio analysis)
 @Composable
-fun WaveformAnimation(amplitudeData: FloatArray) {
-    val bars = amplitudeData.size
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.height(20.dp)
-    ) {
-        repeat(bars) { index ->
-            val amplitude = amplitudeData.getOrElse(index) { 0f }
-            val height = amplitude.coerceIn(0.3f, 1f)
-
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .fillMaxHeight(height)
-                    .background(
-                        color = Color.White.copy(alpha = 0.9f),
-                        shape = MaterialTheme.shapes.small
-                    )
-            )
-        }
-    }
-}
-
-// Animated waveform (fake animation when audio analysis is not available)
-@Composable
-fun AnimatedWaveform() {
-    val bars = 4
+fun AnimatedWaveform(color: Color = Color.White.copy(alpha = 0.9f)) {
+    val bars = 5
     Row(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -77,7 +49,7 @@ fun AnimatedWaveform() {
                     .width(3.dp)
                     .fillMaxHeight(height)
                     .background(
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = color,
                         shape = MaterialTheme.shapes.small
                     )
             )

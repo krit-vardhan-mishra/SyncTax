@@ -28,7 +28,9 @@ fun QuickPicksSection(
     onRefreshClick: () -> Unit,
     onViewAllClick: () -> Unit,
     isGenerating: Boolean,
-    onPlayAll: () -> Unit = {}
+    onPlayAll: () -> Unit = {},
+    currentSong: Song? = null,
+    trainingDataSize: Int = 0
 ) {
     Column(
         modifier = Modifier.padding(vertical = 16.dp),
@@ -78,7 +80,7 @@ fun QuickPicksSection(
                     )
                 }
                 Text(
-                    text = "The app is analyzing your listening habits to find the best songs for you. Listen to songs and we'll find your match.",
+                    text = "The app is analyzing your listening habits to find the best songs for you. Training data: $trainingDataSize plays.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp),
@@ -97,7 +99,8 @@ fun QuickPicksSection(
                 items(songs) { song ->
                     QuickPickCard(
                         song = song,
-                        onClick = { onSongClick(song) }
+                        onClick = { onSongClick(song) },
+                        isPlaying = song.id == currentSong?.id
                     )
                 }
             }

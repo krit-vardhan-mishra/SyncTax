@@ -25,7 +25,8 @@ import com.just_for_fun.synctax.ui.components.card.QuickPickCard
 fun SpeedDialSection(
     songs: List<com.just_for_fun.synctax.core.data.local.entities.Song>,
     onSongClick: (com.just_for_fun.synctax.core.data.local.entities.Song) -> Unit,
-    userInitial: String = "M"
+    userInitial: String = "M",
+    currentSong: com.just_for_fun.synctax.core.data.local.entities.Song? = null
 ) {
     Column(
         modifier = Modifier.padding(vertical = 16.dp)
@@ -56,7 +57,8 @@ fun SpeedDialSection(
             items(songs.take(9)) { song ->
                 QuickPickCard(
                     song = song,
-                    onClick = { onSongClick(song) }
+                    onClick = { onSongClick(song) },
+                    isPlaying = song.id == currentSong?.id
                 )
             }
         }

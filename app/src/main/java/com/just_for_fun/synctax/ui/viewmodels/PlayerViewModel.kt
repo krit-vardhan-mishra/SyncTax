@@ -8,21 +8,32 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.media.AudioManager
+import android.os.Environment
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
+import com.just_for_fun.synctax.core.player.ChunkedStreamManager
 import com.just_for_fun.synctax.core.player.MusicPlayer
 import com.just_for_fun.synctax.core.player.PlaybackCollector
+import com.just_for_fun.synctax.core.player.PlaybackEvent
+import com.just_for_fun.synctax.core.player.PlaybackEventBus
+import com.just_for_fun.synctax.core.player.QueueManager
 import com.just_for_fun.synctax.service.MusicService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import com.just_for_fun.synctax.core.player.ChunkedStreamManager
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.net.URL
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -33,13 +44,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val chunkedStreamManager = ChunkedStreamManager(application)
     private val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+    private val recommendationManager = MusicRecommendationManager(application)
+    private val queueManager = QueueManager(application, repository, recommendationManager)
+    
+    // Track if we're currently handling song end to prevent multiple triggers
+    private var isHandlingSongEnd = false
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
-
-    private var currentPlaylist: List<Song> = emptyList()
-    private var currentIndex: Int = 0
-    private var playHistory: MutableList<Song> = mutableListOf()
 
     // Service binding
     private var musicService: MusicService? = null
@@ -173,6 +185,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Initialize volume from device and sync UI state
         _uiState.value = _uiState.value.copy(volume = getVolume())
 
+        // Observe queue state changes
+        viewModelScope.launch {
+            queueManager.queueState.collect { queueState ->
+                // Queue state is now managed by QueueManager
+                // UI can observe this for updates
+            }
+        }
+
         // Restore last playing song
         viewModelScope.launch {
             restoreLastSong()
@@ -192,29 +212,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (playlistIds.isNotEmpty()) {
                     val playlist = playlistIds.mapNotNull { id -> repository.getSongById(id) }
                     if (playlist.isNotEmpty()) {
-                        currentPlaylist = playlist
-                        currentIndex = savedIndex.coerceIn(0, playlist.size - 1)
+                        // Initialize queue manager with restored playlist
+                        val actualIndex = savedIndex.coerceIn(0, playlist.size - 1)
+                        
                         // Ensure the current song is at the current index
-                        if (currentIndex < playlist.size && playlist[currentIndex].id == song.id) {
-                            // Good
+                        if (actualIndex < playlist.size && playlist[actualIndex].id == song.id) {
+                            queueManager.initializeQueue(playlist, actualIndex)
                         } else {
                             // Find the song in playlist
                             val songIndex = playlist.indexOf(song)
                             if (songIndex != -1) {
-                                currentIndex = songIndex
+                                queueManager.initializeQueue(playlist, songIndex)
                             } else {
                                 // Add it to playlist
-                                currentPlaylist = playlist + song
-                                currentIndex = playlist.size
+                                queueManager.initializeQueue(playlist + song, playlist.size)
                             }
                         }
                     } else {
-                        currentPlaylist = listOf(song)
-                        currentIndex = 0
+                        queueManager.initializeQueue(listOf(song), 0)
                     }
                 } else {
-                    currentPlaylist = listOf(song)
-                    currentIndex = 0
+                    queueManager.initializeQueue(listOf(song), 0)
                 }
 
                 player.prepare(song.filePath, song.id)
@@ -233,9 +251,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun savePlaylistState() {
         viewModelScope.launch {
+            val queueState = queueManager.queueState.value
             playerPreferences.saveCurrentPlaylist(
-                songIds = currentPlaylist.map { it.id },
-                currentIndex = currentIndex
+                songIds = queueState.currentPlaylist.map { it.id },
+                currentIndex = queueState.currentIndex
             )
         }
     }
@@ -249,12 +268,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Stop current song
             if (_uiState.value.currentSong != null) {
                 playbackCollector.stopCollecting(skipped = true)
-                // Add current song to history
-                _uiState.value.currentSong?.let { playHistory.add(it) }
             }
 
-            currentPlaylist = playlist
-            currentIndex = playlist.indexOf(song)
+            // Initialize queue with new playlist
+            val songIndex = playlist.indexOf(song).coerceAtLeast(0)
+            queueManager.initializeQueue(playlist, songIndex)
 
             player.prepare(song.filePath, song.id)
             player.play()
@@ -265,6 +283,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentSong = song,
                 isPlaying = true
             )
+
+            // Check if song is already downloaded
+            checkIfSongDownloaded(song)
+
+            // Emit playback events
+            PlaybackEventBus.emit(PlaybackEvent.SongChanged(song))
+            PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(true))
+            PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
+                upcomingQueue = queueManager.getUpcomingQueue(),
+                playHistory = queueManager.getPlayHistory()
+            ))
 
             // Update notification with new song
             updateNotification()
@@ -297,9 +326,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 albumArtUri = null
             )
 
-            // Play the online URL
-            currentPlaylist = listOf(onlineSong)
-            currentIndex = 0
+            // Initialize queue with online song
+            queueManager.initializeQueue(listOf(onlineSong), 0)
+
             player.prepare(url, onlineSong.id)
             player.play()
 
@@ -309,6 +338,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentSong = onlineSong,
                 isPlaying = true
             )
+            // Check if song is already downloaded
+            checkIfSongDownloaded(onlineSong)
             savePlaylistState()
             updateNotification()
         }
@@ -344,8 +375,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Stop current collecting and prepare new
             playbackCollector.stopCollecting(skipped = true)
 
-            currentPlaylist = listOf(onlineSong)
-            currentIndex = 0
+            // Initialize queue with streaming song
+            queueManager.initializeQueue(listOf(onlineSong), 0)
 
             player.prepare(tempFile.absolutePath, onlineSong.id)
             player.play()
@@ -357,6 +388,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 isPlaying = true,
                 isBuffering = true
             )
+
+            // Check if song is already downloaded
+            checkIfSongDownloaded(onlineSong)
 
             // Observe chunk download state and update UI; when completed swap file path to final cached file
             viewModelScope.launch {
@@ -400,41 +434,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun getUpcomingQueue(): List<Song> {
-        if (currentPlaylist.isEmpty()) return emptyList()
-        return if (currentIndex < currentPlaylist.size - 1) {
-            currentPlaylist.subList(currentIndex + 1, currentPlaylist.size)
-        } else {
-            emptyList()
-        }
+        return queueManager.getUpcomingQueue()
     }
 
     fun getPlayHistory(): List<Song> {
-        return playHistory.toList()
+        return queueManager.getPlayHistory()
     }
 
     fun togglePlayPause() {
-        if (_uiState.value.isPlaying) {
-            player.pause()
-            musicService?.updatePlaybackState(
-                _uiState.value.currentSong,
-                false,
-                _uiState.value.position,
-                _uiState.value.duration
-            )
-        } else {
-            player.play()
+        viewModelScope.launch {
+            if (_uiState.value.isPlaying) {
+                player.pause()
+                musicService?.updatePlaybackState(
+                    _uiState.value.currentSong,
+                    false,
+                    _uiState.value.position,
+                    _uiState.value.duration
+                )
+                PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(false))
+            } else {
+                player.play()
 
-            _uiState.value.currentSong?.let { song ->
-                playbackCollector.startCollecting(song.id)
+                _uiState.value.currentSong?.let { song ->
+                    playbackCollector.startCollecting(song.id)
+                }
+                
+                // Update notification immediately
+                musicService?.updatePlaybackState(
+                    _uiState.value.currentSong,
+                    true,
+                    _uiState.value.position,
+                    _uiState.value.duration
+                )
+                PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(true))
             }
-            
-            // Update notification immediately
-            musicService?.updatePlaybackState(
-                _uiState.value.currentSong,
-                true,
-                _uiState.value.position,
-                _uiState.value.duration
-            )
         }
     }
 
@@ -449,13 +482,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun next() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
-            if (currentPlaylist.isEmpty()) return@launch
+            
+            // Use queue manager to move to next song (with auto-refill)
+            val nextSong = queueManager.moveToNext(autoRefill = true)
+            
+            if (nextSong != null) {
+                player.prepare(nextSong.filePath, nextSong.id)
+                player.play()
+                playbackCollector.startCollecting(nextSong.id)
 
-            // Simply move to next song in the playlist (whether shuffled or not)
-            if (currentIndex < currentPlaylist.size - 1) {
-                currentIndex++
-                val nextSong = currentPlaylist[currentIndex]
-                playSong(nextSong, currentPlaylist)
+                _uiState.value = _uiState.value.copy(
+                    currentSong = nextSong,
+                    isPlaying = true
+                )
+
+                updateNotification()
+                savePlaylistState()
+            } else {
+                // No more songs available
+                _uiState.value = _uiState.value.copy(isPlaying = false)
             }
         }
     }
@@ -463,48 +508,82 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun previous() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
-            if (currentPlaylist.isEmpty()) return@launch
+            
+            // Use queue manager to move to previous song
+            val previousSong = queueManager.moveToPrevious()
+            
+            if (previousSong != null) {
+                player.prepare(previousSong.filePath, previousSong.id)
+                player.play()
+                playbackCollector.startCollecting(previousSong.id)
 
-            // Simply move to previous song in the playlist (whether shuffled or not)
-            if (currentIndex > 0) {
-                currentIndex--
-                val previousSong = currentPlaylist[currentIndex]
-                playSong(previousSong, currentPlaylist)
+                _uiState.value = _uiState.value.copy(
+                    currentSong = previousSong,
+                    isPlaying = true
+                )
+
+                updateNotification()
+                savePlaylistState()
             }
         }
     }
 
     private fun onSongEnded() {
+        // Prevent multiple simultaneous calls to onSongEnded
+        if (isHandlingSongEnd) {
+            return
+        }
+        
+        isHandlingSongEnd = true
+        
         viewModelScope.launch {
-            playbackCollector.stopCollecting(skipped = false)
-            val repeat = _uiState.value.repeatEnabled
-            val currentSong = _uiState.value.currentSong
+            try {
+                playbackCollector.stopCollecting(skipped = false)
+                val repeat = _uiState.value.repeatEnabled
+                val currentSong = _uiState.value.currentSong
 
-            if (currentPlaylist.isEmpty() || currentSong == null) {
-                _uiState.value = _uiState.value.copy(isPlaying = false)
-                return@launch
-            }
-
-            if (repeat) {
-                // Handle repeat differently for online vs offline songs
-                if (currentSong.id.startsWith("online:")) {
-                    // For online songs, just seek back to beginning and continue playing
-                    seekTo(0L)
-                    player.play()
-                    playbackCollector.startCollecting(currentSong.id)
-                } else {
-                    // For offline songs, restart the song normally
-                    playSong(currentSong, currentPlaylist)
-                }
-            } else {
-                // Auto-play next song in order (whether playlist is shuffled or not)
-                if (currentIndex < currentPlaylist.size - 1) {
-                    currentIndex++
-                    val nextSong = currentPlaylist[currentIndex]
-                    playSong(nextSong, currentPlaylist)
-                } else {
+                if (currentSong == null) {
                     _uiState.value = _uiState.value.copy(isPlaying = false)
+                    return@launch
                 }
+
+                if (repeat) {
+                    // Handle repeat differently for online vs offline songs
+                    if (currentSong.id.startsWith("online:")) {
+                        // For online songs, just seek back to beginning and continue playing
+                        seekTo(0L)
+                        player.play()
+                        playbackCollector.startCollecting(currentSong.id)
+                    } else {
+                        // For offline songs, restart the song normally
+                        player.prepare(currentSong.filePath, currentSong.id)
+                        player.play()
+                        playbackCollector.startCollecting(currentSong.id)
+                    }
+                } else {
+                    // Auto-play next song with queue refill enabled
+                    val nextSong = queueManager.moveToNext(autoRefill = true)
+                    
+                    if (nextSong != null) {
+                        player.prepare(nextSong.filePath, nextSong.id)
+                        player.play()
+                        playbackCollector.startCollecting(nextSong.id)
+
+                        _uiState.value = _uiState.value.copy(
+                            currentSong = nextSong,
+                            isPlaying = true
+                        )
+
+                        updateNotification()
+                        savePlaylistState()
+                    } else {
+                        _uiState.value = _uiState.value.copy(isPlaying = false)
+                    }
+                }
+            } finally {
+                // Reset the flag after a short delay to allow state to stabilize
+                kotlinx.coroutines.delay(500)
+                isHandlingSongEnd = false
             }
         }
     }
@@ -513,39 +592,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Always reshuffle the playlist with current song at first position
         viewModelScope.launch {
             val currentSong = _uiState.value.currentSong
+            val queueState = queueManager.queueState.value
             
-            if (currentSong != null && currentPlaylist.isNotEmpty()) {
-                // Create a mutable list from current playlist
-                val songsToShuffle = currentPlaylist.toMutableList()
-                
-                // Remove current song from the list
-                songsToShuffle.remove(currentSong)
-                
-                // Shuffle remaining songs
-                val shuffledOthers = songsToShuffle.shuffled()
-                
-                // Place current song at the beginning
-                val newPlaylist = mutableListOf(currentSong).apply {
-                    addAll(shuffledOthers)
-                }
-                
-                // Update playlist and index
-                currentPlaylist = newPlaylist
-                currentIndex = 0 // Current song is now at index 0
+            if (currentSong != null && queueState.currentPlaylist.isNotEmpty()) {
+                // Use queue manager to shuffle
+                queueManager.shuffle()
                 
                 // Update UI state
                 _uiState.value = _uiState.value.copy(shuffleEnabled = true)
                 
                 savePlaylistState()
+                
+                PlaybackEventBus.emit(PlaybackEvent.QueueShuffled)
+                PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
+                    upcomingQueue = queueManager.getUpcomingQueue(),
+                    playHistory = queueManager.getPlayHistory()
+                ))
             } else {
                 // If no current song, just fetch and shuffle all songs
                 val allSongs = repository.getAllSongs().first()
                 if (allSongs.isNotEmpty()) {
                     val shuffledPlaylist = allSongs.shuffled()
-                    currentPlaylist = shuffledPlaylist
-                    currentIndex = 0
                     _uiState.value = _uiState.value.copy(shuffleEnabled = true)
-                    playSong(shuffledPlaylist[currentIndex], shuffledPlaylist)
+                    playSong(shuffledPlaylist[0], shuffledPlaylist)
                 }
             }
         }
@@ -562,80 +631,87 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             
             // Shuffle the playlist
             val shuffledPlaylist = playlist.shuffled()
-            currentPlaylist = shuffledPlaylist
             
             // Start playing from the first song in shuffled list
-            currentIndex = 0
             _uiState.value = _uiState.value.copy(shuffleEnabled = true)
-            playSong(shuffledPlaylist[currentIndex], shuffledPlaylist)
+            playSong(shuffledPlaylist[0], shuffledPlaylist)
         }
     }
 
     fun removeFromQueue(song: Song) {
         viewModelScope.launch {
-            val songIndex = currentPlaylist.indexOf(song)
+            val queueState = queueManager.queueState.value
+            val songIndex = queueState.currentPlaylist.indexOf(song)
+            
             if (songIndex != -1) {
                 // If removing current song, stop playback
-                if (songIndex == currentIndex) {
+                if (songIndex == queueState.currentIndex) {
                     player.pause()
                     playbackCollector.stopCollecting(skipped = true)
                     _uiState.value = _uiState.value.copy(
                         currentSong = null,
                         isPlaying = false
                     )
-                } else if (songIndex < currentIndex) {
-                    // If removing song before current index, adjust current index
-                    currentIndex--
                 }
 
-                // Remove from playlist
-                currentPlaylist = currentPlaylist.toMutableList().apply { removeAt(songIndex) }
+                // Remove from queue using queue manager
+                queueManager.removeFromQueue(song)
                 savePlaylistState()
+                
+                PlaybackEventBus.emit(PlaybackEvent.SongRemovedFromQueue(song))
+                PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
+                    upcomingQueue = queueManager.getUpcomingQueue(),
+                    playHistory = queueManager.getPlayHistory()
+                ))
             }
         }
     }
 
     fun placeNext(song: Song) {
         viewModelScope.launch {
-            // Remove song from current position if it's already in the queue
-            val currentPosition = currentPlaylist.indexOf(song)
-            currentPlaylist = currentPlaylist.toMutableList().apply {
-                if (currentPosition != -1) {
-                    removeAt(currentPosition)
-                    // Adjust current index if necessary
-                    if (currentPosition < currentIndex) {
-                        currentIndex--
-                    } else if (currentPosition == currentIndex) {
-                        // If we're moving the current song, keep it as current
-                        currentIndex = 0
-                    }
-                }
-            }
-
-            // Insert song at position after current song
-            val insertPosition = currentIndex + 1
-            currentPlaylist = currentPlaylist.toMutableList().apply {
-                add(insertPosition, song)
-            }
+            queueManager.placeNext(song)
             savePlaylistState()
+            PlaybackEventBus.emit(PlaybackEvent.SongPlacedNext(song))
+            PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
+                upcomingQueue = queueManager.getUpcomingQueue(),
+                playHistory = queueManager.getPlayHistory()
+            ))
         }
     }
 
     fun reorderQueue(fromIndex: Int, toIndex: Int) {
         viewModelScope.launch {
-            if (fromIndex in currentPlaylist.indices && toIndex in currentPlaylist.indices) {
-                val mutablePlaylist = currentPlaylist.toMutableList()
-                val song = mutablePlaylist.removeAt(fromIndex)
-                mutablePlaylist.add(toIndex, song)
+            queueManager.reorderQueue(fromIndex, toIndex)
+            savePlaylistState()
+            PlaybackEventBus.emit(PlaybackEvent.QueueReordered(fromIndex, toIndex))
+            PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
+                upcomingQueue = queueManager.getUpcomingQueue(),
+                playHistory = queueManager.getPlayHistory()
+            ))
+        }
+    }
 
-                // Update current index if necessary
-                when {
-                    fromIndex == currentIndex -> currentIndex = toIndex
-                    fromIndex < currentIndex && toIndex >= currentIndex -> currentIndex--
-                    fromIndex > currentIndex && toIndex <= currentIndex -> currentIndex++
-                }
+    /**
+     * Play a song from the queue
+     * This will remove all songs before it and make it the current song
+     */
+    fun playFromQueue(song: Song) {
+        viewModelScope.launch {
+            val selectedSong = queueManager.playFromQueue(song)
+            
+            if (selectedSong != null) {
+                playbackCollector.stopCollecting(skipped = true)
+                
+                player.prepare(selectedSong.filePath, selectedSong.id)
+                player.play()
+                playbackCollector.startCollecting(selectedSong.id)
 
-                currentPlaylist = mutablePlaylist
+                _uiState.value = _uiState.value.copy(
+                    currentSong = selectedSong,
+                    isPlaying = true
+                )
+
+                updateNotification()
                 savePlaylistState()
             }
         }
@@ -657,6 +733,164 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun getVolume(): Float {
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         return currentVolume.toFloat() / maxVolume.toFloat()
+    }
+
+    private fun checkIfSongDownloaded(song: Song) {
+        if (!song.id.startsWith("online:")) return
+        
+        viewModelScope.launch {
+            try {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
+                val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
+                val audioFilename = "$safeTitle - $safeArtist.mp3"
+                val audioFile = File(downloadsDir, audioFilename)
+                
+                if (audioFile.exists() && !_uiState.value.downloadedSongs.contains(song.id)) {
+                    _uiState.value = _uiState.value.copy(
+                        downloadedSongs = _uiState.value.downloadedSongs + song.id
+                    )
+                }
+            } catch (e: Exception) {
+                // Ignore errors when checking for existing downloads
+            }
+        }
+    }
+
+    fun refreshDownloadedSongsCheck(allSongs: List<Song>) {
+        viewModelScope.launch {
+            val onlineSongs = allSongs.filter { it.id.startsWith("online:") }
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            
+            val downloadedSongIds = mutableSetOf<String>()
+            
+            onlineSongs.forEach { song ->
+                try {
+                    val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
+                    val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
+                    val audioFilename = "$safeTitle - $safeArtist.mp3"
+                    val audioFile = File(downloadsDir, audioFilename)
+                    
+                    if (audioFile.exists()) {
+                        downloadedSongIds.add(song.id)
+                    }
+                } catch (e: Exception) {
+                    // Ignore errors for individual songs
+                }
+            }
+            
+            _uiState.value = _uiState.value.copy(
+                downloadedSongs = downloadedSongIds,
+                downloadingSongs = emptySet() // Clear downloading state on refresh
+            )
+        }
+    }
+
+    fun downloadCurrentSong() {
+        val currentSong = _uiState.value.currentSong ?: return
+        
+        // Only allow downloading online songs
+        if (!currentSong.id.startsWith("online:")) {
+            return
+        }
+
+        // Check if already downloaded
+        if (_uiState.value.downloadedSongs.contains(currentSong.id)) {
+            return
+        }
+
+        // Check if already downloading
+        if (_uiState.value.downloadingSongs.contains(currentSong.id)) {
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                // Mark as downloading
+                _uiState.value = _uiState.value.copy(
+                    downloadingSongs = _uiState.value.downloadingSongs + currentSong.id
+                )
+                
+                // Get the Downloads directory
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                
+                // Create a safe filename
+                val safeTitle = currentSong.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
+                val safeArtist = currentSong.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
+                val baseFilename = "$safeTitle - $safeArtist"
+                val audioFilename = "$baseFilename.mp3"
+                val audioFile = File(downloadsDir, audioFilename)
+                
+                // Check if audio file already exists
+                if (audioFile.exists()) {
+                    // Mark as downloaded and return
+                    _uiState.value = _uiState.value.copy(
+                        downloadedSongs = _uiState.value.downloadedSongs + currentSong.id,
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                    )
+                    return@launch
+                }
+                
+                // For online songs, find the cached file
+                // Extract video ID from song ID (format: "online:${videoId}")
+                val videoId = currentSong.id.substringAfter("online:")
+                val cacheDir = getApplication<Application>().cacheDir
+                val cacheFile = File(cacheDir, "stream_${videoId}.cache")
+                
+                var downloadSuccess = false
+                
+                if (cacheFile.exists() && cacheFile.length() > 0) {
+                    withContext(Dispatchers.IO) {
+                        FileInputStream(cacheFile).use { input ->
+                            FileOutputStream(audioFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+                    downloadSuccess = true
+                }
+                
+                // Download album art if available
+                if (downloadSuccess && !currentSong.albumArtUri.isNullOrEmpty()) {
+                    try {
+                        val albumArtFilename = "$baseFilename.jpg"
+                        val albumArtFile = File(downloadsDir, albumArtFilename)
+                        
+                        withContext(Dispatchers.IO) {
+                            URL(currentSong.albumArtUri).openStream().use { input ->
+                                FileOutputStream(albumArtFile).use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Album art download failed, but audio download succeeded
+                        e.printStackTrace()
+                    }
+                }
+                
+                // Mark as downloaded if audio download was successful
+                if (downloadSuccess) {
+                    _uiState.value = _uiState.value.copy(
+                        downloadedSongs = _uiState.value.downloadedSongs + currentSong.id,
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                    )
+                } else {
+                    // Remove from downloading if failed
+                    _uiState.value = _uiState.value.copy(
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                    )
+                }
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // Remove from downloading on error
+                _uiState.value = _uiState.value.copy(
+                    downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                )
+                // Handle download error - could emit an event or update UI state
+            }
+        }
     }
 
     private fun updateNotification() {
@@ -681,6 +915,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         chunkedStreamManager.stopAndCleanup()
         player.release()
     }
+
+    /**
+     * Get current queue state for UI
+     */
+    fun getQueueState() = queueManager.queueState
 }
 
 data class PlayerUiState(
@@ -692,5 +931,7 @@ data class PlayerUiState(
     val shuffleEnabled: Boolean = false,
     val repeatEnabled: Boolean = false,
     val downloadPercent: Int = 0,
-    val volume: Float = 1.0f
+    val volume: Float = 1.0f,
+    val downloadedSongs: Set<String> = emptySet(),
+    val downloadingSongs: Set<String> = emptySet()
 )

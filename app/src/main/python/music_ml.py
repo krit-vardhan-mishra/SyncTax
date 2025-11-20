@@ -4,6 +4,7 @@ Similar to behavioral_ml.py in OD-MAS
 """
 import json
 import math
+import os
 from typing import List, Dict, Any
 
 class SimpleClustering:
@@ -45,6 +46,16 @@ class SimpleClustering:
 
     def _distance(self, a: List[float], b: List[float]) -> float:
         return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+    def to_dict(self):
+        return {
+            "n_clusters": self.n_clusters,
+            "centroids": self.centroids
+        }
+
+    def from_dict(self, data):
+        self.n_clusters = data.get("n_clusters", 5)
+        self.centroids = data.get("centroids", [])
 
 
 class RecommendationScorer:
@@ -119,14 +130,26 @@ class RecommendationScorer:
 
         return weighted_score
 
+    def to_dict(self):
+        return {
+            "user_mean": self.user_mean,
+            "user_std": self.user_std
+        }
+
+    def from_dict(self, data):
+        self.user_mean = data.get("user_mean")
+        self.user_std = data.get("user_std")
+
 
 class MusicRecommendationML:
     """Main ML recommendation engine"""
 
-    def __init__(self):
+    def __init__(self, model_dir=None):
         self.scorer = RecommendationScorer()
         self.clustering = SimpleClustering(n_clusters=5)
         self.is_trained = False
+        self.model_dir = model_dir or "."
+        self._load_model()
 
     def train(self, user_history_json: str) -> Dict[str, Any]:
         """Train models on user listening history"""
@@ -149,6 +172,7 @@ class MusicRecommendationML:
             self.clustering.fit(features_list)
 
             self.is_trained = True
+            self._save_model()
 
             return {
                 "success": True,
@@ -207,31 +231,73 @@ class MusicRecommendationML:
             "n_clusters": self.clustering.n_clusters
         }
 
+    def _save_model(self):
+        """Save model state to file"""
+        try:
+            model_data = {
+                "is_trained": self.is_trained,
+                "scorer": self.scorer.to_dict(),
+                "clustering": self.clustering.to_dict()
+            }
+            with open(os.path.join(self.model_dir, "ml_model.json"), "w") as f:
+                json.dump(model_data, f)
+        except Exception as e:
+            print(f"Failed to save model: {e}")
+
+    def _load_model(self):
+        """Load model state from file"""
+        try:
+            model_file = os.path.join(self.model_dir, "ml_model.json")
+            if os.path.exists(model_file):
+                with open(model_file, "r") as f:
+                    model_data = json.load(f)
+                self.is_trained = model_data.get("is_trained", False)
+                self.scorer.from_dict(model_data.get("scorer", {}))
+                self.clustering.from_dict(model_data.get("clustering", {}))
+        except Exception as e:
+            print(f"Failed to load model: {e}")
+
 
 # Global instance
-_ml_engine = MusicRecommendationML()
+_ml_engine = None
+
+def _get_engine(model_dir=None):
+    global _ml_engine
+    if _ml_engine is None:
+        _ml_engine = MusicRecommendationML(model_dir)
+    return _ml_engine
 
 
-def train_model(user_history_json: str) -> str:
+def train_model(user_history_json: str, model_dir=None) -> str:
     """Train the recommendation model"""
-    result = _ml_engine.train(user_history_json)
+    engine = _get_engine(model_dir)
+    result = engine.train(user_history_json)
     return json.dumps(result)
 
 
-def get_recommendation(song_features_json: str) -> str:
+def get_recommendation(song_features_json: str, model_dir=None) -> str:
     """Get recommendation score for a song"""
-    result = _ml_engine.recommend(song_features_json)
+    engine = _get_engine(model_dir)
+    result = engine.recommend(song_features_json)
     return json.dumps(result)
 
 
-def get_model_status() -> str:
+def get_model_status(model_dir=None) -> str:
     """Get current model status"""
-    result = _ml_engine.get_status()
+    engine = _get_engine(model_dir)
+    result = engine.get_status()
     return json.dumps(result)
 
 
-def reset_model() -> str:
+def reset_model(model_dir=None) -> str:
     """Reset the ML engine state"""
     global _ml_engine
-    _ml_engine = MusicRecommendationML()
+    if _ml_engine:
+        try:
+            model_file = os.path.join(_ml_engine.model_dir, "ml_model.json")
+            if os.path.exists(model_file):
+                os.remove(model_file)
+        except:
+            pass
+    _ml_engine = MusicRecommendationML(model_dir)
     return json.dumps({"success": True, "message": "Model reset"})

@@ -16,7 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.just_for_fun.synctax.ui.theme.ChipSelected
+import com.just_for_fun.synctax.ui.theme.ChipUnselected
 
 @Composable
 fun FilterChipsRow() {
@@ -35,11 +38,20 @@ fun FilterChipsRow() {
                 selected = chip == selectedChip,
                 onClick = { selectedChip = chip },
                 label = { Text(chip) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    selectedLabelColor = MaterialTheme.colorScheme.onBackground
-                )
-            )
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = ChipSelected,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = ChipUnselected,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = chip == selectedChip,
+                    selectedBorderColor = Color.White,
+                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                ),
+                shape = MaterialTheme.shapes.medium
+            )   
         }
     }
 }

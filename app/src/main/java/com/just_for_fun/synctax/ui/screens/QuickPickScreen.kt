@@ -32,7 +32,7 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.background.EnhancedEmptyQuickPicksState
 import com.just_for_fun.synctax.ui.components.card.RecommendationCard
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
-import com.just_for_fun.synctax.ui.dynamic.DynamicHorizontalBackground
+import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
@@ -73,7 +73,7 @@ fun QuickPicksScreen(
             )
         }
     ) { paddingValues ->
-        DynamicHorizontalBackground(
+        DynamicAlbumBackground(
             albumColors = albumColors,
             modifier = Modifier
                 .fillMaxSize()
@@ -114,7 +114,7 @@ fun QuickPicksScreen(
                     }
                 } else if (uiState.quickPicks.isEmpty()) {
                     item {
-                        EnhancedEmptyQuickPicksState(albumColors = albumColors)
+                        EnhancedEmptyQuickPicksState(albumColors = albumColors, trainingDataSize = uiState.trainingDataSize)
                     }
                 } else {
                     // Display the list of recommendations

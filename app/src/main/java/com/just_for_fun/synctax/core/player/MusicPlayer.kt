@@ -71,13 +71,19 @@ class MusicPlayer(context: Context) {
     }
 
     fun prepare(filePath: String, songId: String) {
+        // Reset isEnded flag BEFORE setting new media item to prevent stale state
+        _playerState.value = _playerState.value.copy(
+            isEnded = false
+        )
+        
         val mediaItem = MediaItem.fromUri(filePath)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
 
         _playerState.value = _playerState.value.copy(
             currentSongId = songId,
-            duration = exoPlayer.duration
+            duration = exoPlayer.duration,
+            isEnded = false
         )
     }
 

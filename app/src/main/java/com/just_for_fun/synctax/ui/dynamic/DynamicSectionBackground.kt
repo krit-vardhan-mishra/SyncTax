@@ -15,11 +15,7 @@ fun DynamicSectionBackground(
 ) {
     Surface(
         modifier = modifier,
-        color = if (useAccent) {
-            albumColors.dominant.copy(alpha = 0.15f)
-        } else {
-            albumColors.muted.copy(alpha = 0.08f)
-        },
+        color = androidx.compose.ui.graphics.Color(0xFF8e8a8aff), // Fixed section color
         shape = MaterialTheme.shapes.medium
     ) {
         content()
