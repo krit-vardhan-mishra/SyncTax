@@ -25,10 +25,11 @@ import com.just_for_fun.synctax.ui.components.section.QuickPicksSection
 import com.just_for_fun.synctax.ui.components.section.SectionHeader
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.ui.components.utils.SortOption
+import com.just_for_fun.synctax.ui.components.onboarding.DirectorySelectionDialog
 import com.just_for_fun.synctax.ui.components.section.SpeedDialSection
+import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +38,6 @@ fun HomeScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
     userPreferences: UserPreferences,
-    onSearchClick: () -> Unit = {},
     onTrainClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {}
 ) {
@@ -46,6 +46,10 @@ fun HomeScreen(
     val userName by userPreferences.userName.collectAsState()
     val userInitial = userPreferences.getUserInitial()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+    val scanPaths by userPreferences.scanPaths.collectAsState()
+
+    // Directory selection dialog state
+    var showDirectorySelectionDialog by remember { mutableStateOf(false) }
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
@@ -158,12 +162,25 @@ fun HomeScreen(
                     }
 
                     uiState.allSongs.isEmpty() -> {
+                        // Show directory selection dialog when no songs are scanned
+                        LaunchedEffect(Unit) {
+                            if (scanPaths.isEmpty() && !showDirectorySelectionDialog) {
+                                showDirectorySelectionDialog = true
+                            }
+                        }
+                        
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             EmptyMusicState(
-                                onScanClick = { homeViewModel.scanMusic() },
+                                onScanClick = { 
+                                    if (scanPaths.isEmpty()) {
+                                        showDirectorySelectionDialog = true
+                                    } else {
+                                        homeViewModel.scanMusic()
+                                    }
+                                },
                                 isScanning = uiState.isScanning
                             )
                         }
@@ -416,6 +433,24 @@ fun HomeScreen(
                         onDismiss = {
                             showGuide = false
                             userPreferences.setGuideShown(UserPreferences.GUIDE_HOME)
+                            // Show directory selection dialog if no directories are selected yet
+                            if (scanPaths.isEmpty()) {
+                                showDirectorySelectionDialog = true
+                            }
+                        }
+                    )
+                }
+
+                // Directory Selection Dialog
+                if (showDirectorySelectionDialog) {
+                    DirectorySelectionDialog(
+                        userPreferences = userPreferences,
+                        onScanClick = {
+                            showDirectorySelectionDialog = false
+                            homeViewModel.scanMusic()
+                        },
+                        onDismiss = {
+                            showDirectorySelectionDialog = false
                         }
                     )
                 }

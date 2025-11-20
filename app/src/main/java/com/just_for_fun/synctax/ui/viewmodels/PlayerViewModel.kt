@@ -740,11 +740,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         
         viewModelScope.launch {
             try {
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "SyncTax")
                 val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                 val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
-                val audioFilename = "$safeTitle - $safeArtist.mp3"
-                val audioFile = File(downloadsDir, audioFilename)
+                val audioFilename = "$safeTitle - $safeArtist.opus"
+                val audioFile = File(musicDir, audioFilename)
                 
                 if (audioFile.exists() && !_uiState.value.downloadedSongs.contains(song.id)) {
                     _uiState.value = _uiState.value.copy(
@@ -760,7 +760,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshDownloadedSongsCheck(allSongs: List<Song>) {
         viewModelScope.launch {
             val onlineSongs = allSongs.filter { it.id.startsWith("online:") }
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "SyncTax")
             
             val downloadedSongIds = mutableSetOf<String>()
             
@@ -768,8 +768,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 try {
                     val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                     val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
-                    val audioFilename = "$safeTitle - $safeArtist.mp3"
-                    val audioFile = File(downloadsDir, audioFilename)
+                    val audioFilename = "$safeTitle - $safeArtist.opus"
+                    val audioFile = File(musicDir, audioFilename)
                     
                     if (audioFile.exists()) {
                         downloadedSongIds.add(song.id)
@@ -784,6 +784,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 downloadingSongs = emptySet() // Clear downloading state on refresh
             )
         }
+    }
+
+    fun dismissDownloadMessage() {
+        _uiState.value = _uiState.value.copy(downloadMessage = null)
     }
 
     fun downloadCurrentSong() {
@@ -811,15 +815,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     downloadingSongs = _uiState.value.downloadingSongs + currentSong.id
                 )
                 
-                // Get the Downloads directory
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                // Get the app's download directory (Download/SyncTax)
+                val downloadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SyncTax")
+                if (!downloadDir.exists()) {
+                    downloadDir.mkdirs()
+                }
+                val musicDir = downloadDir // Keep variable name for compatibility
                 
-                // Create a safe filename
+                // Create a safe filename with proper audio extension
                 val safeTitle = currentSong.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                 val safeArtist = currentSong.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
                 val baseFilename = "$safeTitle - $safeArtist"
-                val audioFilename = "$baseFilename.mp3"
-                val audioFile = File(downloadsDir, audioFilename)
+                // Use .opus format since that's what the cache files are
+                val audioFilename = "$baseFilename.opus"
+                val audioFile = File(musicDir, audioFilename)
                 
                 // Check if audio file already exists
                 if (audioFile.exists()) {
@@ -843,7 +852,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     withContext(Dispatchers.IO) {
                         FileInputStream(cacheFile).use { input ->
                             FileOutputStream(audioFile).use { output ->
-                                input.copyTo(output)
+                                val buffer = ByteArray(8192)
+                                var bytesRead: Int
+                                var totalBytesRead = 0L
+                                val totalBytes = cacheFile.length()
+                                
+                                while (input.read(buffer).also { bytesRead = it } != -1) {
+                                    output.write(buffer, 0, bytesRead)
+                                    totalBytesRead += bytesRead
+                                    
+                                    // Update progress
+                                    val progress = totalBytesRead.toFloat() / totalBytes.toFloat()
+                                    _uiState.value = _uiState.value.copy(
+                                        downloadProgress = _uiState.value.downloadProgress + (currentSong.id to progress)
+                                    )
+                                }
                             }
                         }
                     }
@@ -854,10 +877,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (downloadSuccess && !currentSong.albumArtUri.isNullOrEmpty()) {
                     try {
                         val albumArtFilename = "$baseFilename.jpg"
-                        val albumArtFile = File(downloadsDir, albumArtFilename)
+                        val albumArtFile = File(musicDir, albumArtFilename)
+                        
+                        // Upgrade thumbnail URL to maxres quality if it's a YouTube thumbnail
+                        val highQualityThumbnail = currentSong.albumArtUri
+                            ?.replace("/hqdefault.jpg", "/maxresdefault.jpg")
+                            ?.replace("/mqdefault.jpg", "/maxresdefault.jpg")
+                            ?.replace("/sddefault.jpg", "/maxresdefault.jpg")
+                            ?.replace("/default.jpg", "/maxresdefault.jpg")
                         
                         withContext(Dispatchers.IO) {
-                            URL(currentSong.albumArtUri).openStream().use { input ->
+                            URL(highQualityThumbnail ?: currentSong.albumArtUri).openStream().use { input ->
                                 FileOutputStream(albumArtFile).use { output ->
                                     input.copyTo(output)
                                 }
@@ -871,14 +901,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 
                 // Mark as downloaded if audio download was successful
                 if (downloadSuccess) {
+                    val downloadLocation = "Download/SyncTax/${audioFile.name}"
                     _uiState.value = _uiState.value.copy(
                         downloadedSongs = _uiState.value.downloadedSongs + currentSong.id,
-                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
+                        downloadProgress = _uiState.value.downloadProgress + (currentSong.id to 1.0f),
+                        downloadMessage = "Downloaded to $downloadLocation"
                     )
+                    
+                    // Add the downloaded song to the database so it appears in library
+                    val downloadedSong = Song(
+                        id = audioFile.absolutePath, // Use file path as ID for local songs
+                        title = currentSong.title,
+                        artist = currentSong.artist,
+                        album = currentSong.album,
+                        duration = currentSong.duration,
+                        filePath = audioFile.absolutePath,
+                        genre = currentSong.genre,
+                        releaseYear = currentSong.releaseYear,
+                        albumArtUri = if (File(musicDir, "$baseFilename.jpg").exists()) {
+                            File(musicDir, "$baseFilename.jpg").absolutePath
+                        } else {
+                            currentSong.albumArtUri
+                        }
+                    )
+                    
+                    // Insert into database if not already present
+                    if (repository.getSongById(downloadedSong.id) == null) {
+                        repository.insertSong(downloadedSong)
+                    }
                 } else {
                     // Remove from downloading if failed
                     _uiState.value = _uiState.value.copy(
-                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
+                        downloadProgress = _uiState.value.downloadProgress - currentSong.id
                     )
                 }
                 
@@ -886,7 +942,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 e.printStackTrace()
                 // Remove from downloading on error
                 _uiState.value = _uiState.value.copy(
-                    downloadingSongs = _uiState.value.downloadingSongs - currentSong.id
+                    downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
+                    downloadProgress = _uiState.value.downloadProgress - currentSong.id
                 )
                 // Handle download error - could emit an event or update UI state
             }
@@ -933,5 +990,7 @@ data class PlayerUiState(
     val downloadPercent: Int = 0,
     val volume: Float = 1.0f,
     val downloadedSongs: Set<String> = emptySet(),
-    val downloadingSongs: Set<String> = emptySet()
+    val downloadingSongs: Set<String> = emptySet(),
+    val downloadProgress: Map<String, Float> = emptyMap(), // songId to progress (0.0 to 1.0)
+    val downloadMessage: String? = null // Download location message for snackbar
 )

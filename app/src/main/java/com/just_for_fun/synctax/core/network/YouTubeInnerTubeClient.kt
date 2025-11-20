@@ -338,10 +338,12 @@ class YouTubeInnerTubeClient {
                     thumbnail = "https:$thumbnail"
                 }
                 
-                // Upgrade to higher quality thumbnail
-                thumbnail = thumbnail?.replace("/default.jpg", "/hqdefault.jpg")
-                    ?.replace("/mqdefault.jpg", "/hqdefault.jpg")
-                    ?.replace("/sddefault.jpg", "/hqdefault.jpg")
+                // Upgrade to maximum quality thumbnail (maxresdefault = 1280x720)
+                // Falls back to high quality if maxres is not available
+                thumbnail = thumbnail?.replace("/default.jpg", "/maxresdefault.jpg")
+                    ?.replace("/mqdefault.jpg", "/maxresdefault.jpg")
+                    ?.replace("/sddefault.jpg", "/maxresdefault.jpg")
+                    ?.replace("/hqdefault.jpg", "/maxresdefault.jpg")
             }
             
             // Get fixed run (duration)

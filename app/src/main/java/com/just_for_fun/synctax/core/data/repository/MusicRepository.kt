@@ -2,7 +2,11 @@ package com.just_for_fun.synctax.core.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
+import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
+import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.core.data.local.MusicDatabase
 import com.just_for_fun.synctax.core.data.local.entities.ListeningHistory
 import com.just_for_fun.synctax.core.data.local.entities.Song
@@ -10,6 +14,7 @@ import com.just_for_fun.synctax.core.data.local.entities.UserPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Calendar
 
 class MusicRepository(private val context: Context) {
@@ -19,12 +24,282 @@ class MusicRepository(private val context: Context) {
     private val historyDao = database.listeningHistoryDao()
     private val preferenceDao = database.userPreferenceDao()
 
-    /**
-     * Scan device storage for music files
-     */
-    suspend fun scanDeviceMusic(): List<Song> = withContext(Dispatchers.IO) {
-        val songs = mutableListOf<Song>()
+    companion object {
+        const val APP_MUSIC_DIR = "SyncTax"
+    }
 
+    /**
+     * Get the app's download directory (always scanned)
+     * This is where the app stores downloaded songs
+     */
+    fun getAppMusicDirectory(): File {
+        val downloadDir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "SyncTax"
+        )
+        if (!downloadDir.exists()) {
+            downloadDir.mkdirs()
+        }
+        Log.d("Directory Location", "App music directory: ${downloadDir.absolutePath}/")
+
+        return downloadDir
+    }
+
+    /**
+     * Scan device storage for music files from selected directories
+     */
+    suspend fun scanDeviceMusic(selectedPaths: List<String> = emptyList()): List<Song> =
+        withContext(Dispatchers.IO) {
+            val songs = mutableListOf<Song>()
+
+            // Get app's download directory - always scan this
+            val appMusicDir = getAppMusicDirectory()
+
+            // First, scan app's download directory directly (not relying on MediaStore)
+            scanDirectoryDirectly(appMusicDir, songs)
+
+            // Then scan user-selected directories using SAF
+            selectedPaths.forEach { uriString ->
+                try {
+                    val uri = Uri.parse(uriString)
+                    scanDirectoryFromSAF(uri, songs)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            // Save to database
+            songDao.insertSongs(songs)
+
+            // Prune songs that are no longer present on device (by MediaStore id)
+            val scannedIds = songs.map { it.id }
+            if (scannedIds.isNotEmpty()) {
+                songDao.deleteSongsNotIn(scannedIds)
+            }
+
+            songs
+        }
+
+    /**
+     * Scan a directory directly using File API
+     */
+    private fun scanDirectoryDirectly(directory: File, songs: MutableList<Song>) {
+        fun scanRecursive(folder: File) {
+            folder.listFiles()?.forEach { file ->
+                if (file.isDirectory) {
+                    scanRecursive(file)
+                } else if (file.isFile) {
+                    val fileName = file.name ?: ""
+                    // Check if it's an audio file
+                    if (fileName.matches(Regex(".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$", RegexOption.IGNORE_CASE))) {
+                        try {
+                            // Get metadata from MediaStore using file path
+                            val projection = arrayOf(
+                                MediaStore.Audio.Media._ID,
+                                MediaStore.Audio.Media.TITLE,
+                                MediaStore.Audio.Media.ARTIST,
+                                MediaStore.Audio.Media.ALBUM,
+                                MediaStore.Audio.Media.ALBUM_ID,
+                                MediaStore.Audio.Media.DURATION,
+                                MediaStore.Audio.Media.YEAR
+                            )
+
+                            val selection = "${MediaStore.Audio.Media.DATA} = ?"
+                            val selectionArgs = arrayOf(file.absolutePath)
+
+                            var songAdded = false
+                            context.contentResolver.query(
+                                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                                projection,
+                                selection,
+                                selectionArgs,
+                                null
+                            )?.use { cursor ->
+                                if (cursor.moveToFirst()) {
+                                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)).toString()
+                                    val title = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)) ?: fileName.removeSuffix(fileName.substringAfterLast(".", ""))
+                                    val artist = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)) ?: "Unknown Artist"
+                                    val album = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
+                                    val albumId = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
+                                    val duration = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
+                                    val year = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
+
+                                    // Get album art URI
+                                    val albumArtUri = ContentUris.withAppendedId(
+                                        android.net.Uri.parse("content://media/external/audio/albumart"),
+                                        albumId
+                                    ).toString()
+
+                                    val genre = detectGenre(file.absolutePath, artist, title)
+
+                                    val song = Song(
+                                        id = id,
+                                        title = title,
+                                        artist = artist,
+                                        album = album,
+                                        duration = duration,
+                                        filePath = file.absolutePath,
+                                        genre = genre,
+                                        releaseYear = if (year > 0) year else null,
+                                        albumArtUri = albumArtUri
+                                    )
+
+                                    songs.add(song)
+                                    songAdded = true
+                                    Log.d("Directory Location", "Added song from direct scan: ${file.absolutePath}")
+                                }
+                            }
+
+                            // If not found in MediaStore, add basic info
+                            if (!songAdded) {
+                                val title = fileName.removeSuffix(fileName.substringAfterLast(".", ""))
+                                val song = Song(
+                                    id = file.absolutePath,
+                                    title = title,
+                                    artist = "Unknown Artist",
+                                    album = null,
+                                    duration = 0L,
+                                    filePath = file.absolutePath,
+                                    genre = detectGenre(file.absolutePath, "", title),
+                                    releaseYear = null,
+                                    albumArtUri = null
+                                )
+                                songs.add(song)
+                                Log.d("Directory Location", "Added song from direct scan (no MediaStore): ${file.absolutePath}")
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+
+        scanRecursive(directory)
+    }
+    private fun scanDirectoryFromSAF(directoryUri: Uri, songs: MutableList<Song>) {
+        val directory = DocumentFile.fromTreeUri(context, directoryUri) ?: return
+
+        fun scanRecursive(folder: DocumentFile) {
+            folder.listFiles().forEach { file ->
+                if (file.isDirectory) {
+                    scanRecursive(file)
+                } else if (file.isFile) {
+                    val mimeType = file.type
+                    // Check if it's an audio file
+                    if (mimeType?.startsWith("audio/") == true ||
+                        file.name?.matches(
+                            Regex(
+                                ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
+                                RegexOption.IGNORE_CASE
+                            )
+                        ) == true
+                    ) {
+
+                        try {
+                            // Get metadata from MediaStore using the document URI
+                            val projection = arrayOf(
+                                MediaStore.Audio.Media._ID,
+                                MediaStore.Audio.Media.TITLE,
+                                MediaStore.Audio.Media.ARTIST,
+                                MediaStore.Audio.Media.ALBUM,
+                                MediaStore.Audio.Media.ALBUM_ID,
+                                MediaStore.Audio.Media.DURATION,
+                                MediaStore.Audio.Media.DATA,
+                                MediaStore.Audio.Media.YEAR
+                            )
+
+                            // Try to find this file in MediaStore
+                            val displayName = file.name ?: "Unknown"
+                            val selection = "${MediaStore.Audio.Media.DISPLAY_NAME} = ?"
+                            val selectionArgs = arrayOf(displayName)
+
+                            var songAdded = false
+                            context.contentResolver.query(
+                                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                                projection,
+                                selection,
+                                selectionArgs,
+                                null
+                            )?.use { cursor ->
+                                if (cursor.moveToFirst()) {
+                                    val id =
+                                        cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
+                                            .toString()
+                                    val title =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE))
+                                            ?: displayName
+                                    val artist =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST))
+                                            ?: "Unknown Artist"
+                                    val album =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
+                                    val albumId =
+                                        cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
+                                    val duration =
+                                        cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
+                                    val filePath =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA))
+                                    val year =
+                                        cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
+
+                                    // Get album art URI
+                                    val albumArtUri = ContentUris.withAppendedId(
+                                        android.net.Uri.parse("content://media/external/audio/albumart"),
+                                        albumId
+                                    ).toString()
+
+                                    val genre = detectGenre(filePath, artist, title)
+
+                                    val song = Song(
+                                        id = id,
+                                        title = title,
+                                        artist = artist,
+                                        album = album,
+                                        duration = duration,
+                                        filePath = filePath,
+                                        genre = genre,
+                                        releaseYear = if (year > 0) year else null,
+                                        albumArtUri = albumArtUri
+                                    )
+
+                                    songs.add(song)
+                                    songAdded = true
+                                }
+                            }
+
+                            // If not found in MediaStore, add basic info
+                            if (!songAdded) {
+                                val song = Song(
+                                    id = file.uri.toString(),
+                                    title = displayName.removeSuffix(
+                                        file.name?.substringAfterLast(".") ?: ""
+                                    ),
+                                    artist = "Unknown Artist",
+                                    album = null,
+                                    duration = 0L,
+                                    filePath = file.uri.toString(),
+                                    genre = "Other",
+                                    releaseYear = null,
+                                    albumArtUri = null
+                                )
+                                songs.add(song)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+
+        scanRecursive(directory)
+    }
+
+    /**
+     * Scan from MediaStore with path filtering
+     */
+    private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -65,6 +340,14 @@ class MusicRepository(private val context: Context) {
                 val filePath = cursor.getString(dataColumn)
                 val year = cursor.getInt(yearColumn)
 
+                // Check if file is in allowed directory
+                if (!filePath.startsWith(allowedPath)) {
+                    Log.d("Directory Location", "Skipping file not in allowed path: $filePath (allowed: $allowedPath)")
+                    continue // Skip this song
+                }
+
+                Log.d("Directory Location", "Found song in SyncTax: $filePath")
+
                 // Get album art URI
                 val albumArtUri = ContentUris.withAppendedId(
                     android.net.Uri.parse("content://media/external/audio/albumart"),
@@ -89,17 +372,6 @@ class MusicRepository(private val context: Context) {
                 songs.add(song)
             }
         }
-
-        // Save to database
-        songDao.insertSongs(songs)
-
-        // Prune songs that are no longer present on device (by MediaStore id)
-        val scannedIds = songs.map { it.id }
-        if (scannedIds.isNotEmpty()) {
-            songDao.deleteSongsNotIn(scannedIds)
-        }
-
-        songs
     }
 
     private fun detectGenre(filePath: String, artist: String, title: String): String {
@@ -129,6 +401,13 @@ class MusicRepository(private val context: Context) {
      * Get song by ID
      */
     suspend fun getSongById(songId: String): Song? = songDao.getSongById(songId)
+
+    /**
+     * Insert a single song into the database
+     */
+    suspend fun insertSong(song: Song) = withContext(Dispatchers.IO) {
+        songDao.insertSongs(listOf(song))
+    }
 
     /**
      * Get songs by genre
@@ -170,7 +449,8 @@ class MusicRepository(private val context: Context) {
         if (existingPref != null) {
             val newPlayCount = existingPref.playCount + 1
             val newSkipCount = if (skipped) existingPref.skipCount + 1 else existingPref.skipCount
-            val newAvgCompletion = (existingPref.avgCompletionRate * existingPref.playCount + completionRate) / newPlayCount
+            val newAvgCompletion =
+                (existingPref.avgCompletionRate * existingPref.playCount + completionRate) / newPlayCount
 
             val updatedPref = existingPref.copy(
                 playCount = newPlayCount,
@@ -222,16 +502,17 @@ class MusicRepository(private val context: Context) {
         val ninetyDaysAgo = System.currentTimeMillis() - (90 * 24 * 60 * 60 * 1000L)
         historyDao.deleteOldHistory(ninetyDaysAgo)
     }
-    
+
     /**
      * Clean up listening history and preferences for deleted songs
      */
-    suspend fun cleanupDeletedSongsData(deletedSongIds: List<String>) = withContext(Dispatchers.IO) {
-        deletedSongIds.forEach { songId ->
-            // Remove from listening history
-            historyDao.deleteBySongId(songId)
-            // Remove from user preferences
-            preferenceDao.deleteBySongId(songId)
+    suspend fun cleanupDeletedSongsData(deletedSongIds: List<String>) =
+        withContext(Dispatchers.IO) {
+            deletedSongIds.forEach { songId ->
+                // Remove from listening history
+                historyDao.deleteBySongId(songId)
+                // Remove from user preferences
+                preferenceDao.deleteBySongId(songId)
+            }
         }
-    }
 }

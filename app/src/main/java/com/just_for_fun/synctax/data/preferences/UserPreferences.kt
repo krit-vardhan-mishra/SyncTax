@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class UserPreferences(context: Context) {
-    
+
     private val prefs: SharedPreferences = context.getSharedPreferences(
         "user_preferences",
         Context.MODE_PRIVATE
@@ -18,9 +18,37 @@ class UserPreferences(context: Context) {
 
     private val _isFirstLaunch = MutableStateFlow(isFirstLaunch())
     val isFirstLaunch: StateFlow<Boolean> = _isFirstLaunch.asStateFlow()
-    
+
     private val _showQuickPicksGuide = MutableStateFlow(isQuickPicksGuideEnabled())
     val showQuickPicksGuide: StateFlow<Boolean> = _showQuickPicksGuide.asStateFlow()
+
+    // --- new: persisted scan paths (list of tree URIs as strings) ---
+    private val _scanPaths = MutableStateFlow(getScanPathsPref())
+    val scanPaths: StateFlow<List<String>> = _scanPaths.asStateFlow()
+
+    private fun getScanPathsPref(): List<String> {
+        val raw = prefs.getString(KEY_SCAN_PATHS, "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").map { it }.filter { it.isNotBlank() }
+    }
+
+    fun addScanPath(uriString: String) {
+        val current = getScanPathsPref().toMutableList()
+        if (!current.contains(uriString)) {
+            current.add(uriString)
+            prefs.edit().putString(KEY_SCAN_PATHS, current.joinToString("|")).apply()
+            _scanPaths.value = current
+        }
+    }
+
+    fun removeScanPath(uriString: String) {
+        val current = getScanPathsPref().toMutableList()
+        if (current.remove(uriString)) {
+            prefs.edit().putString(KEY_SCAN_PATHS, if (current.isEmpty()) "" else current.joinToString("|")).apply()
+            _scanPaths.value = current
+        }
+    }
+    // --- end new ---
 
     fun saveUserName(name: String) {
         prefs.edit().apply {
@@ -79,11 +107,11 @@ class UserPreferences(context: Context) {
     fun isGuideShown(screen: String): Boolean {
         return prefs.getBoolean("guide_shown_$screen", false)
     }
-    
+
     fun setGuideShown(screen: String, shown: Boolean = true) {
         prefs.edit().putBoolean("guide_shown_$screen", shown).apply()
     }
-    
+
     fun shouldShowGuide(screen: String): Boolean {
         return !isGuideShown(screen)
     }
@@ -97,7 +125,10 @@ class UserPreferences(context: Context) {
         const val KEY_THEME_MODE_SYSTEM = "system"
         const val KEY_THEME_MODE_LIGHT = "light"
         const val KEY_THEME_MODE_DARK = "dark"
-        
+
+        // new: key for scan paths
+        private const val KEY_SCAN_PATHS = "scan_paths"
+
         // Guide screen identifiers
         const val GUIDE_HOME = "home"
         const val GUIDE_PLAYER = "player"

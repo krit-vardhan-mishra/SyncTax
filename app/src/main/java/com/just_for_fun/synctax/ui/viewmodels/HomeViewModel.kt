@@ -83,7 +83,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(isScanning = true)
 
             try {
-                val songs = repository.scanDeviceMusic()
+                // Get selected scan paths from UserPreferences
+                val userPrefs = com.just_for_fun.synctax.data.preferences.UserPreferences(getApplication())
+                val scanPaths = userPrefs.scanPaths.value
+                val songs = repository.scanDeviceMusic(scanPaths)
                 
                 // Force refresh the song list by updating the state
                 _uiState.value = _uiState.value.copy(

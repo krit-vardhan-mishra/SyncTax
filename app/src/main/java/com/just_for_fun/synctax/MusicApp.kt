@@ -137,7 +137,6 @@ fun MusicApp(userPreferences: UserPreferences) {
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel,
                             userPreferences = userPreferences,
-                            onSearchClick = { navController.navigate("search") },
                             onTrainClick = { navController.navigate("train") },
                             onOpenSettings = { navController.navigate("settings") }
                         )
@@ -183,7 +182,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                     composable("settings") {
                         SettingsScreen(
                             userPreferences = userPreferences,
-                            onBackClick = { navController.popBackStack() }
+                            onBackClick = { navController.popBackStack() },
+                            onScanTrigger = { homeViewModel.scanMusic() }
                         )
                     }
                     composable(
