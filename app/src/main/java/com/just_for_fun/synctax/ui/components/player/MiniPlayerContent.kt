@@ -75,7 +75,7 @@ fun MiniPlayerContent(
                 progress = { (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp),
+                    .height(2.dp),
                 color = PlayerAccent, // Assuming PlayerAccent is the red color from the image
                 trackColor = Color.White.copy(alpha = 0.2f)
             )

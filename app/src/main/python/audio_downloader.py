@@ -68,6 +68,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+                'writethumbnail': True,  # Download thumbnail for embedding
                 'postprocessors': [
                     {
                         'key': 'FFmpegExtractAudio',
@@ -76,6 +77,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
                     },
                     {
                         'key': 'EmbedThumbnail',
+                        'already_have_thumbnail': False,
                     },
                     {
                         'key': 'FFmpegMetadata',
@@ -85,10 +87,11 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
                 **base_opts
             }
         else:
-            # Download M4A with embedded thumbnail using FFmpeg
+            # Download M4A with embedded thumbnail - M4A supports embedded thumbnails better than opus
             ydl_opts = {
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+                'writethumbnail': True,  # Download thumbnail for embedding
                 'postprocessors': [
                     {
                         'key': 'FFmpegExtractAudio',
@@ -97,6 +100,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
                     },
                     {
                         'key': 'EmbedThumbnail',
+                        'already_have_thumbnail': False,
                     },
                     {
                         'key': 'FFmpegMetadata',
@@ -113,9 +117,11 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
             # Get the final filename
             filename = ydl.prepare_filename(info)
             
-            # If FFmpeg was used, update extension to mp3
+            # Update extension based on format
             if ffmpeg_available and prefer_mp3:
                 filename = os.path.splitext(filename)[0] + '.mp3'
+            else:
+                filename = os.path.splitext(filename)[0] + '.m4a'
             
             result = {
                 "success": True,

@@ -6,10 +6,22 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.widget.RemoteViews
 import com.just_for_fun.synctax.MainActivity
 import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.service.MusicService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.    net.HttpURLConnection
+import java.net.URL
 
 class MusicWidgetProvider : AppWidgetProvider() {
 
@@ -26,6 +38,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val EXTRA_POSITION = "extra_position"
         const val EXTRA_DURATION = "extra_duration"
         const val EXTRA_SHUFFLE_ON = "extra_shuffle_on"
+
+        private val widgetScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
         fun updateWidget(
             context: Context,
@@ -62,29 +76,31 @@ class MusicWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        val songTitle = context.getString(R.string.app_name)
-        val songArtist = ""
-        val albumArtUri: String? = null
-        val isPlaying = false
-        val position = 0L
-        val duration = 0L
-        val shuffleOn = false
-
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(
                 context,
                 appWidgetManager,
                 appWidgetId,
-                songTitle,
-                songArtist,
-                albumArtUri,
-                isPlaying,
-                position,
-                duration,
-                shuffleOn
+                "",
+                "",
+                null,
+                false,
+                0L,
+                0L,
+                false
             )
         }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        // Widget was resized, update with new layout
+        updateAppWidget(context, appWidgetManager, appWidgetId, "", "", null, false, 0L, 0L, false)
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -110,7 +126,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 context.startService(serviceIntent)
             }
             ACTION_SHUFFLE -> {
-                // Handle shuffle action - this would need to be implemented in MusicService
+                // Handle shuffle action
             }
             AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -143,6 +159,26 @@ class MusicWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    private fun getLayoutForSize(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int
+    ): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+            val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+            val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
+
+            // Choose layout based on size
+            return when {
+                width < 150 || height < 80 -> R.layout.widget_music_small
+                height < 120 -> R.layout.widget_music_medium
+                else -> R.layout.widget_music_circular // Large layout
+            }
+        }
+        return R.layout.widget_music_medium // Default
+    }
+
     private fun updateAppWidget(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -156,19 +192,14 @@ class MusicWidgetProvider : AppWidgetProvider() {
         shuffleOn: Boolean
     ) {
         try {
-            val views = RemoteViews(context.packageName, R.layout.widget_music_circular)
-
-            // Set gray background when no song is playing
-            if (songTitle.isEmpty() || songTitle == context.getString(R.string.app_name)) {
-                // Use proper color integer (ARGB format)
-                views.setInt(R.id.widget_background_circle, "setBackgroundColor", 0xFF777777.toInt())
-            } else {
-                // Keep the default circular background (semi-transparent black)
-                views.setInt(R.id.widget_background_circle, "setBackgroundColor", 0x4D000000.toInt())
-            }
+            // Get appropriate layout based on widget size
+            val layoutId = getLayoutForSize(context, appWidgetManager, appWidgetId)
+            val views = RemoteViews(context.packageName, layoutId)
 
             // Set up click intent to open the app
-            val appIntent = Intent(context, MainActivity::class.java)
+            val appIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
             val appPendingIntent = PendingIntent.getActivity(
                 context,
                 0,
@@ -178,82 +209,152 @@ class MusicWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_container, appPendingIntent)
 
             // Set up control intents
-            val playPauseIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-                action = ACTION_PLAY_PAUSE
-            }
-            val playPausePendingIntent = PendingIntent.getBroadcast(
-                context,
-                1,
-                playPauseIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_play_pause, playPausePendingIntent)
-
-            val nextIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-                action = ACTION_NEXT
-            }
-            val nextPendingIntent = PendingIntent.getBroadcast(
-                context,
-                2,
-                nextIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
-
-            val previousIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-                action = ACTION_PREVIOUS
-            }
-            val previousPendingIntent = PendingIntent.getBroadcast(
-                context,
-                3,
-                previousIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_previous, previousPendingIntent)
-
-            val shuffleIntent = Intent(context, MusicWidgetProvider::class.java).apply {
-                action = ACTION_SHUFFLE
-            }
-            val shufflePendingIntent = PendingIntent.getBroadcast(
-                context,
-                4,
-                shuffleIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            views.setOnClickPendingIntent(R.id.widget_shuffle, shufflePendingIntent)
+            setupControlButtons(context, views)
 
             // Update widget content
-            if (songTitle.isNotEmpty()) {
-                views.setTextViewText(R.id.widget_song_title, songTitle)
-                views.setTextViewText(R.id.widget_artist, songArtist)
-
-                // Update progress
-                val progress = if (duration > 0) ((position.toFloat() / duration.toFloat()) * 100).toInt() else 0
-                views.setProgressBar(R.id.widget_progress, 100, progress, false)
-
-                // Update duration text
-                views.setTextViewText(R.id.widget_duration, formatTime(duration))
+            val displayTitle = if (songTitle.isNotEmpty()) songTitle else "No song playing"
+            val displayArtist = if (songArtist.isNotEmpty()) {
+                songArtist
+            } else if (songTitle.isEmpty()) {
+                "Tap to open app"
             } else {
-                views.setTextViewText(R.id.widget_song_title, "No song playing")
-                views.setTextViewText(R.id.widget_artist, "")
-                views.setProgressBar(R.id.widget_progress, 100, 0, false)
-                views.setTextViewText(R.id.widget_duration, "0:00")
+                ""
+            }
+            
+            views.setTextViewText(R.id.widget_song_title, displayTitle)
+            views.setTextViewText(R.id.widget_artist, displayArtist)
+
+            // Update progress
+            val progress = if (duration > 0) {
+                ((position.toFloat() / duration.toFloat()) * 100).toInt().coerceIn(0, 100)
+            } else {
+                0
+            }
+            
+            // Only set progress bar if it exists in this layout
+            try {
+                views.setProgressBar(R.id.widget_progress, 100, progress, false)
+                views.setTextViewText(R.id.widget_current_time, formatTime(position))
+                views.setTextViewText(R.id.widget_duration, formatTime(duration))
+            } catch (e: Exception) {
+                // Progress bar doesn't exist in small layout
             }
 
             // Update play/pause icon
-            views.setImageViewResource(
-                R.id.widget_play_pause,
-                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
-            )
+            val playPauseIcon = if (isPlaying) {
+                android.R.drawable.ic_media_pause
+            } else {
+                android.R.drawable.ic_media_play
+            }
+            views.setImageViewResource(R.id.widget_play_pause, playPauseIcon)
 
+            // Load album art asynchronously
+            if (!albumArtUri.isNullOrEmpty()) {
+                widgetScope.launch {
+                    val bitmap = loadAlbumArt(context, albumArtUri)
+                    if (bitmap != null) {
+                        views.setImageViewBitmap(R.id.widget_album_art, bitmap)
+                        appWidgetManager.updateAppWidget(appWidgetId, views)
+                    }
+                }
+            } else {
+                views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
+            }
+
+            // Apply the update
             appWidgetManager.updateAppWidget(appWidgetId, views)
         } catch (e: Exception) {
-            // Log error and create a simple fallback widget
-            e.printStackTrace()
-            val fallbackViews = RemoteViews(context.packageName, R.layout.widget_music_circular)
-            fallbackViews.setTextViewText(R.id.widget_song_title, "Widget Error")
-            fallbackViews.setTextViewText(R.id.widget_artist, e.message ?: "Unknown error")
-            appWidgetManager.updateAppWidget(appWidgetId, fallbackViews)
+            android.util.Log.e("MusicWidgetProvider", "Error updating widget", e)
+        }
+    }
+
+    private fun setupControlButtons(context: Context, views: RemoteViews) {
+        // Play/Pause
+        val playPauseIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+            action = ACTION_PLAY_PAUSE
+        }
+        views.setOnClickPendingIntent(
+            R.id.widget_play_pause,
+            PendingIntent.getBroadcast(
+                context, 1, playPauseIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+
+        // Next (if exists)
+        try {
+            val nextIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_NEXT
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_next,
+                PendingIntent.getBroadcast(
+                    context, 2, nextIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        } catch (e: Exception) {
+            // Button doesn't exist in this layout
+        }
+
+        // Previous (if exists)
+        try {
+            val previousIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_PREVIOUS
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_previous,
+                PendingIntent.getBroadcast(
+                    context, 3, previousIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        } catch (e: Exception) {
+            // Button doesn't exist in this layout
+        }
+
+        // Equalizer (if exists)
+        try {
+            val equalizerIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            views.setOnClickPendingIntent(
+                R.id.widget_equalizer,
+                PendingIntent.getActivity(
+                    context, 5, equalizerIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        } catch (e: Exception) {
+            // Button doesn't exist in this layout
+        }
+    }
+
+    private suspend fun loadAlbumArt(context: Context, albumArtUri: String): Bitmap? {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (albumArtUri.startsWith("http")) {
+                    val url = URL(albumArtUri)
+                    val connection = url.openConnection() as HttpURLConnection
+                    connection.connectTimeout = 5000
+                    connection.readTimeout = 5000
+                    connection.inputStream.use { inputStream ->
+                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                            Bitmap.createScaledBitmap(bitmap, 200, 200, true)
+                        }
+                    }
+                } else {
+                    val uri = Uri.parse(albumArtUri)
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                            Bitmap.createScaledBitmap(bitmap, 200, 200, true)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MusicWidgetProvider", "Error loading album art", e)
+                null
+            }
         }
     }
 

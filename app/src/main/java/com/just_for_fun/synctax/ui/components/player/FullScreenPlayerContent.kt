@@ -3,23 +3,65 @@ package com.just_for_fun.synctax.ui.components.player
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -36,66 +78,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
-import com.just_for_fun.synctax.ui.theme.*
+import com.just_for_fun.synctax.ui.theme.PlayerAccent
+import com.just_for_fun.synctax.ui.theme.PlayerIconColor
+import com.just_for_fun.synctax.ui.theme.PlayerOnAccent
+import com.just_for_fun.synctax.ui.theme.PlayerSurface
+import com.just_for_fun.synctax.ui.theme.PlayerSurfaceVariant
+import com.just_for_fun.synctax.ui.theme.PlayerTextPrimary
+import com.just_for_fun.synctax.ui.theme.PlayerTextSecondary
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.ui.viewmodels.LyricsViewModel
 import kotlinx.coroutines.delay
-import kotlin.math.abs
-import kotlin.math.max
 import java.io.File
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.graphics.compositeOver
-
-// Data class for LRC lyrics
-data class LyricLine(
-    val timestamp: Long, // in milliseconds
-    val text: String
-)
-
-// Function to parse LRC file content
-fun parseLrcContent(content: String): List<LyricLine> {
-    val lines = mutableListOf<LyricLine>()
-    val regex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2})\\](.+)")
-
-    content.lines().forEach { line ->
-        val match = regex.find(line.trim())
-        if (match != null) {
-            val minutes = match.groupValues[1].toInt()
-            val seconds = match.groupValues[2].toInt()
-            val centiseconds = match.groupValues[3].toInt()
-            val text = match.groupValues[4].trim()
-
-            val totalMillis = (minutes * 60 * 1000) + (seconds * 1000) + (centiseconds * 10)
-            lines.add(LyricLine(totalMillis.toLong(), text))
-        }
-    }
-
-    return lines.sortedBy { it.timestamp }
-}
-
-// Function to load lyrics for a song
-fun loadLyricsForSong(song: Song): List<LyricLine>? {
-    return try {
-        // Try to find LRC file with the same name as the audio file
-        val audioFile = File(song.filePath)
-        val lrcFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".lrc")
-
-        if (lrcFile.exists()) {
-            val content = lrcFile.readText()
-            parseLrcContent(content)
-        } else {
-            null
-        }
-    } catch (e: Exception) {
-        null
-    }
-}
+import kotlin.math.abs
 
 // Function to get current lyric line based on position
 fun getCurrentLyricLine(lyrics: List<LyricLine>, position: Long): Int {
@@ -147,13 +147,20 @@ fun FullScreenPlayerContent(
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
 
+
+    // Get LyricsViewModel for lyrics functionality
+    val lyricsViewModel: LyricsViewModel = viewModel()
+    val lyricsState by lyricsViewModel.lyricsState.collectAsState()
+    val searchResults by lyricsViewModel.searchResults.collectAsState()
+    val lyrics by lyricsViewModel.currentLyrics.collectAsState()
+
     // --- Local UI States ---
     var showPlayerMenu by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) } // State to control the lyrics overlay
 
-    // Load lyrics for current song
-    val lyrics by remember(song.id) {
-        derivedStateOf { loadLyricsForSong(song) }
+    // Load lyrics when song changes
+    LaunchedEffect(song.id) {
+        lyricsViewModel.loadLyricsForSong(song)
     }
 
     // Get current lyric index
@@ -728,7 +735,21 @@ fun FullScreenPlayerContent(
                 lyrics = lyrics,
                 currentLyricIndex = currentLyricIndex,
                 songDominantColor = MaterialTheme.colorScheme.primary, // Placeholder for song color
-                onDismiss = { showLyrics = false }
+                onDismiss = { 
+                    showLyrics = false
+                    lyricsViewModel.clearError()
+                    lyricsViewModel.clearSearchResults()
+                },
+                onFetchLyrics = { lyricsViewModel.fetchLyricsForSong(song) },
+                onFetchLyricsWithCustomQuery = { customSong, customArtist ->
+                    lyricsViewModel.fetchLyricsForSongWithCustomQuery(song, customSong, customArtist)
+                },
+                isFetchingLyrics = lyricsState.isFetching,
+                lyricsError = lyricsState.error,
+                hasFailedFetch = lyricsViewModel.hasFailedToFindLyrics(song.id),
+                searchResults = searchResults,
+                onSelectLyrics = { trackId -> lyricsViewModel.selectLyrics(trackId, song) },
+                hasSearchResults = lyricsState.hasSearchResults
             )
         }
 

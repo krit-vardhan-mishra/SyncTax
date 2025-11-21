@@ -90,8 +90,9 @@ class MusicRepository(private val context: Context) {
                     scanRecursive(file)
                 } else if (file.isFile) {
                     val fileName = file.name ?: ""
-                    // Check if it's an audio file
-                    if (fileName.matches(Regex(".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$", RegexOption.IGNORE_CASE))) {
+                    // Check if it's an audio file and not a deleted/trash file
+                    if (fileName.matches(Regex(".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$", RegexOption.IGNORE_CASE)) &&
+                        !fileName.startsWith(".") && !fileName.contains("trashed", ignoreCase = true)) {
                         try {
                             // Get metadata from MediaStore using file path
                             val projection = arrayOf(
@@ -192,14 +193,16 @@ class MusicRepository(private val context: Context) {
                     scanRecursive(file)
                 } else if (file.isFile) {
                     val mimeType = file.type
-                    // Check if it's an audio file
-                    if (mimeType?.startsWith("audio/") == true ||
-                        file.name?.matches(
+                    val fileName = file.name ?: ""
+                    // Check if it's an audio file and not a deleted/trash file
+                    if ((mimeType?.startsWith("audio/") == true ||
+                        fileName.matches(
                             Regex(
                                 ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
                                 RegexOption.IGNORE_CASE
                             )
-                        ) == true
+                        )) &&
+                        !fileName.startsWith(".") && !fileName.contains("trashed", ignoreCase = true)
                     ) {
 
                         try {
@@ -375,6 +378,13 @@ class MusicRepository(private val context: Context) {
                 // Check if file is in allowed directory
                 if (!filePath.startsWith(allowedPath)) {
                     Log.d("Directory Location", "Skipping file not in allowed path: $filePath (allowed: $allowedPath)")
+                    continue // Skip this song
+                }
+
+                // Skip deleted/trash files
+                val fileName = File(filePath).name
+                if (fileName.startsWith(".") || fileName.contains("trashed", ignoreCase = true)) {
+                    Log.d("Directory Location", "Skipping deleted/trash file: $filePath")
                     continue // Skip this song
                 }
 
