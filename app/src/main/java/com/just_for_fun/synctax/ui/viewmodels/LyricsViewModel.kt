@@ -35,6 +35,9 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
     private val _searchResults = MutableStateFlow<List<LrcLibResponse>>(emptyList())
     val searchResults: StateFlow<List<LrcLibResponse>> = _searchResults.asStateFlow()
     
+    // In-memory cache for online songs' lyrics (since they don't have local files)
+    private val _onlineLyricsCache = mutableMapOf<String, List<LyricLine>>()
+    
     // Set of song IDs that failed to find lyrics
     private val _failedSongs = mutableSetOf<String>()
     
@@ -67,20 +70,25 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
     }
     
     /**
-     * Load lyrics for a song from local file
+     * Load lyrics for a song from local file or cache
      */
     fun loadLyricsForSong(song: Song) {
         viewModelScope.launch(Dispatchers.IO) {
             val lyrics = try {
-                // Try to find LRC file with the same name as the audio file
-                val audioFile = File(song.filePath)
-                val lrcFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".lrc")
-                
-                if (lrcFile.exists()) {
-                    val content = lrcFile.readText()
-                    parseLrcContent(content)
+                if (song.id.startsWith("online:")) {
+                    // For online songs, check the in-memory cache
+                    _onlineLyricsCache[song.id]
                 } else {
-                    null
+                    // For local songs, try to find LRC file with the same name as the audio file
+                    val audioFile = File(song.filePath)
+                    val lrcFile = File(audioFile.parent, audioFile.nameWithoutExtension + ".lrc")
+                    
+                    if (lrcFile.exists()) {
+                        val content = lrcFile.readText()
+                        parseLrcContent(content)
+                    } else {
+                        null
+                    }
                 }
             } catch (e: Exception) {
                 null
@@ -112,8 +120,14 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
                 
                 if (lyrics != null) {
                     // Save and reload
-                    lyricsRepository.saveLyricsToFile(song, lyrics)
-                    loadLyricsForSong(song)
+                    val parsedLyrics = lyricsRepository.saveLyricsToFile(song, lyrics)
+                    if (parsedLyrics != null) {
+                        if (song.id.startsWith("online:")) {
+                            // Cache lyrics for online songs
+                            _onlineLyricsCache[song.id] = parsedLyrics
+                        }
+                        _currentLyrics.value = parsedLyrics
+                    }
                     
                     _lyricsState.value = _lyricsState.value.copy(
                         isFetching = false,
@@ -162,8 +176,14 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
                 
                 if (lyrics != null) {
                     // Save and reload
-                    lyricsRepository.saveLyricsToFile(song, lyrics)
-                    loadLyricsForSong(song)
+                    val parsedLyrics = lyricsRepository.saveLyricsToFile(song, lyrics)
+                    if (parsedLyrics != null) {
+                        if (song.id.startsWith("online:")) {
+                            // Cache lyrics for online songs
+                            _onlineLyricsCache[song.id] = parsedLyrics
+                        }
+                        _currentLyrics.value = parsedLyrics
+                    }
                     
                     _lyricsState.value = _lyricsState.value.copy(
                         isFetching = false,
@@ -268,10 +288,14 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 _lyricsState.value = _lyricsState.value.copy(isFetching = true, error = null)
                 
-                val success = lyricsRepository.fetchAndSaveLyricsById(trackId, song)
+                val parsedLyrics = lyricsRepository.fetchAndSaveLyricsById(trackId, song)
                 
-                if (success) {
-                    loadLyricsForSong(song)
+                if (parsedLyrics != null) {
+                    if (song.id.startsWith("online:")) {
+                        // Cache lyrics for online songs
+                        _onlineLyricsCache[song.id] = parsedLyrics
+                    }
+                    _currentLyrics.value = parsedLyrics
                     _searchResults.value = emptyList() // Clear search results
                     _lyricsState.value = _lyricsState.value.copy(
                         isFetching = false,
@@ -314,7 +338,13 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
      * Check if lyrics file exists for a song
      */
     fun hasLyricsFile(song: Song): Boolean {
-        return lyricsRepository.hasLyricsFile(song)
+        if (song.id.startsWith("online:")) {
+            // For online songs, check the in-memory cache
+            return _onlineLyricsCache.containsKey(song.id)
+        } else {
+            // For local songs, check the file system
+            return lyricsRepository.hasLyricsFile(song)
+        }
     }
     
     /**

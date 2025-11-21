@@ -65,7 +65,8 @@ fun HomeScreen(
                 val totalItems = layoutInfo.totalItemsCount
                 if (lastVisibleItemIndex >= totalItems - 1 && !hasScrolledToBottom && totalItems > 0) {
                     hasScrolledToBottom = true
-                    homeViewModel.cleanupAndRefresh()
+                    // Refresh album art when user scrolls to bottom
+                    homeViewModel.refreshAlbumArt()
                 } else if (lastVisibleItemIndex < totalItems - 2) {
                     hasScrolledToBottom = false
                 }

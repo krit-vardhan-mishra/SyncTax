@@ -316,25 +316,40 @@ class MusicRepository(private val context: Context) {
 
     /**
      * Check for local album art file with same base name as audio file
-     * Looks for .jpg files with the same name as the audio file
+     * Also checks for common album art file names like cover.jpg, folder.jpg, etc.
+     * Supports multiple image formats: jpg, jpeg, png, bmp, gif
      */
     private fun checkForLocalAlbumArt(audioFile: File): String? {
         try {
-            val baseName = audioFile.nameWithoutExtension
             val directory = audioFile.parentFile ?: return null
-
-            // Look for .jpg file with same base name
-            val albumArtFile = File(directory, "$baseName.jpg")
-            if (albumArtFile.exists() && albumArtFile.isFile) {
-                return albumArtFile.absolutePath
+            val baseName = audioFile.nameWithoutExtension
+            
+            // Common image extensions to check
+            val imageExtensions = listOf("jpg", "jpeg", "png", "bmp", "gif")
+            
+            // 1. Check for file with same base name as audio file
+            for (ext in imageExtensions) {
+                val albumArtFile = File(directory, "$baseName.$ext")
+                if (albumArtFile.exists() && albumArtFile.isFile) {
+                    return albumArtFile.absolutePath
+                }
+            }
+            
+            // 2. Check for common album art file names in the directory
+            val commonAlbumArtNames = listOf("cover", "folder", "album", "artwork", "front")
+            for (name in commonAlbumArtNames) {
+                for (ext in imageExtensions) {
+                    val albumArtFile = File(directory, "$name.$ext")
+                    if (albumArtFile.exists() && albumArtFile.isFile) {
+                        return albumArtFile.absolutePath
+                    }
+                }
             }
         } catch (e: Exception) {
             // Silently ignore errors when checking for album art
         }
         return null
-    }
-    
-    private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
+    }    private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,

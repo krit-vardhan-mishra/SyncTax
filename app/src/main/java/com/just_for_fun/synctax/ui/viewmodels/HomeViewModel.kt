@@ -42,6 +42,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         observeListenAgain()
         // Start periodic refresh for deleted songs check
         startPeriodicRefresh()
+        // Refresh album art for songs without embedded art
+        refreshAlbumArtForSongs()
     }
 
     private fun observeListenAgain() {
@@ -78,7 +80,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun scanMusic() {
+    fun forceRefreshLibrary() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isScanning = true)
 
@@ -86,9 +88,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 // Get selected scan paths from UserPreferences
                 val userPrefs = com.just_for_fun.synctax.data.preferences.UserPreferences(getApplication())
                 val scanPaths = userPrefs.scanPaths.value
+                
+                // Force a complete rescan
                 val songs = repository.scanDeviceMusic(scanPaths)
                 
-                // Force refresh the song list by updating the state
+                // Update the state with fresh data
                 _uiState.value = _uiState.value.copy(
                     allSongs = songs,
                     isScanning = false,
@@ -97,6 +101,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 
                 // Notify listeners that songs have been refreshed
                 onSongsRefreshed?.invoke(songs)
+                
+                // Refresh album art for songs that might have new art files
+                refreshAlbumArtForSongs()
                 
                 // Regenerate quick picks with the updated song list
                 if (songs.isNotEmpty()) {
@@ -162,6 +169,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isGeneratingRecommendations = false,
+                    error = e.message
+                )
+            }
+        }
+    }
+
+    fun scanMusic() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isScanning = true)
+
+            try {
+                // Get selected scan paths from UserPreferences
+                val userPrefs = com.just_for_fun.synctax.data.preferences.UserPreferences(getApplication())
+                val scanPaths = userPrefs.scanPaths.value
+                val songs = repository.scanDeviceMusic(scanPaths)
+
+                // Force refresh the song list by updating the state
+                _uiState.value = _uiState.value.copy(
+                    allSongs = songs,
+                    isScanning = false,
+                    scanComplete = true
+                )
+
+                // Notify listeners that songs have been refreshed
+                onSongsRefreshed?.invoke(songs)
+
+                // Regenerate quick picks with the updated song list
+                if (songs.isNotEmpty()) {
+                    generateQuickPicks()
+                }
+
+                // Refresh listen again cache after scanning
+                listenAgainManager.refresh()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isScanning = false,
                     error = e.message
                 )
             }
@@ -281,15 +324,99 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun cleanupAndRefresh() {
+    private fun refreshAlbumArtForSongs() {
         viewModelScope.launch {
             try {
-                recommendationManager.cleanupDeletedSongs()
-                generateQuickPicks()
+                // Get all songs from database
+                val allSongs = _uiState.value.allSongs
+                
+                // Find songs without album art (either null or MediaStore URI)
+                val songsWithoutArt = allSongs.filter { song ->
+                    song.albumArtUri.isNullOrEmpty() || 
+                    song.albumArtUri?.startsWith("content://media/external/audio/albumart") == true
+                }
+                
+                if (songsWithoutArt.isNotEmpty()) {
+                    // Check for local image files for these songs
+                    val updatedSongs = mutableListOf<Song>()
+                    
+                    songsWithoutArt.forEach { song ->
+                        val audioFile = java.io.File(song.filePath)
+                        if (audioFile.exists()) {
+                            val directory = audioFile.parentFile ?: return@forEach
+                            
+                            // Check for various album art file patterns
+                            val albumArtUri = findAlbumArtForSong(audioFile, directory)
+                            
+                            if (albumArtUri != null) {
+                                // Found album art file, update the song
+                                val updatedSong = song.copy(albumArtUri = albumArtUri)
+                                updatedSongs.add(updatedSong)
+                                
+                                // Update in database
+                                repository.insertSong(updatedSong)
+                            }
+                        }
+                    }
+                    
+                    if (updatedSongs.isNotEmpty()) {
+                        // Update the UI state with songs that now have album art
+                        val currentSongs = _uiState.value.allSongs.toMutableList()
+                        updatedSongs.forEach { updatedSong ->
+                            val index = currentSongs.indexOfFirst { it.id == updatedSong.id }
+                            if (index != -1) {
+                                currentSongs[index] = updatedSong
+                            }
+                        }
+                        
+                        _uiState.value = _uiState.value.copy(allSongs = currentSongs)
+                        
+                        // Regenerate quick picks with updated album art
+                        if (currentSongs.isNotEmpty()) {
+                            generateQuickPicks()
+                        }
+                    }
+                }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message)
+                // Silently handle errors during album art refresh
+                e.printStackTrace()
             }
         }
+    }
+    
+    /**
+     * Find album art for a song by checking various file patterns
+     */
+    private fun findAlbumArtForSong(audioFile: java.io.File, directory: java.io.File): String? {
+        val baseName = audioFile.nameWithoutExtension
+        
+        // Common image extensions to check
+        val imageExtensions = listOf("jpg", "jpeg", "png", "bmp", "gif")
+        
+        // 1. Check for file with same base name as audio file
+        for (ext in imageExtensions) {
+            val albumArtFile = java.io.File(directory, "$baseName.$ext")
+            if (albumArtFile.exists() && albumArtFile.isFile) {
+                return albumArtFile.absolutePath
+            }
+        }
+        
+        // 2. Check for common album art file names in the directory
+        val commonAlbumArtNames = listOf("cover", "folder", "album", "artwork", "front")
+        for (name in commonAlbumArtNames) {
+            for (ext in imageExtensions) {
+                val albumArtFile = java.io.File(directory, "$name.$ext")
+                if (albumArtFile.exists() && albumArtFile.isFile) {
+                    return albumArtFile.absolutePath
+                }
+            }
+        }
+        
+        return null
+    }
+
+    fun refreshAlbumArt() {
+        refreshAlbumArtForSongs()
     }
 }
 

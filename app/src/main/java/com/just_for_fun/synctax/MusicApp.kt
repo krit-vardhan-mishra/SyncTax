@@ -183,7 +183,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                         SettingsScreen(
                             userPreferences = userPreferences,
                             onBackClick = { navController.popBackStack() },
-                            onScanTrigger = { homeViewModel.scanMusic() }
+                            onScanTrigger = { homeViewModel.forceRefreshLibrary() }
                         )
                     }
                     composable(

@@ -1,10 +1,12 @@
 # SyncTax
 
-<img src="assets/screenshots/app_icon.png" alt="App icon" height="96" />
+<p align="left">
+  <img src="assets/app_icon.png" alt="App icon" height="96" />
+</p>
 
 SyncTax is an offline-first Android music player and recommender app that demonstrates privacy-preserving, on-device personalization and compact ML models. It combines a modern Android UI with background playback, local-first data storage, and a lightweight hybrid recommendation engine that uses Kotlin-based agents and an optional Python model via Chaquopy.
 
-This README gives a quick project overview, usage tips, and developer setup instructions. For a deeper dive into architecture, models, and implementation details, see the `Docs/` folder.
+This README gives a quick project overview, usage tips, and developer setup instructions. For a deeper dive into architecture, models, and implementation details, see the Docs/ folder.
 
 ---
 
@@ -18,6 +20,16 @@ This README gives a quick project overview, usage tips, and developer setup inst
 
 ---
 
+## What's New in v1.1.0
+
+- **Enhanced Search Performance**: Improved search speed for both local and online music discovery.
+- **Download Feature**: Added download option for online songs directly from search results.
+- **Lyrics Support**: New lyrics section with support for LRC files and online fetching from LRCLIB for select songs.
+- **UI Enhancements**: Various UI improvements for a better user experience.
+- **Security Improvements**: Restricted directory scanning to only user-selected directories, enhancing privacy and security.
+
+---
+
 ### App screenshots
 
 Below are screenshots showcasing the app's UI and key features, from initial setup through personalized recommendations.
@@ -26,21 +38,32 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 <div align="center">
 
-| Welcome Screen | Home (Before Training) |
-|:---:|:---:|
-| <img src="assets/screenshots/screenshot_01_landing.png" alt="Welcome to the app" height="400" /> | <img src="assets/screenshots/screenshot_02_home_before_training.png" alt="Initial home screen" height="400" /> |
-| Set up your profile | Home screen before the AI learns your taste |
+| Welcome Screen | Home (Getting Started) | Select Directory |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/screenshot_01_landing_screen.png" alt="Welcome to the app" height="300" /> | <img src="assets/screenshots/screenshot_02_home_screen_starting_with_guide.png" alt="Home with guide" height="300" /> | <img src="assets/screenshots/screenshot_03_select_directory_option.png" alt="Select directory" height="300" /> |
+| App landing & onboarding | First-time home guidance | Directory selection (SAF)
 
 </div>
 
-#### Core Playback Experience
+#### Core Playback & Player
 
 <div align="center">
 
-| Music Player | Queue Management (Half) | Queue Management (Full) 
+| Offline Player | Offline Lyrics | Online Player |
 |:---:|:---:|:---:|
-| <img src="assets/screenshots/screenshot_03_player.png" alt="Now playing interface" height="400" /> | <img src="assets/screenshots/screenshot_04_queue_semi_opened.png" alt="Up next queue" height="400" /> |  <img src="assets/screenshots/screenshot_04_queue_opened.png" alt="Up next queue" height="400" />
-| Full-featured player with offline support | View and manage your play queue | Queue fully opened |
+| <img src="assets/screenshots/screenshot_13_offline_player.png" alt="Offline player" height="300" /> | <img src="assets/screenshots/screenshot_14_offline_lyrics.png" alt="Offline lyrics view" height="300" /> | <img src="assets/screenshots/screenshot_09_online_song_player.png" alt="Online player" height="300" /> |
+| Now playing (local) | Synchronized LRC display for local files | Online stream player
+
+</div>
+
+#### Online Player — Lyrics Flow
+
+<div align="center">
+
+| Lyrics Overlay | Lyrics Fetching | Lyrics Fetched |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/screenshot_10_online_player_lyrics_overlay.png" alt="Lyrics overlay" height="300" /> | <img src="assets/screenshots/screenshot_11_online_lyrics_fetching.png" alt="Fetching lyrics" height="300" /> | <img src="assets/screenshots/screenshot_12_online_lyrics_fetched.png" alt="Fetched lyrics" height="300" /> |
+| Live overlay while streaming | LRCLIB / online lookup in progress | Online lyrics displayed
 
 </div>
 
@@ -48,32 +71,43 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 <div align="center">
 
-| Your Library | Local Search | Online Search Results |
+| Library (Songs) | Library (Artists) | Albums |
 |:---:|:---:|:---:|
-| <img src="assets/screenshots/screenshot_05_library.png" alt="Music library" height="400" /> | <img src="assets/screenshots/screenshot_07_search_screen.png" alt="Search interface" height="400" /> | <img src="assets/screenshots/screenshot_08_online_search.png" alt="YouTube search results" height="400" /> |
-| Browse your local collection | Search songs, artists, and albums | Find new music via YouTube frontends |
+| <img src="assets/screenshots/screenshot_17_library_screen_songs.png" alt="Songs library" height="300" /> | <img src="assets/screenshots/screenshot_18_library_screen_artists.png" alt="Artists library" height="300" /> | <img src="assets/screenshots/screenshot_21_library_screen_albums.png" alt="Albums view" height="300" /> |
+| Browse songs and play offline | Artist list & quick actions | Album view and track list
 
 </div>
 
-#### AI-Powered Recommendations
+#### Search & Online Discovery
 
 <div align="center">
 
-| Quick Picks (Learning) | Quick Picks (Trained) | Home (After Training) |
-|:---:|:---:|:---:|
-| <img src="assets/screenshots/screenshot_06_quick_picks_before_training.png" alt="Initial Quick Picks" height="400" /> | <img src="assets/screenshots/screenshot_09_quick_picks_after_training.png" alt="Personalized recommendations" height="400" /> | <img src="assets/screenshots/screenshot_10_home_after_training.png" alt="Smart home with recommendations" height="400" /> |
-| App analyzing your preferences | AI-curated picks based on listening habits | Personalized home with mood categories |
-
-</div>
-
-#### Enhanced Home Experience
-
-<div align="center">
-
-| Speed Dial & Collections | All Songs View |
+| Local Search | Online Search Results |
 |:---:|:---:|
-| <img src="assets/screenshots/screenshot_11_more_home.png" alt="Quick access to favorites" height="400" /> | <img src="assets/screenshots/screenshot_12_more_home.png" alt="Complete song library" height="400" /> |
-| Quick access to favorite artists and playlists | Browse your complete music collection |
+| <img src="assets/screenshots/screenshot_07_search_screen.png" alt="Search interface" height="300" /> | <img src="assets/screenshots/screenshot_08_searching_song_online.png" alt="Online search results" height="300" /> |
+| Search local songs, albums, artists | Search results from online frontends |
+
+</div>
+
+#### Recommendations & Training
+
+<div align="center">
+
+| Quick Picks (Before) | Quick Picks (After) | Training Screen |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/screenshot_15_quick_pick_before_training.png" alt="Quick picks before training" height="300" /> | <img src="assets/screenshots/screenshot_16_quick_pick_after_training.png" alt="Quick picks after training" height="300" /> | <img src="assets/screenshots/screenshot_24_train_model_screen.png" alt="Model training screen" height="300" /> |
+| Initial suggestions during learning | Personalized picks after training | Model training / status
+
+</div>
+
+#### Collections, Albums & Settings
+
+<div align="center">
+
+| Artist Detail | Album Detail | Settings |
+|:---:|:---:|:---:|
+| <img src="assets/screenshots/screenshot_20_artist_screen.png" alt="Artist screen" height="300" /> | <img src="assets/screenshots/screenshot_22_album_screen.png" alt="Album screen" height="300" /> | <img src="assets/screenshots/screenshot_23_settings_screen.png" alt="Settings" height="300" /> |
+| Artist details & tracks | Album track listing & artwork | App settings & directory selection
 
 </div>
 

@@ -2,6 +2,7 @@ package com.just_for_fun.synctax.core.data.repository
 
 import android.util.Log
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.core.network.LrcLibClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -184,9 +185,9 @@ class LyricsRepository {
      * 
      * @param trackId The LRCLIB track ID
      * @param song The song to save lyrics for
-     * @return True if lyrics were successfully fetched and saved
+     * @return Parsed lyrics as LyricLine objects, or null if failed
      */
-    suspend fun fetchAndSaveLyricsById(trackId: Int, song: Song): Boolean = withContext(Dispatchers.IO) {
+    suspend fun fetchAndSaveLyricsById(trackId: Int, song: Song): List<LyricLine>? = withContext(Dispatchers.IO) {
         try {
             Log.d("LyricsRepository", "Fetching lyrics by ID: $trackId")
             
@@ -198,20 +199,20 @@ class LyricsRepository {
             if (selectedResult != null) {
                 val lyrics = selectedResult.syncedLyrics ?: selectedResult.plainLyrics
                 if (lyrics != null) {
-                    saveLyricsToFile(song, lyrics)
+                    val parsedLyrics = saveLyricsToFile(song, lyrics)
                     Log.d("LyricsRepository", "Saved selected lyrics for: ${selectedResult.trackName}")
-                    true
+                    parsedLyrics
                 } else {
                     Log.w("LyricsRepository", "Selected result has no lyrics content")
-                    false
+                    null
                 }
             } else {
                 Log.w("LyricsRepository", "Could not find lyrics with ID: $trackId")
-                false
+                null
             }
         } catch (e: Exception) {
             Log.e("LyricsRepository", "Failed to fetch lyrics by ID", e)
-            false
+            null
         }
     }
     
@@ -249,31 +250,61 @@ class LyricsRepository {
     }
     
     /**
-     * Save lyrics to a .lrc file next to the audio file
+     * Parse LRC content into LyricLine objects
+     */
+    private fun parseLrcContent(content: String): List<LyricLine> {
+        val lines = mutableListOf<LyricLine>()
+        val regex = Regex("\\[(\\d{2}):(\\d{2})\\.(\\d{2})\\](.+)")
+        
+        content.lines().forEach { line ->
+            val match = regex.find(line.trim())
+            if (match != null) {
+                val minutes = match.groupValues[1].toInt()
+                val seconds = match.groupValues[2].toInt()
+                val centiseconds = match.groupValues[3].toInt()
+                val text = match.groupValues[4].trim()
+                
+                val totalMillis = (minutes * 60 * 1000) + (seconds * 1000) + (centiseconds * 10)
+                lines.add(LyricLine(totalMillis.toLong(), text))
+            }
+        }
+        
+        return lines.sortedBy { it.timestamp }
+    }
+    
+    /**
+     * Save lyrics to a .lrc file next to the audio file or cache for online songs
      * 
      * @param song The song to save lyrics for
      * @param lyrics The lyrics content in LRC format
+     * @return Parsed lyrics as LyricLine objects, or null if parsing failed
      */
-    fun saveLyricsToFile(song: Song, lyrics: String) {
+    fun saveLyricsToFile(song: Song, lyrics: String): List<LyricLine>? {
         try {
-            // Only save for local files, not online songs
+            // Parse the lyrics content
+            val parsedLyrics = parseLrcContent(lyrics)
+            
             if (song.id.startsWith("online:")) {
-                Log.d("LyricsRepository", "Skipping file save for online song")
-                return
+                // For online songs, lyrics are stored in memory cache (handled by ViewModel)
+                Log.d("LyricsRepository", "Parsed lyrics for online song: ${song.id}")
+                return parsedLyrics
+            } else {
+                // For local songs, save to file
+                val audioFile = File(song.filePath)
+                if (!audioFile.exists()) {
+                    Log.w("LyricsRepository", "Audio file does not exist: ${song.filePath}")
+                    return null
+                }
+                
+                val lrcFile = File(audioFile.parent, "${audioFile.nameWithoutExtension}.lrc")
+                lrcFile.writeText(lyrics)
+                
+                Log.d("LyricsRepository", "Saved lyrics to: ${lrcFile.absolutePath}")
+                return parsedLyrics
             }
-            
-            val audioFile = File(song.filePath)
-            if (!audioFile.exists()) {
-                Log.w("LyricsRepository", "Audio file does not exist: ${song.filePath}")
-                return
-            }
-            
-            val lrcFile = File(audioFile.parent, "${audioFile.nameWithoutExtension}.lrc")
-            lrcFile.writeText(lyrics)
-            
-            Log.d("LyricsRepository", "Saved lyrics to: ${lrcFile.absolutePath}")
         } catch (e: Exception) {
-            Log.e("LyricsRepository", "Failed to save lyrics to file", e)
+            Log.e("LyricsRepository", "Failed to save lyrics", e)
+            return null
         }
     }
     

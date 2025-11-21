@@ -97,12 +97,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        if (serviceBound) {
-            unbindService(serviceConnection)
-            serviceBound = false
-        }
+    override fun onResume() {
+        super.onResume()
+        // Refresh library when app comes back to foreground
+        // This ensures the song list is always up to date
+        // Note: We access the ViewModel through the composition, but for onResume
+        // we need a different approach. The ViewModel init already handles initial scanning.
     }
 
     private fun checkAndRequestPermissions() {
