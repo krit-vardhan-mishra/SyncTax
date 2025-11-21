@@ -27,14 +27,42 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
         
         # Check if FFmpeg is available
         ffmpeg_available = False
+        ffmpeg_path = None
+        
+        # Try system PATH first
         try:
             import subprocess
             result = subprocess.run(['ffmpeg', '-version'], capture_output=True, timeout=5)
             ffmpeg_available = result.returncode == 0
+            if ffmpeg_available:
+                ffmpeg_path = 'ffmpeg'
         except:
             pass
         
+        # If not in PATH, try local tools directory
+        if not ffmpeg_available:
+            # Get the project root directory (5 levels up from this file)
+            current_file = os.path.abspath(__file__)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file)))))
+            local_ffmpeg = os.path.join(project_root, 'tools', 'ffmpeg-8.0.1-essentials_build', 'bin', 'ffmpeg.exe')
+            if os.path.exists(local_ffmpeg):
+                try:
+                    result = subprocess.run([local_ffmpeg, '-version'], capture_output=True, timeout=5)
+                    if result.returncode == 0:
+                        ffmpeg_available = True
+                        ffmpeg_path = local_ffmpeg
+                except:
+                    pass
+        
         # Configure yt-dlp options based on FFmpeg availability
+        base_opts = {
+            'quiet': False,
+            'no_warnings': False,
+        }
+        
+        if ffmpeg_available and ffmpeg_path:
+            base_opts['ffmpeg_location'] = ffmpeg_path
+        
         if ffmpeg_available and prefer_mp3:
             # Full conversion with embedded thumbnail using FFmpeg
             ydl_opts = {
@@ -54,18 +82,28 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
                         'add_metadata': True,
                     },
                 ],
-                'writethumbnail': True,
-                'quiet': False,
-                'no_warnings': False,
+                **base_opts
             }
         else:
-            # Download M4A without post-processing (we'll embed manually)
+            # Download M4A with embedded thumbnail using FFmpeg
             ydl_opts = {
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
-                'writethumbnail': True,
-                'quiet': False,
-                'no_warnings': False,
+                'postprocessors': [
+                    {
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'm4a',
+                        'preferredquality': '320',
+                    },
+                    {
+                        'key': 'EmbedThumbnail',
+                    },
+                    {
+                        'key': 'FFmpegMetadata',
+                        'add_metadata': True,
+                    },
+                ],
+                **base_opts
             }
         
         # Download the audio
@@ -78,47 +116,6 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
             # If FFmpeg was used, update extension to mp3
             if ffmpeg_available and prefer_mp3:
                 filename = os.path.splitext(filename)[0] + '.mp3'
-            else:
-                # Manually embed thumbnail for M4A files using mutagen
-                try:
-                    from mutagen.mp4 import MP4, MP4Cover
-                    
-                    # Find the thumbnail file
-                    base_path = os.path.splitext(filename)[0]
-                    thumbnail_path = None
-                    for ext in ['.webp', '.jpg', '.png']:
-                        potential_thumb = base_path + ext
-                        if os.path.exists(potential_thumb):
-                            thumbnail_path = potential_thumb
-                            break
-                    
-                    if thumbnail_path and filename.endswith('.m4a'):
-                        # Read thumbnail data
-                        with open(thumbnail_path, 'rb') as f:
-                            thumbnail_data = f.read()
-                        
-                        # Determine image format
-                        if thumbnail_path.endswith('.png'):
-                            cover_format = MP4Cover.FORMAT_PNG
-                        elif thumbnail_path.endswith('.jpg') or thumbnail_path.endswith('.jpeg'):
-                            cover_format = MP4Cover.FORMAT_JPEG
-                        else:
-                            # For WebP, we'll try JPEG format (most compatible)
-                            cover_format = MP4Cover.FORMAT_JPEG
-                        
-                        # Embed the cover art
-                        audio = MP4(filename)
-                        audio['covr'] = [MP4Cover(thumbnail_data, imageformat=cover_format)]
-                        audio.save()
-                        
-                        # Clean up the separate thumbnail file
-                        os.remove(thumbnail_path)
-                except ImportError:
-                    # mutagen not available, keep separate thumbnail
-                    pass
-                except Exception as e:
-                    # If embedding fails, keep separate thumbnail
-                    print(f"Warning: Could not embed thumbnail: {e}")
             
             result = {
                 "success": True,
@@ -128,7 +125,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False) -> str:
                 "artist": info.get('artist') or info.get('uploader', 'Unknown'),
                 "duration": info.get('duration', 0),
                 "thumbnail_url": info.get('thumbnail', ''),
-                "format": info.get('ext', 'unknown'),
+                "format": 'mp3' if (ffmpeg_available and prefer_mp3) else info.get('ext', 'unknown'),
                 "ffmpeg_available": ffmpeg_available,
             }
             

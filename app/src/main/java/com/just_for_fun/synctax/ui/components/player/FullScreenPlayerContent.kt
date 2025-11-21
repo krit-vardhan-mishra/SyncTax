@@ -50,6 +50,7 @@ import java.io.File
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.compositeOver
 
 // Data class for LRC lyrics
 data class LyricLine(
@@ -102,10 +103,13 @@ fun getCurrentLyricLine(lyrics: List<LyricLine>, position: Long): Int {
 
     // Find the lyric line that should be displayed at current position
     for (i in lyrics.indices) {
+        // Check if the current position is less than the timestamp of the next lyric line
+        // This means the current line is the one right before it.
         if (position < lyrics[i].timestamp) {
             return if (i > 0) i - 1 else 0
         }
     }
+    // If we passed all timestamps, the last line is the current line
     return lyrics.size - 1
 }
 
@@ -145,7 +149,7 @@ fun FullScreenPlayerContent(
 
     // --- Local UI States ---
     var showPlayerMenu by remember { mutableStateOf(false) }
-    var showLyrics by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) } // State to control the lyrics overlay
 
     // Load lyrics for current song
     val lyrics by remember(song.id) {
@@ -173,7 +177,7 @@ fun FullScreenPlayerContent(
     val context = LocalContext.current
     val userPreferences = remember(context) { UserPreferences(context) }
     var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(UserPreferences.GUIDE_PLAYER)) }
-    
+
     // Get PlayerViewModel for download functionality
     val playerViewModel: PlayerViewModel = viewModel()
     val uiState by playerViewModel.uiState.collectAsState()
@@ -387,6 +391,7 @@ fun FullScreenPlayerContent(
                         )
 
                         // Tap Gesture Layer (Seek & Play/Pause & Lyrics Toggle)
+                        // MODIFIED: Single tap now toggles lyrics. Double tap handles Play/Pause/Seek.
                         Row(modifier = Modifier.fillMaxSize()) {
                             // Double Tap Left: Rewind
                             Box(
@@ -396,9 +401,7 @@ fun FullScreenPlayerContent(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
-                                                if (showLyrics) {
-                                                    showLyrics = false
-                                                }
+                                                showLyrics = true // Single tap opens lyrics
                                             },
                                             onDoubleTap = {
                                                 val target = (position - 10_000L).coerceAtLeast(0L)
@@ -409,7 +412,7 @@ fun FullScreenPlayerContent(
                                         )
                                     }
                             )
-                            // Double Tap Center: Play/Pause or Toggle Lyrics
+                            // Double Tap Center: Play/Pause
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -417,11 +420,7 @@ fun FullScreenPlayerContent(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
-                                                if (showLyrics) {
-                                                    showLyrics = false
-                                                } else {
-                                                    showLyrics = true
-                                                }
+                                                showLyrics = true // Single tap opens lyrics
                                             },
                                             onDoubleTap = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -438,9 +437,7 @@ fun FullScreenPlayerContent(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
-                                                if (showLyrics) {
-                                                    showLyrics = false
-                                                }
+                                                showLyrics = true // Single tap opens lyrics
                                             },
                                             onDoubleTap = {
                                                 val target =
@@ -549,7 +546,7 @@ fun FullScreenPlayerContent(
                         val isDownloaded = uiState.downloadedSongs.contains(song.id)
                         val isDownloading = uiState.downloadingSongs.contains(song.id)
                         val downloadProgress = uiState.downloadProgress[song.id] ?: 0f
-                        
+
                         AnimatedDownloadButton(
                             isDownloading = isDownloading,
                             isDownloaded = isDownloaded,
@@ -721,116 +718,18 @@ fun FullScreenPlayerContent(
         }
 
         // =====================================================================
-        // LYRICS OVERLAY
+        // LYRICS OVERLAY (Using new composable and requested design)
         // =====================================================================
         if (showLyrics) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.9f))
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { showLyrics = false }
-                        )
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                if (lyrics.isNullOrEmpty()) {
-                    // No lyrics found
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = PlayerTextSecondary.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No Lyrics Found",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = PlayerTextPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Tap anywhere to return",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = PlayerTextSecondary
-                        )
-                    }
-                } else {
-                    // Display lyrics
-                    val listState = rememberLazyListState()
-
-                    // Auto-scroll to current lyric
-                    LaunchedEffect(currentLyricIndex) {
-                        if (currentLyricIndex >= 0) {
-                            listState.animateScrollToItem(
-                                index = max(0, currentLyricIndex - 2), // Show 2 lines before current
-                                scrollOffset = 0
-                            )
-                        }
-                    }
-
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        items(lyrics!!) { lyric ->
-                            val isCurrentLine = lyrics?.indexOf(lyric) == currentLyricIndex
-                            val alpha = if (isCurrentLine) 1.0f else 0.4f
-                            val fontSize = if (isCurrentLine)
-                                MaterialTheme.typography.headlineMedium
-                            else
-                                MaterialTheme.typography.titleLarge
-
-                            Text(
-                                text = lyric.text,
-                                style = fontSize,
-                                color = PlayerTextPrimary.copy(alpha = alpha),
-                                textAlign = TextAlign.Center,
-                                fontWeight = if (isCurrentLine) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-
-                    // Song info overlay at top
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 48.dp, start = 24.dp, end = 24.dp)
-                            .align(Alignment.TopCenter)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = song.title,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = PlayerTextPrimary,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = song.artist,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = PlayerTextSecondary,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
-            }
+            // NOTE: MaterialTheme.colorScheme.primary is used as a placeholder for the
+            // song-dependent dominant color. Replace this with your actual color calculation.
+            LyricsOverlay(
+                song = song,
+                lyrics = lyrics,
+                currentLyricIndex = currentLyricIndex,
+                songDominantColor = MaterialTheme.colorScheme.primary, // Placeholder for song color
+                onDismiss = { showLyrics = false }
+            )
         }
 
         // =====================================================================

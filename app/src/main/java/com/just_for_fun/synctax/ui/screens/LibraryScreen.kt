@@ -86,7 +86,6 @@ fun LibraryScreen(
                 albumColors = albumColors,
                 showSortButton = true,
                 showShuffleButton = true,
-                showSearchButton = true,
                 showProfileButton = true,
                 onShuffleClick = {
                     val songsToShuffle = when (pagerState.currentPage) {
@@ -99,7 +98,6 @@ fun LibraryScreen(
                         playerViewModel.shufflePlay(songsToShuffle)
                     }
                 },
-                onSearchClick = onSearchClick,
                 onSortOptionChange = { sortOption = it },
                 userPreferences = userPreferences,
                 userName = userName,

@@ -124,11 +124,17 @@ class MusicRepository(private val context: Context) {
                                     val duration = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
                                     val year = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
 
-                                    // Get album art URI
-                                    val albumArtUri = ContentUris.withAppendedId(
+                                    // Get album art URI - check for local image file first
+                                    var albumArtUri = ContentUris.withAppendedId(
                                         android.net.Uri.parse("content://media/external/audio/albumart"),
                                         albumId
                                     ).toString()
+
+                                    // Check for local album art file with same base name
+                                    val localAlbumArtUri = checkForLocalAlbumArt(file)
+                                    if (localAlbumArtUri != null) {
+                                        albumArtUri = localAlbumArtUri
+                                    }
 
                                     val genre = detectGenre(file.absolutePath, artist, title)
 
@@ -162,7 +168,7 @@ class MusicRepository(private val context: Context) {
                                     filePath = file.absolutePath,
                                     genre = detectGenre(file.absolutePath, "", title),
                                     releaseYear = null,
-                                    albumArtUri = null
+                                    albumArtUri = checkForLocalAlbumArt(file) // Check for local album art
                                 )
                                 songs.add(song)
                                 Log.d("Directory Location", "Added song from direct scan (no MediaStore): ${file.absolutePath}")
@@ -243,11 +249,20 @@ class MusicRepository(private val context: Context) {
                                     val year =
                                         cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
 
-                                    // Get album art URI
-                                    val albumArtUri = ContentUris.withAppendedId(
+                                    // Get album art URI - check for local image file first
+                                    var albumArtUri = ContentUris.withAppendedId(
                                         android.net.Uri.parse("content://media/external/audio/albumart"),
                                         albumId
                                     ).toString()
+
+                                    // Check for local album art file with same base name (if we have file path)
+                                    if (filePath != null) {
+                                        val audioFile = File(filePath)
+                                        val localAlbumArtUri = checkForLocalAlbumArt(audioFile)
+                                        if (localAlbumArtUri != null) {
+                                            albumArtUri = localAlbumArtUri
+                                        }
+                                    }
 
                                     val genre = detectGenre(filePath, artist, title)
 
@@ -297,8 +312,25 @@ class MusicRepository(private val context: Context) {
     }
 
     /**
-     * Scan from MediaStore with path filtering
+     * Check for local album art file with same base name as audio file
+     * Looks for .jpg files with the same name as the audio file
      */
+    private fun checkForLocalAlbumArt(audioFile: File): String? {
+        try {
+            val baseName = audioFile.nameWithoutExtension
+            val directory = audioFile.parentFile ?: return null
+
+            // Look for .jpg file with same base name
+            val albumArtFile = File(directory, "$baseName.jpg")
+            if (albumArtFile.exists() && albumArtFile.isFile) {
+                return albumArtFile.absolutePath
+            }
+        } catch (e: Exception) {
+            // Silently ignore errors when checking for album art
+        }
+        return null
+    }
+    
     private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -348,11 +380,18 @@ class MusicRepository(private val context: Context) {
 
                 Log.d("Directory Location", "Found song in SyncTax: $filePath")
 
-                // Get album art URI
-                val albumArtUri = ContentUris.withAppendedId(
+                // Get album art URI - check for local image file first
+                var albumArtUri = ContentUris.withAppendedId(
                     android.net.Uri.parse("content://media/external/audio/albumart"),
                     albumId
                 ).toString()
+
+                // Check for local album art file with same base name
+                val audioFile = File(filePath)
+                val localAlbumArtUri = checkForLocalAlbumArt(audioFile)
+                if (localAlbumArtUri != null) {
+                    albumArtUri = localAlbumArtUri
+                }
 
                 // Detect genre from file path or metadata (simplified)
                 val genre = detectGenre(filePath, artist, title)

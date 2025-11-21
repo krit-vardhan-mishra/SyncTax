@@ -1,6 +1,6 @@
 # SyncTax
 
-<img src="assets/app_icon.png" alt="App icon" height="96" />
+<img src="assets/screenshots/app_icon.png" alt="App icon" height="96" />
 
 SyncTax is an offline-first Android music player and recommender app that demonstrates privacy-preserving, on-device personalization and compact ML models. It combines a modern Android UI with background playback, local-first data storage, and a lightweight hybrid recommendation engine that uses Kotlin-based agents and an optional Python model via Chaquopy.
 
@@ -28,7 +28,7 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 | Welcome Screen | Home (Before Training) |
 |:---:|:---:|
-| <img src="assets/screenshot_01_landing.png" alt="Welcome to the app" height="400" /> | <img src="assets/screenshot_02_home_before_training.png" alt="Initial home screen" height="400" /> |
+| <img src="assets/screenshots/screenshot_01_landing.png" alt="Welcome to the app" height="400" /> | <img src="assets/screenshots/screenshot_02_home_before_training.png" alt="Initial home screen" height="400" /> |
 | Set up your profile | Home screen before the AI learns your taste |
 
 </div>
@@ -39,7 +39,7 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 | Music Player | Queue Management (Half) | Queue Management (Full) 
 |:---:|:---:|:---:|
-| <img src="assets/screenshot_03_player.png" alt="Now playing interface" height="400" /> | <img src="assets/screenshot_04_queue_semi_opened.png" alt="Up next queue" height="400" /> |  <img src="assets/screenshot_04_queue_opened.png" alt="Up next queue" height="400" />
+| <img src="assets/screenshots/screenshot_03_player.png" alt="Now playing interface" height="400" /> | <img src="assets/screenshots/screenshot_04_queue_semi_opened.png" alt="Up next queue" height="400" /> |  <img src="assets/screenshots/screenshot_04_queue_opened.png" alt="Up next queue" height="400" />
 | Full-featured player with offline support | View and manage your play queue | Queue fully opened |
 
 </div>
@@ -50,7 +50,7 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 | Your Library | Local Search | Online Search Results |
 |:---:|:---:|:---:|
-| <img src="assets/screenshot_05_library.png" alt="Music library" height="400" /> | <img src="assets/screenshot_07_search_screen.png" alt="Search interface" height="400" /> | <img src="assets/screenshot_08_online_search.png" alt="YouTube search results" height="400" /> |
+| <img src="assets/screenshots/screenshot_05_library.png" alt="Music library" height="400" /> | <img src="assets/screenshots/screenshot_07_search_screen.png" alt="Search interface" height="400" /> | <img src="assets/screenshots/screenshot_08_online_search.png" alt="YouTube search results" height="400" /> |
 | Browse your local collection | Search songs, artists, and albums | Find new music via YouTube frontends |
 
 </div>
@@ -61,7 +61,7 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 | Quick Picks (Learning) | Quick Picks (Trained) | Home (After Training) |
 |:---:|:---:|:---:|
-| <img src="assets/screenshot_06_quick_picks_before_training.png" alt="Initial Quick Picks" height="400" /> | <img src="assets/screenshot_09_quick_picks_after_training.png" alt="Personalized recommendations" height="400" /> | <img src="assets/screenshot_10_home_after_training.png" alt="Smart home with recommendations" height="400" /> |
+| <img src="assets/screenshots/screenshot_06_quick_picks_before_training.png" alt="Initial Quick Picks" height="400" /> | <img src="assets/screenshots/screenshot_09_quick_picks_after_training.png" alt="Personalized recommendations" height="400" /> | <img src="assets/screenshots/screenshot_10_home_after_training.png" alt="Smart home with recommendations" height="400" /> |
 | App analyzing your preferences | AI-curated picks based on listening habits | Personalized home with mood categories |
 
 </div>
@@ -72,12 +72,12 @@ Below are screenshots showcasing the app's UI and key features, from initial set
 
 | Speed Dial & Collections | All Songs View |
 |:---:|:---:|
-| <img src="assets/screenshot_11_more_home.png" alt="Quick access to favorites" height="400" /> | <img src="assets/screenshot_12_more_home.png" alt="Complete song library" height="400" /> |
+| <img src="assets/screenshots/screenshot_11_more_home.png" alt="Quick access to favorites" height="400" /> | <img src="assets/screenshots/screenshot_12_more_home.png" alt="Complete song library" height="400" /> |
 | Quick access to favorite artists and playlists | Browse your complete music collection |
 
 </div>
 
-[View full image gallery](./assets)
+[View full image gallery](./assets/screenshots/)
 
 ---
 

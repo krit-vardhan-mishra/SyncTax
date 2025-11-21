@@ -355,6 +355,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Stop any existing streaming downloads
             chunkedStreamManager.stopAndCleanup()
 
+            // Upgrade thumbnail URL to 544x544 quality for better album art display
+            val highQualityThumbnail = thumbnailUrl?.let { url ->
+                when {
+                    // Google Photos URLs (YouTube Music thumbnails)
+                    url.contains("lh3.googleusercontent.com") -> {
+                        url.replace(Regex("=w\\d+-h\\d+"), "=w544-h544")
+                    }
+                    // YouTube thumbnail URLs
+                    url.contains("ytimg.com") && url.contains("/default.jpg") -> {
+                        url.replace("/default.jpg", "/maxresdefault.jpg")
+                    }
+                    url.contains("ytimg.com") && url.contains("/mqdefault.jpg") -> {
+                        url.replace("/mqdefault.jpg", "/maxresdefault.jpg")
+                    }
+                    url.contains("ytimg.com") && url.contains("/hqdefault.jpg") -> {
+                        url.replace("/hqdefault.jpg", "/maxresdefault.jpg")
+                    }
+                    url.contains("ytimg.com") && url.contains("/sddefault.jpg") -> {
+                        url.replace("/sddefault.jpg", "/maxresdefault.jpg")
+                    }
+                    // Return original if no pattern matches
+                    else -> url
+                }
+            }
+
             // Create a Song object where filePath will point to growing tmp file so player can read it
             val tempFile = chunkedStreamManager.startStreaming(videoId, streamUrl, durationMs)
             // Request first 2 chunks to start playback and have a small buffer
@@ -369,7 +394,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 filePath = tempFile.absolutePath,
                 genre = null,
                 releaseYear = null,
-                albumArtUri = thumbnailUrl  // Use thumbnail from YouTube
+                albumArtUri = highQualityThumbnail  // Use high-quality thumbnail
             )
 
             // Stop current collecting and prepare new
