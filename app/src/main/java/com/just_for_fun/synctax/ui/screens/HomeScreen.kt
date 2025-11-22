@@ -39,7 +39,8 @@ fun HomeScreen(
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
     userPreferences: UserPreferences,
     onTrainClick: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onOpenSettings: () -> Unit = {},
+    onNavigateToLibrary: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -170,13 +171,13 @@ fun HomeScreen(
                                 showDirectorySelectionDialog = true
                             }
                         }
-                        
+
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
                             EmptyMusicState(
-                                onScanClick = { 
+                                onScanClick = {
                                     if (scanPaths.isEmpty()) {
                                         showDirectorySelectionDialog = true
                                     } else {
@@ -202,7 +203,7 @@ fun HomeScreen(
                                 // Greeting Section with dynamic colors
                                 if (userName.isNotEmpty()) {
                                     item {
-                                        DynamicGreetingSection (
+                                        DynamicGreetingSection(
                                             userName = userName,
                                             albumColors = albumColors
                                         )
@@ -234,6 +235,40 @@ fun HomeScreen(
                                         },
                                         currentSong = playerState.currentSong,
                                         trainingDataSize = uiState.trainingDataSize
+                                    )
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                }
+
+                                item {
+                                    Divider(
+                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                    )
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                }
+
+                                item {
+                                    QuickAccessGrid(
+                                        songs = uiState.quickAccessSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(song, uiState.quickAccessSongs)
+                                        },
+                                        currentSong = playerState.currentSong
+                                    )
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                }
+
+                                item {
+                                    Divider(
+                                        modifier = Modifier.padding(horizontal = 16.dp)
                                     )
                                 }
 
@@ -307,10 +342,9 @@ fun HomeScreen(
                                 }
 
                                 // Show limited songs initially for better performance
-                                val displaySongs = remember(sortedSongs) {
+                                val displaySongs =
                                     if (sortedSongs.size > 50) sortedSongs.take(50) else sortedSongs
-                                }
-                                
+
                                 items(
                                     items = displaySongs,
                                     key = { song -> song.id }
@@ -322,12 +356,11 @@ fun HomeScreen(
                                         }
                                     )
                                 }
-                                
-                                // Show "View All" button if there are more songs
+
                                 if (sortedSongs.size > 50) {
                                     item {
                                         Button(
-                                            onClick = { onNavigateToLibrary() },
+                                            onClick = onNavigateToLibrary,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -335,40 +368,6 @@ fun HomeScreen(
                                             Text("View All ${sortedSongs.size} Songs")
                                         }
                                     }
-                                }
-
-                                item {
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                }
-
-                                item {
-                                    Divider(
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                }
-
-                                item {
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                }
-
-                                item {
-                                    QuickAccessGrid(
-                                        songs = uiState.quickAccessSongs,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.quickAccessSongs)
-                                        },
-                                        currentSong = playerState.currentSong
-                                    )
-                                }
-
-                                item {
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                }
-
-                                item {
-                                    Divider(
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
                                 }
 
                                 // Bottom padding for mini player

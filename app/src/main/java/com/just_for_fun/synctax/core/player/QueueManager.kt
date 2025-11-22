@@ -310,7 +310,11 @@ class QueueManager(
         } catch (e: Exception) {
             e.printStackTrace()
             // Fallback to regular shuffle
-            setQueue(songs.shuffled(), 0)
+            _queueState.value = QueueState(
+                currentPlaylist = songs.shuffled(),
+                currentIndex = 0,
+                playHistory = emptyList()
+            )
         }
     }
 

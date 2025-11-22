@@ -289,7 +289,10 @@ scripts/
 scripts
 /scripts
 /scripts/
-IMPLEMENTATION_CHECKLIST.md
-OPTIMIZATION_SUMMARY.md
 QUICK_START.md
-app/src/main/java/com/just_for_fun/synctax/PERFORMANCE_OPTIMIZATIONS.md
+BUILD_AND_WIDGET_FIXES.md
+patch_widget.ps1
+patch_lyrics_fix.ps1
+data/vectors.dat
+data/vectors.dat
+data/vectors.dat

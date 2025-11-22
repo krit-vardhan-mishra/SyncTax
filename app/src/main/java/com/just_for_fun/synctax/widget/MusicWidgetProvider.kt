@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.widget
+﻿package com.just_for_fun.synctax.widget
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -45,6 +45,11 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val EXTRA_LYRICS = "extra_lyrics"
 
         private val widgetScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        
+        // Lyrics caching to prevent continuous refresh
+        private var lastLyricsUpdate = 0L
+        private var cachedLyrics: String? = null
+        private const val LYRICS_UPDATE_INTERVAL = 2000L // 2 seconds minimum between lyrics updates
 
         fun updateWidget(
             context: Context,
@@ -307,19 +312,36 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 // View might not exist
             }
 
-            // Update Lyrics Placeholder (if view exists)
+            // Update Lyrics Placeholder (if view exists) with caching to prevent continuous refresh
             try {
-                if (lyrics != null && lyrics.isNotEmpty()) {
-                    views.setTextViewText(R.id.widget_lyrics, lyrics)
-                } else if (isOnline) {
-                     views.setTextViewText(R.id.widget_lyrics, "") // Blank space for online
-                } else {
-                    // Placeholder for lyrics as requested
-                    // In a real app, we would fetch lyrics from DB or API here
-                    views.setTextViewText(R.id.widget_lyrics, "Lyrics not available for this song.\n\n(Lyrics feature coming soon)")
+                // Determine the text to display based on lyrics input
+                val lyricsTextToDisplay = when {
+                    lyrics != null && lyrics.isNotEmpty() -> lyrics
+                    isOnline -> "" // Blank space for online
+                    else -> "Lyrics not available for this song.\n\n(Lyrics feature coming soon)" // Placeholder
+                }
+                
+                // Check if this is actual lyrics content (not placeholder or empty)
+                val isActualLyrics = lyrics != null && lyrics.isNotEmpty()
+                
+                // Only update lyrics if text has changed
+                if (lyricsTextToDisplay != cachedLyrics) {
+                    val currentTime = System.currentTimeMillis()
+                    
+                    // Always update immediately if:
+                    // 1. We're getting actual lyrics (prioritize real content)
+                    // 2. Enough time has passed since last update (throttle placeholder/empty updates)
+                    val shouldUpdateLyrics = isActualLyrics || (currentTime - lastLyricsUpdate > LYRICS_UPDATE_INTERVAL)
+                    
+                    if (shouldUpdateLyrics) {
+                        views.setTextViewText(R.id.widget_lyrics, lyricsTextToDisplay)
+                        cachedLyrics = lyricsTextToDisplay
+                        lastLyricsUpdate = currentTime
+                    }
                 }
             } catch (e: Exception) {
-                // View might not exist
+                // View might not exist in this layout
+                android.util.Log.d("MusicWidgetProvider", "Lyrics view not available in this layout")
             }
 
             // Update progress

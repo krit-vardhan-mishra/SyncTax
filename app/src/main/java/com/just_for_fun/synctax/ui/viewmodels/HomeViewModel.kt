@@ -212,6 +212,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Notify listeners that songs have been refreshed
                 onSongsRefreshed?.invoke(songs)
+                refreshAlbumArtForSongs()
 
                 // Regenerate quick picks with the updated song list
                 if (songs.isNotEmpty()) {
@@ -361,10 +362,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     songsWithoutArt.forEach { song ->
                         val audioFile = java.io.File(song.filePath)
                         if (audioFile.exists()) {
-                            val directory = audioFile.parentFile ?: return@forEach
-                            
+
                             // Check for various album art file patterns
-                            val albumArtUri = findAlbumArtForSong(audioFile, directory)
+                            val albumArtUri = repository.checkForLocalAlbumArt(audioFile)
                             
                             if (albumArtUri != null) {
                                 // Found album art file, update the song

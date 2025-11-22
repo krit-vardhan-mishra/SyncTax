@@ -91,8 +91,17 @@ class MusicRepository(private val context: Context) {
                 } else if (file.isFile) {
                     val fileName = file.name ?: ""
                     // Check if it's an audio file and not a deleted/trash file
-                    if (fileName.matches(Regex(".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$", RegexOption.IGNORE_CASE)) &&
-                        !fileName.startsWith(".") && !fileName.contains("trashed", ignoreCase = true)) {
+                    if (fileName.matches(
+                            Regex(
+                                ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
+                                RegexOption.IGNORE_CASE
+                            )
+                        ) &&
+                        !fileName.startsWith(".") && !fileName.contains(
+                            "trashed",
+                            ignoreCase = true
+                        )
+                    ) {
                         try {
                             // Get metadata from MediaStore using file path
                             val projection = arrayOf(
@@ -117,13 +126,23 @@ class MusicRepository(private val context: Context) {
                                 null
                             )?.use { cursor ->
                                 if (cursor.moveToFirst()) {
-                                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)).toString()
-                                    val title = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)) ?: fileName.removeSuffix(fileName.substringAfterLast(".", ""))
-                                    val artist = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)) ?: "Unknown Artist"
-                                    val album = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
-                                    val albumId = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
-                                    val duration = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
-                                    val year = cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
+                                    val id =
+                                        cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
+                                            .toString()
+                                    val title =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE))
+                                            ?: file.nameWithoutExtension
+                                    val artist =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST))
+                                            ?: "Unknown Artist"
+                                    val album =
+                                        cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
+                                    val albumId =
+                                        cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
+                                    val duration =
+                                        cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
+                                    val year =
+                                        cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
 
                                     // Get album art URI - check for local image file first
                                     var albumArtUri = ContentUris.withAppendedId(
@@ -153,13 +172,17 @@ class MusicRepository(private val context: Context) {
 
                                     songs.add(song)
                                     songAdded = true
-                                    Log.d("Directory Location", "Added song from direct scan: ${file.absolutePath}")
+                                    Log.d(
+                                        "Directory Location",
+                                        "Added song from direct scan: ${file.absolutePath}"
+                                    )
                                 }
                             }
 
                             // If not found in MediaStore, add basic info
                             if (!songAdded) {
-                                val title = fileName.removeSuffix(fileName.substringAfterLast(".", ""))
+                                // Remove file extension properly using nameWithoutExtension
+                                val title = file.nameWithoutExtension
                                 val song = Song(
                                     id = file.absolutePath,
                                     title = title,
@@ -172,7 +195,10 @@ class MusicRepository(private val context: Context) {
                                     albumArtUri = checkForLocalAlbumArt(file) // Check for local album art
                                 )
                                 songs.add(song)
-                                Log.d("Directory Location", "Added song from direct scan (no MediaStore): ${file.absolutePath}")
+                                Log.d(
+                                    "Directory Location",
+                                    "Added song from direct scan (no MediaStore): ${file.absolutePath}"
+                                )
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -184,6 +210,7 @@ class MusicRepository(private val context: Context) {
 
         scanRecursive(directory)
     }
+
     private fun scanDirectoryFromSAF(directoryUri: Uri, songs: MutableList<Song>) {
         val directory = DocumentFile.fromTreeUri(context, directoryUri) ?: return
 
@@ -196,13 +223,16 @@ class MusicRepository(private val context: Context) {
                     val fileName = file.name ?: ""
                     // Check if it's an audio file and not a deleted/trash file
                     if ((mimeType?.startsWith("audio/") == true ||
-                        fileName.matches(
-                            Regex(
-                                ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
-                                RegexOption.IGNORE_CASE
-                            )
-                        )) &&
-                        !fileName.startsWith(".") && !fileName.contains("trashed", ignoreCase = true)
+                                fileName.matches(
+                                    Regex(
+                                        ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
+                                        RegexOption.IGNORE_CASE
+                                    )
+                                )) &&
+                        !fileName.startsWith(".") && !fileName.contains(
+                            "trashed",
+                            ignoreCase = true
+                        )
                     ) {
 
                         try {
@@ -319,14 +349,14 @@ class MusicRepository(private val context: Context) {
      * Also checks for common album art file names like cover.jpg, folder.jpg, etc.
      * Supports multiple image formats: jpg, jpeg, png, bmp, gif
      */
-    private fun checkForLocalAlbumArt(audioFile: File): String? {
+    fun checkForLocalAlbumArt(audioFile: File): String? {
         try {
             val directory = audioFile.parentFile ?: return null
             val baseName = audioFile.nameWithoutExtension
-            
+
             // Common image extensions to check
             val imageExtensions = listOf("jpg", "jpeg", "png", "bmp", "gif")
-            
+
             // 1. Check for file with same base name as audio file
             for (ext in imageExtensions) {
                 val albumArtFile = File(directory, "$baseName.$ext")
@@ -334,7 +364,7 @@ class MusicRepository(private val context: Context) {
                     return albumArtFile.absolutePath
                 }
             }
-            
+
             // 2. Check for common album art file names in the directory
             val commonAlbumArtNames = listOf("cover", "folder", "album", "artwork", "front")
             for (name in commonAlbumArtNames) {
@@ -349,7 +379,9 @@ class MusicRepository(private val context: Context) {
             // Silently ignore errors when checking for album art
         }
         return null
-    }    private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
+    }
+
+    private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
@@ -392,7 +424,10 @@ class MusicRepository(private val context: Context) {
 
                 // Check if file is in allowed directory
                 if (!filePath.startsWith(allowedPath)) {
-                    Log.d("Directory Location", "Skipping file not in allowed path: $filePath (allowed: $allowedPath)")
+                    Log.d(
+                        "Directory Location",
+                        "Skipping file not in allowed path: $filePath (allowed: $allowedPath)"
+                    )
                     continue // Skip this song
                 }
 

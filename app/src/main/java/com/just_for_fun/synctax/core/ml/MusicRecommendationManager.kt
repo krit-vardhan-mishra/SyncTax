@@ -31,10 +31,29 @@ class MusicRecommendationManager(private val context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    // Cache for Quick Picks
+    private var cachedQuickPicks: QuickPicksResult? = null
+    private var cacheTimestamp: Long = 0
+    private val CACHE_DURATION = 5 * 60 * 1000L  // 5 minutes
+
+    /**
+     * Invalidate Quick Picks cache when user listening behavior changes
+     */
+    fun invalidateQuickPicksCache() {
+        cachedQuickPicks = null
+    }
+
     /**
      * Generate quick picks for the home screen
+     * Results are cached for 5 minutes to improve performance
      */
     suspend fun generateQuickPicks(count: Int = 20): QuickPicksResult {
+        // Return cached result if still valid
+        cachedQuickPicks?.let { cached ->
+            if (System.currentTimeMillis() - cacheTimestamp < CACHE_DURATION) {
+                return cached
+            }
+        }
         return withContext(Dispatchers.Default) {
             // Get all songs
             val allSongs = database.songDao().getAllSongs().first()

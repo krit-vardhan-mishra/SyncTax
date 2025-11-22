@@ -1,22 +1,32 @@
 package com.just_for_fun.synctax.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import kotlinx.coroutines.launch
 
 /**
  * Speed Dial Component - 3x3 Grid of song thumbnails
@@ -34,7 +45,8 @@ fun QuickAccessGrid(
     songs: List<Song>,
     onSongClick: (Song) -> Unit,
     modifier: Modifier = Modifier,
-    currentSong: Song? = null
+    currentSong: Song? = null,
+    onAddToQueue: ((Song) -> Unit)? = null
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -58,7 +70,8 @@ fun QuickAccessGrid(
                     SpeedDialItem(
                         song = song,
                         onClick = { onSongClick(song) },
-                        isPlaying = song.id == currentSong?.id
+                        isPlaying = song.id == currentSong?.id,
+                        onAddToQueue = onAddToQueue
                     )
                 }
             }
@@ -66,13 +79,20 @@ fun QuickAccessGrid(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SpeedDialItem(
     song: Song,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isPlaying: Boolean = false
+    isPlaying: Boolean = false,
+    onAddToQueue: ((Song) -> Unit)? = null
 ) {
+    val haptic = LocalHapticFeedback.current
+    var showBottomSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    
     // Use ElevatedCard for a nice pop off the background
     ElevatedCard(
         onClick = onClick,
@@ -83,6 +103,13 @@ private fun SpeedDialItem(
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
         modifier = modifier
             .aspectRatio(1f)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showBottomSheet = true
+                }
+            )
             .then(
                 if (isPlaying) {
                     Modifier.border(
@@ -167,6 +194,45 @@ private fun SpeedDialItem(
                     fontWeight = FontWeight.SemiBold,
                     lineHeight = MaterialTheme.typography.labelMedium.lineHeight
                 )
+            }
+        }
+    }
+    
+    // Bottom sheet menu
+    if (showBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBottomSheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 32.dp)
+            ) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
+                    label = { Text("Add to Queue") },
+                    selected = false,
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            showBottomSheet = false
+                        }
+                        onAddToQueue?.invoke(song)
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+                
+                // More options can be added here later
             }
         }
     }
