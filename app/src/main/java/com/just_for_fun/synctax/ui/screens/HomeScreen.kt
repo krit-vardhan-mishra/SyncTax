@@ -19,6 +19,7 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.dynamic.DynamicGreetingSection
 import com.just_for_fun.synctax.ui.components.card.SongCard
+import com.just_for_fun.synctax.ui.components.section.AllFilesSection
 import com.just_for_fun.synctax.ui.components.section.EmptyMusicState
 import com.just_for_fun.synctax.ui.components.section.FilterChipsRow
 import com.just_for_fun.synctax.ui.components.section.QuickPicksSection
@@ -330,50 +331,13 @@ fun HomeScreen(
                                 }
 
                                 // All Songs Section
-                                item {
-                                    SectionHeader(
-                                        title = "All Songs",
-                                        subtitle = null,
-                                        onViewAllClick = null,
-                                        showSortButton = true,
-                                        currentSortOption = currentSortOption,
-                                        onSortOptionChange = { currentSortOption = it }
-                                    )
-                                }
-
-                                // Show limited songs initially for better performance
-                                val displaySongs =
-                                    if (sortedSongs.size > 50) sortedSongs.take(50) else sortedSongs
-
-                                items(
-                                    items = displaySongs,
-                                    key = { song -> song.id }
-                                ) { song ->
-                                    SongCard(
-                                        song = song,
-                                        onClick = {
-                                            playerViewModel.playSong(song, uiState.allSongs)
-                                        }
-                                    )
-                                }
-
-                                if (sortedSongs.size > 50) {
-                                    item {
-                                        Button(
-                                            onClick = onNavigateToLibrary,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                        ) {
-                                            Text("View All ${sortedSongs.size} Songs")
-                                        }
-                                    }
-                                }
-
-                                // Bottom padding for mini player
-                                item {
-                                    Spacer(modifier = Modifier.height(96.dp))
-                                }
+                                AllFilesSection(
+                                    songs = sortedSongs,
+                                    currentSortOption = currentSortOption,
+                                    onSortOptionChange = { currentSortOption = it },
+                                    playerViewModel = playerViewModel,
+                                    onNavigateToLibrary = onNavigateToLibrary
+                                )
                             }
                         }
                     }

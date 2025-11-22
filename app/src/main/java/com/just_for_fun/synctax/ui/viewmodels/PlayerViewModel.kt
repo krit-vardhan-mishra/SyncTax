@@ -11,6 +11,7 @@ import android.media.AudioManager
 import android.os.Environment
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
+import android.util.Log
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
@@ -296,6 +297,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentSong = song,
                 isPlaying = true
             )
+
+            // Log current playing song details
+            Log.d("Storage Scene", Environment.getExternalStorageDirectory().toString())
+            Log.d("PlayerViewModel", "🎵 Now Playing Song Details:")
+            Log.d("PlayerViewModel", "  ID: ${song.id}")
+            Log.d("PlayerViewModel", "  Title: ${song.title}")
+            Log.d("PlayerViewModel", "  Artist: ${song.artist}")
+            Log.d("PlayerViewModel", "  Album: ${song.album ?: "Unknown"}")
+            Log.d("PlayerViewModel", "  Duration: ${song.duration}ms")
+            Log.d("PlayerViewModel", "  File Path: ${song.filePath}")
+            Log.d("PlayerViewModel", "  Genre: ${song.genre ?: "Unknown"}")
+            Log.d("PlayerViewModel", "  Release Year: ${song.releaseYear ?: "Unknown"}")
+            Log.d("PlayerViewModel", "  Album Art URI: ${song.albumArtUri ?: "None"}")
+            Log.d("PlayerViewModel", "  Added Timestamp: ${song.addedTimestamp}")
 
             // Check if song is already downloaded
             checkIfSongDownloaded(song)
@@ -803,7 +818,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         
         viewModelScope.launch {
             try {
-                val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "SyncTax")
+                val musicDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
                 val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                 val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
                 val audioFilename = "$safeTitle - $safeArtist.opus"
@@ -823,7 +838,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshDownloadedSongsCheck(allSongs: List<Song>) {
         viewModelScope.launch {
             val onlineSongs = allSongs.filter { it.id.startsWith("online:") }
-            val musicDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "SyncTax")
+            val musicDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
             
             val downloadedSongIds = mutableSetOf<String>()
             
@@ -878,8 +893,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     downloadingSongs = _uiState.value.downloadingSongs + currentSong.id
                 )
                 
-                // Get the app's download directory (Download/SyncTax)
-                val downloadDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SyncTax")
+                // Get the app's download directory (app-specific external files)
+                val downloadDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
                 if (!downloadDir.exists()) {
                     downloadDir.mkdirs()
                 }
@@ -964,7 +979,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 
                 // Mark as downloaded if audio download was successful
                 if (downloadSuccess) {
-                    val downloadLocation = "Download/SyncTax/${audioFile.name}"
+                    val downloadLocation = "App Downloads/SyncTax/${audioFile.name}"
                     _uiState.value = _uiState.value.copy(
                         downloadedSongs = _uiState.value.downloadedSongs + currentSong.id,
                         downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,

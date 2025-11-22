@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -463,6 +464,18 @@ class MusicWidgetProvider : AppWidgetProvider() {
                             Bitmap.createScaledBitmap(bitmap, 200, 200, true)
                         }
                     }
+                } else if (albumArtUri.startsWith("/") || albumArtUri.contains(":\\")) {
+                    // Handle absolute file paths (from downloaded songs)
+                    val file = File(albumArtUri)
+                    if (file.exists()) {
+                        file.inputStream().use { inputStream ->
+                            BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                                Bitmap.createScaledBitmap(bitmap, 200, 200, true)
+                            }
+                        }
+                    } else {
+                        null
+                    }
                 } else {
                     val uri = Uri.parse(albumArtUri)
                     context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -472,7 +485,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("MusicWidgetProvider", "Error loading album art", e)
+                android.util.Log.e("MusicWidgetProvider", "Error loading album art: $albumArtUri", e)
                 null
             }
         }

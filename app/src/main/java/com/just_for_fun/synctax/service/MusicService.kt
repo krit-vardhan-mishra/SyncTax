@@ -1,6 +1,7 @@
 package com.just_for_fun.synctax.service
 
 import android.app.Service
+import android.content.ContentUris
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -11,9 +12,11 @@ import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.provider.MediaStore
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.preferences.WidgetPreferences
 import com.just_for_fun.synctax.widget.MusicWidgetProvider
@@ -23,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -197,11 +201,30 @@ class MusicService : Service() {
             .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, song.album ?: "")
             .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, effectiveDuration)
 
+        // Convert album art URI to proper format for MediaSession
+        val albumArtUriForMedia = song.albumArtUri?.let { uri ->
+            when {
+                uri.startsWith("http") -> uri
+                uri.startsWith("content://") -> uri
+                uri.startsWith("/") || uri.contains(":\\") -> {
+                    // For file paths, try to get content URI from MediaStore first
+                    // This provides better cross-process access (e.g., for Bluetooth)
+                    val file = File(uri)
+                    if (file.exists()) {
+                        getContentUriForFile(uri) ?: Uri.fromFile(file).toString()
+                    } else {
+                        null
+                    }
+                }
+                else -> uri
+            }
+        }
+
         // Set low-quality art using URI if available
-        if (!song.albumArtUri.isNullOrEmpty()) {
+        if (!albumArtUriForMedia.isNullOrEmpty()) {
             metadataBuilder
-                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, song.albumArtUri)
-                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, song.albumArtUri)
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, albumArtUriForMedia)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, albumArtUriForMedia)
         }
 
         val initialMetadata = metadataBuilder.build()
@@ -227,43 +250,214 @@ class MusicService : Service() {
 
         return withContext(Dispatchers.IO) {
             try {
-                if (albumArtUri.startsWith("http")) {
-                    // Handle HTTP URLs for online songs
-                    val url = URL(albumArtUri)
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.connectTimeout = 5000
-                    conn.readTimeout = 5000
-                    conn.inputStream.use { inputStream ->
-                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                            // Resize bitmap for metadata
-                            val maxSize = 512
-                            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
-                            val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
-                            val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
-
-                            Bitmap.createScaledBitmap(bitmap, width, height, true)
+                when {
+                    albumArtUri.startsWith("http") -> {
+                        // Handle HTTP URLs for online songs
+                        loadBitmapFromUrl(albumArtUri)
+                    }
+                    albumArtUri.startsWith("content://") -> {
+                        // Handle content URIs from MediaStore
+                        val uri = Uri.parse(albumArtUri)
+                        contentResolver.openInputStream(uri)?.use { inputStream ->
+                            BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                                resizeBitmap(bitmap, 512)
+                            }
                         }
                     }
-                } else {
-                    // Handle content URIs for local songs
-                    val uri = Uri.parse(albumArtUri)
-                    contentResolver.openInputStream(uri)?.use { inputStream ->
-                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                            // Resize bitmap for metadata
-                            val maxSize = 512
-                            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
-                            val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
-                            val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
-
-                            Bitmap.createScaledBitmap(bitmap, width, height, true)
-                        }
+                    albumArtUri.startsWith("/storage/emulated/0/Download/SyncTax/") -> {
+                        // Use MediaStore to access files in Download directory
+                        loadAlbumArtFromDownloadDirectory(albumArtUri)
+                    }
+                    else -> {
+                        // Fallback for other file paths
+                        loadBitmapFromFilePath(albumArtUri)
                     }
                 }
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                Log.e("MusicService", "Failed to load album art from: $albumArtUri", e)
                 null
             }
         }
     }
+
+    private fun loadAlbumArtFromDownloadDirectory(filePath: String): Bitmap? {
+        return try {
+            val fileName = File(filePath).name
+            // Query MediaStore to get content URI for this file
+            val projection = arrayOf(MediaStore.MediaColumns._ID)
+            val selection = "${MediaStore.MediaColumns.DATA} = ?"
+            val selectionArgs = arrayOf(filePath)
+
+            contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                    val contentUri = ContentUris.withAppendedId(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        id
+                    )
+                    // Load using content URI
+                    contentResolver.openInputStream(contentUri)?.use { inputStream ->
+                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                            resizeBitmap(bitmap, 512)
+                        }
+                    }
+                } else {
+                    // Fallback to direct file access with proper error handling
+                    loadBitmapFromFilePath(filePath)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MusicService", "Failed to load from Download directory: $filePath", e)
+            null
+        }
+    }
+
+    private fun loadBitmapFromFilePath(filePath: String): Bitmap? {
+        return try {
+            val file = File(filePath)
+            if (file.exists() && file.canRead()) {
+                file.inputStream().use { inputStream ->
+                    BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                        resizeBitmap(bitmap, 512)
+                    }
+                }
+            } else {
+                Log.w("MusicService", "File does not exist or cannot be read: $filePath")
+                null
+            }
+        } catch (e: SecurityException) {
+            Log.e("MusicService", "Security exception accessing file: $filePath", e)
+            null
+        } catch (e: Exception) {
+            Log.e("MusicService", "Error loading bitmap from file: $filePath", e)
+            null
+        }
+    }
+
+    /**
+     * Try to get content URI for a file path using MediaStore
+     * This provides better cross-process access for files
+     */
+    private fun getContentUriForFile(filePath: String): String? {
+        return try {
+            val projection = arrayOf(MediaStore.MediaColumns._ID)
+            val selection = "${MediaStore.MediaColumns.DATA} = ?"
+            val selectionArgs = arrayOf(filePath)
+
+            contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                    ContentUris.withAppendedId(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        id
+                    ).toString()
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("MusicService", "Could not get content URI for: $filePath", e)
+            null
+        }
+    }
+
+    private fun loadBitmapFromUrl(urlString: String): Bitmap? {
+        return try {
+            val url = URL(urlString)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.inputStream.use { inputStream ->
+                BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+                    resizeBitmap(bitmap, 512)
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("Music Server", "Load Bitmap Fro Url ${e.message}")
+            null
+        }
+    }
+
+    private fun resizeBitmap(bitmap: Bitmap, maxSize: Int): Bitmap {
+        val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+        val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+        val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+        return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    }
+
+//    private suspend fun loadAlbumArt(albumArtUri: String?): Bitmap? {
+//        if (albumArtUri.isNullOrEmpty()) return null
+//
+//        return withContext(Dispatchers.IO) {
+//            try {
+//                if (albumArtUri.startsWith("http")) {
+//                    // Handle HTTP URLs for online songs
+//                    val url = URL(albumArtUri)
+//                    val conn = url.openConnection() as HttpURLConnection
+//                    conn.connectTimeout = 5000
+//                    conn.readTimeout = 5000
+//                    conn.inputStream.use { inputStream ->
+//                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+//                            // Resize bitmap for metadata
+//                            val maxSize = 512
+//                            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+//                            val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+//                            val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+//
+//                            Bitmap.createScaledBitmap(bitmap, width, height, true)
+//                        }
+//                    }
+//                } else if (albumArtUri.startsWith("/") || albumArtUri.contains(":\\")) {
+//                    // Handle absolute file paths (from downloaded songs)
+//                    val file = File(albumArtUri)
+//                    if (file.exists()) {
+//                        file.inputStream().use { inputStream ->
+//                            BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+//                                // Resize bitmap for metadata
+//                                val maxSize = 512
+//                                val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+//                                val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+//                                val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+//
+//                                Bitmap.createScaledBitmap(bitmap, width, height, true)
+//                            }
+//                        }
+//                    } else {
+//                        null
+//                    }
+//                } else {
+//                    // Handle content URIs for local songs from MediaStore
+//                    val uri = Uri.parse(albumArtUri)
+//                    contentResolver.openInputStream(uri)?.use { inputStream ->
+//                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
+//                            // Resize bitmap for metadata
+//                            val maxSize = 512
+//                            val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+//                            val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
+//                            val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
+//
+//                            Bitmap.createScaledBitmap(bitmap, width, height, true)
+//                        }
+//                    }
+//                }
+//            } catch (e: Exception) {
+//                Log.e("MusicService", "Failed to load album art from: $albumArtUri", e)
+//                null
+//            }
+//        }
+//    }
 
     fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long, lyrics: String? = null) {
         // Request audio focus when starting playback

@@ -3,10 +3,10 @@ package com.just_for_fun.synctax.ui.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.just_for_fun.synctax.core.data.cache.ListenAgainManager
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
-import com.just_for_fun.synctax.core.data.cache.ListenAgainManager
 import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.schabi.newpipe.extractor.timeago.patterns.it
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
