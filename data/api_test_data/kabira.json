@@ -1,0 +1,268 @@
+{
+    "created": "2025-11-21T15:57:25.870Z",
+    "count": 1,
+    "offset": 0,
+    "recordings": [
+        {
+            "id": "fb43bc8c-99d0-42cd-b1d8-9293ec7bd377",
+            "score": 100,
+            "artist-credit-id": "09381cc7-87db-3449-9ada-138276cbf324",
+            "title": "Kabira",
+            "length": 225546,
+            "video": null,
+            "artist-credit": [
+                {
+                    "joinphrase": " & ",
+                    "name": "Rekha Bhardwaj",
+                    "artist": {
+                        "id": "44032aa6-cffc-41b8-b898-1ec0e1ba8a27",
+                        "name": "Rekha Bhardwaj",
+                        "sort-name": "Bhardwaj, Rekha",
+                        "aliases": [
+                            {
+                                "sort-name": "Bharadwaj, Rekha",
+                                "name": "Rekha Bharadwaj",
+                                "locale": null,
+                                "type": null,
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "Tochi Raina",
+                    "artist": {
+                        "id": "64e61fc0-1aac-48f5-bd9c-ef5192f56515",
+                        "name": "Tochi Raina",
+                        "sort-name": "Raina, Tochi",
+                        "aliases": [
+                            {
+                                "sort-name": "Tochi",
+                                "name": "Tochi",
+                                "locale": null,
+                                "type": null,
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2013-04-29",
+            "releases": [
+                {
+                    "id": "59f541fd-2d4a-44a3-bb10-f856fc2be8c9",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "faa96148-7f72-395a-9947-3b6a9266150f",
+                    "count": 1,
+                    "title": "Yeh Jawaani Hai Deewani",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Pritam",
+                            "artist": {
+                                "id": "52db98c1-0cc9-4aab-9f2d-ea8d359234f3",
+                                "name": "Pritam",
+                                "sort-name": "Pritam",
+                                "disambiguation": "music director and composer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "e7fd502e-85ca-4b14-b250-b2734192db5b",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Yeh Jawaani Hai Deewani",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "track-count": 10,
+                    "media": [
+                        {
+                            "id": "f8e1ab21-7a20-3672-b293-bac13306d2b8",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "4f9328f1-4089-471d-a6d8-588c48e98cde",
+                                    "number": "4",
+                                    "title": "Kabira",
+                                    "length": 225546
+                                }
+                            ],
+                            "track-count": 10,
+                            "track-offset": 3
+                        }
+                    ]
+                },
+                {
+                    "id": "337be58d-cf4a-4909-a156-a44032e9dc05",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "1de85209-a9a8-4bd7-8f60-7f8d8ad4497e",
+                    "count": 1,
+                    "title": "Yeh Jawaani Hai Deewani",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "joinphrase": " & ",
+                            "name": "Pritam",
+                            "artist": {
+                                "id": "52db98c1-0cc9-4aab-9f2d-ea8d359234f3",
+                                "name": "Pritam",
+                                "sort-name": "Pritam",
+                                "disambiguation": "music director and composer"
+                            }
+                        },
+                        {
+                            "name": "Amitabh Bhattacharya",
+                            "artist": {
+                                "id": "2b3ac722-4fe2-4d08-b582-b86f610ae55b",
+                                "name": "Amitabh Bhattacharya",
+                                "sort-name": "Bhattacharya, Amitabh"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "e7fd502e-85ca-4b14-b250-b2734192db5b",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Yeh Jawaani Hai Deewani",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-29",
+                    "country": "IN",
+                    "release-events": [
+                        {
+                            "date": "2013-04-29",
+                            "area": {
+                                "id": "d31a9a15-537f-3669-ad53-25753ddd2772",
+                                "name": "India",
+                                "sort-name": "India",
+                                "iso-3166-1-codes": [
+                                    "IN"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 9,
+                    "media": [
+                        {
+                            "id": "41b39caf-6626-3827-9be5-019878f90b9f",
+                            "position": 1,
+                            "format": "CD",
+                            "track": [
+                                {
+                                    "id": "946b2af0-76d1-4650-8e4d-ceeae397c2cf",
+                                    "number": "4",
+                                    "title": "Kabira",
+                                    "length": 225546
+                                }
+                            ],
+                            "track-count": 9,
+                            "track-offset": 3
+                        }
+                    ]
+                },
+                {
+                    "id": "981f748b-0fc6-4fab-9f8b-b67765aa0c08",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "1de85209-a9a8-4bd7-8f60-7f8d8ad4497e",
+                    "count": 1,
+                    "title": "Yeh Jawaani Hai Deewani",
+                    "status": "Official",
+                    "disambiguation": "Original Motion Picture Soundtrack",
+                    "artist-credit": [
+                        {
+                            "joinphrase": " & ",
+                            "name": "Pritam",
+                            "artist": {
+                                "id": "52db98c1-0cc9-4aab-9f2d-ea8d359234f3",
+                                "name": "Pritam",
+                                "sort-name": "Pritam",
+                                "disambiguation": "music director and composer"
+                            }
+                        },
+                        {
+                            "name": "Amitabh Bhattacharya",
+                            "artist": {
+                                "id": "2b3ac722-4fe2-4d08-b582-b86f610ae55b",
+                                "name": "Amitabh Bhattacharya",
+                                "sort-name": "Bhattacharya, Amitabh"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "e7fd502e-85ca-4b14-b250-b2734192db5b",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Yeh Jawaani Hai Deewani",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-29",
+                    "country": "XW",
+                    "release-events": [
+                        {
+                            "date": "2013-04-29",
+                            "area": {
+                                "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                                "name": "[Worldwide]",
+                                "sort-name": "[Worldwide]",
+                                "iso-3166-1-codes": [
+                                    "XW"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 9,
+                    "media": [
+                        {
+                            "id": "cd203eeb-71d8-3e0e-805b-adfb0b3dff5f",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "b7ddc90e-89b7-405e-a02b-31c4b68092b7",
+                                    "number": "4",
+                                    "title": "Kabira",
+                                    "length": 225546
+                                }
+                            ],
+                            "track-count": 9,
+                            "track-offset": 3
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "USLZJ1575933",
+                "INS181303780"
+            ],
+            "tags": [
+                {
+                    "count": 1,
+                    "name": "soundtrack"
+                }
+            ]
+        }
+    ]
+}

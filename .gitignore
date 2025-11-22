@@ -289,3 +289,7 @@ scripts/
 scripts
 /scripts
 /scripts/
+IMPLEMENTATION_CHECKLIST.md
+OPTIMIZATION_SUMMARY.md
+QUICK_START.md
+app/src/main/java/com/just_for_fun/synctax/PERFORMANCE_OPTIMIZATIONS.md

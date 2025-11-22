@@ -1,0 +1,992 @@
+{
+    "created": "2025-11-21T15:57:23.174Z",
+    "count": 29,
+    "offset": 0,
+    "recordings": [
+        {
+            "id": "1227659f-a933-4549-8fc4-d839b4cd3d45",
+            "score": 100,
+            "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+            "title": "Blinding Lights",
+            "disambiguation": "live, 2024-09-07: MorumBIS, S\u00e3o Paulo, Brazil",
+            "video": true,
+            "artist-credit": [
+                {
+                    "name": "The Weeknd",
+                    "artist": {
+                        "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                        "name": "The Weeknd",
+                        "sort-name": "Weeknd, The",
+                        "disambiguation": "Canadian R&B singer",
+                        "aliases": [
+                            {
+                                "sort-name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "locale": "am",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Weeknd, The",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "The Weeknd",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": "2009",
+                                "end-date": "2023-05-15"
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "Abel Tesfaye",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "locale": "ja",
+                                "type": "Artist name",
+                                "primary": true,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel Makkonen",
+                                "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                                "name": "Abel Makkonen Tesfaye",
+                                "locale": "en",
+                                "type": "Legal name",
+                                "primary": null,
+                                "begin-date": "1990-02-16",
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "The Weekend",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "The Weekend",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "isrcs": [
+                "USUMV2403154"
+            ]
+        },
+        {
+            "id": "f6f6532a-1d52-47e2-af35-703c3773d85a",
+            "score": 100,
+            "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+            "title": "Blinding Lights",
+            "length": 201040,
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "The Weeknd",
+                    "artist": {
+                        "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                        "name": "The Weeknd",
+                        "sort-name": "Weeknd, The",
+                        "disambiguation": "Canadian R&B singer",
+                        "aliases": [
+                            {
+                                "sort-name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "locale": "am",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Weeknd, The",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "The Weeknd",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": "2009",
+                                "end-date": "2023-05-15"
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "Abel Tesfaye",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "locale": "ja",
+                                "type": "Artist name",
+                                "primary": true,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel Makkonen",
+                                "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                                "name": "Abel Makkonen Tesfaye",
+                                "locale": "en",
+                                "type": "Legal name",
+                                "primary": null,
+                                "begin-date": "1990-02-16",
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "The Weekend",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "The Weekend",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2021",
+            "releases": [
+                {
+                    "id": "65d5866f-1ff0-4727-99db-d3bb874160d9",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+                    "count": 2,
+                    "title": "Die Ultimative Chartshow: Die erfolgreichsten Sommer Party-Hits",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Various Artists",
+                            "artist": {
+                                "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+                                "name": "Various Artists",
+                                "sort-name": "Various Artists",
+                                "disambiguation": "add compilations to this artist"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "d8d27e99-1e8b-4019-afb1-f098d8e3fad5",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Die Ultimative Chartshow: Die erfolgreichsten Sommer Party-Hits",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2021",
+                    "country": "DE",
+                    "release-events": [
+                        {
+                            "date": "2021",
+                            "area": {
+                                "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+                                "name": "Germany",
+                                "sort-name": "Germany",
+                                "iso-3166-1-codes": [
+                                    "DE"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 46,
+                    "media": [
+                        {
+                            "id": "e7970317-18b8-48e1-8ed0-6dc3e6779aac",
+                            "position": 2,
+                            "format": "CD",
+                            "track": [
+                                {
+                                    "id": "191e73cb-2c6b-4b3f-8aaf-b6750dbdf557",
+                                    "number": "2",
+                                    "title": "Blinding Lights",
+                                    "length": 201040
+                                }
+                            ],
+                            "track-count": 23,
+                            "track-offset": 1
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "4a7e3973-48fa-4d6b-8c54-7dd87c177243",
+            "score": 100,
+            "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+            "title": "Blinding Lights",
+            "length": 200000,
+            "disambiguation": "part of \u201cZedd's 2020\u201d DJ\u2010mix",
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "The Weeknd",
+                    "artist": {
+                        "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                        "name": "The Weeknd",
+                        "sort-name": "Weeknd, The",
+                        "disambiguation": "Canadian R&B singer",
+                        "aliases": [
+                            {
+                                "sort-name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "locale": "am",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Weeknd, The",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "The Weeknd",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": "2009",
+                                "end-date": "2023-05-15"
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "Abel Tesfaye",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "locale": "ja",
+                                "type": "Artist name",
+                                "primary": true,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel Makkonen",
+                                "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                                "name": "Abel Makkonen Tesfaye",
+                                "locale": "en",
+                                "type": "Legal name",
+                                "primary": null,
+                                "begin-date": "1990-02-16",
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "The Weekend",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "The Weekend",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2020-12-21",
+            "releases": [
+                {
+                    "id": "7d13b994-4f38-4d38-a59e-5054c96ed5a8",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "da9c84a8-84fc-369f-b330-758f26311ea7",
+                    "count": 1,
+                    "title": "Today\u2019s Hits 2020",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Zedd",
+                            "artist": {
+                                "id": "56c4b861-0922-4c3a-a9b9-3bfcb00f8274",
+                                "name": "Zedd",
+                                "sort-name": "Zedd",
+                                "disambiguation": "Russian\u2010German producer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "0b19ea51-f552-4131-a5c3-b28a5eeae419",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Today\u2019s Hits 2020",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation",
+                            "DJ-mix"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                            "0d47f47a-3fe5-3d69-ac9d-d566c23968bf"
+                        ]
+                    },
+                    "track-count": 31,
+                    "media": [
+                        {
+                            "id": "4c395f02-d0d9-3cca-8ae4-fe244d5b2520",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "eccd48e7-ee8b-4c08-8dfb-fa28f56efebd",
+                                    "number": "31",
+                                    "title": "Blinding Lights",
+                                    "length": 200000
+                                }
+                            ],
+                            "track-count": 31,
+                            "track-offset": 30
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "US23A1521198"
+            ]
+        },
+        {
+            "id": "9ce40394-cfc8-43fe-aa14-a36f61680cd3",
+            "score": 100,
+            "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+            "title": "Blinding Lights",
+            "length": 200000,
+            "disambiguation": "Dolby Atmos mix",
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "The Weeknd",
+                    "artist": {
+                        "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                        "name": "The Weeknd",
+                        "sort-name": "Weeknd, The",
+                        "disambiguation": "Canadian R&B singer",
+                        "aliases": [
+                            {
+                                "sort-name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "locale": "am",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Weeknd, The",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "The Weeknd",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": "2009",
+                                "end-date": "2023-05-15"
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "Abel Tesfaye",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "locale": "ja",
+                                "type": "Artist name",
+                                "primary": true,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel Makkonen",
+                                "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                                "name": "Abel Makkonen Tesfaye",
+                                "locale": "en",
+                                "type": "Legal name",
+                                "primary": null,
+                                "begin-date": "1990-02-16",
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "The Weekend",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "The Weekend",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2019-11-29",
+            "releases": [
+                {
+                    "id": "87bc8a40-1073-43b4-8cd0-80c74cee2110",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "After Hours",
+                    "status": "Official",
+                    "disambiguation": "Dolby Atmos mix, deluxe, explicit",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "78570bea-2a26-467c-a3db-c52723ceb394",
+                        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "After Hours",
+                        "primary-type": "Album"
+                    },
+                    "track-count": 18,
+                    "media": [
+                        {
+                            "id": "15c09c2f-5b91-375b-be44-0fed35c753bc",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "4dd80f4f-b076-4d5d-aa71-19042e093792",
+                                    "number": "9",
+                                    "title": "Blinding Lights",
+                                    "length": 200000
+                                }
+                            ],
+                            "track-count": 18,
+                            "track-offset": 8
+                        }
+                    ]
+                },
+                {
+                    "id": "bd3c34b8-88a9-415d-8663-014c8a3cbc2e",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "After Hours",
+                    "status": "Official",
+                    "disambiguation": "Dolby Atmos mix, explicit",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "78570bea-2a26-467c-a3db-c52723ceb394",
+                        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "After Hours",
+                        "primary-type": "Album"
+                    },
+                    "track-count": 14,
+                    "media": [
+                        {
+                            "id": "ae3d6d3f-045e-3cf5-aa9a-f4225ee0f11a",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "8c92d210-cc01-404c-91cf-df512d5a0741",
+                                    "number": "9",
+                                    "title": "Blinding Lights",
+                                    "length": 200000
+                                }
+                            ],
+                            "track-count": 14,
+                            "track-offset": 8
+                        }
+                    ]
+                },
+                {
+                    "id": "5149293f-ccb3-4be9-b570-85fd6343b688",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "After Hours",
+                    "status": "Official",
+                    "disambiguation": "Dolby Atmos mix, deluxe, clean",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "78570bea-2a26-467c-a3db-c52723ceb394",
+                        "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "After Hours",
+                        "primary-type": "Album"
+                    },
+                    "track-count": 18,
+                    "media": [
+                        {
+                            "id": "10db8cdc-8eae-3d46-b5b9-bfe98ab7956e",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "1fa3c606-778b-427f-9041-ac7e7e3cfa33",
+                                    "number": "9",
+                                    "title": "Blinding Lights",
+                                    "length": 200000
+                                }
+                            ],
+                            "track-count": 18,
+                            "track-offset": 8
+                        }
+                    ]
+                },
+                {
+                    "id": "d80c36f7-089f-43c0-885a-1cdbb6326e1a",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "Blinding Lights",
+                    "status": "Official",
+                    "disambiguation": "Dolby Atmos mix",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "9b905cac-df8d-4942-bc4e-4fe0f2ed635f",
+                        "type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+                        "primary-type-id": "d6038452-8ee0-3f68-affc-2de9a1ede0b9",
+                        "title": "Blinding Lights",
+                        "primary-type": "Single"
+                    },
+                    "track-count": 1,
+                    "media": [
+                        {
+                            "id": "841a5c70-b9bc-3af3-b6ee-2cc357aa65a1",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "e9f647e7-bf6f-4260-bdcf-adf53bbddb00",
+                                    "number": "1",
+                                    "title": "Blinding Lights",
+                                    "length": 200000
+                                }
+                            ],
+                            "track-count": 1,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "0b291e42-8e77-4cb5-ba31-900071edcd8a",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "The Highlights",
+                    "status": "Official",
+                    "disambiguation": "Dolby Atmos mix, deluxe",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "f60c961a-b4c8-4e01-831c-51a0dfa55188",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "The Highlights",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "track-count": 36,
+                    "media": [
+                        {
+                            "id": "a7458674-9059-3061-9f5e-8a0b943b7e81",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "c04719dc-f2d7-4793-946b-5b7860809fcd",
+                                    "number": "4",
+                                    "title": "Blinding Lights",
+                                    "length": 200000
+                                }
+                            ],
+                            "track-count": 36,
+                            "track-offset": 3
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "USUG11904251"
+            ]
+        },
+        {
+            "id": "2537b91a-1fae-4d74-9322-d0c6b97a5d38",
+            "score": 100,
+            "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+            "title": "Blinding Lights",
+            "length": 253365,
+            "disambiguation": "live, 2022\u201011\u201026\u201327: SoFi Stadium, Inglewood, CA, USA",
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "The Weeknd",
+                    "artist": {
+                        "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                        "name": "The Weeknd",
+                        "sort-name": "Weeknd, The",
+                        "disambiguation": "Canadian R&B singer",
+                        "aliases": [
+                            {
+                                "sort-name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u12a0\u1264\u120d \u1218\u12ae\u1295\u1295 \u1270\u1235\u134b\u12ec",
+                                "locale": "am",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Weeknd, The",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "The Weeknd",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": "2009",
+                                "end-date": "2023-05-15"
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "Abel Tesfaye",
+                                "locale": "en",
+                                "type": "Artist name",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                                "name": "\u30b6\u30fb\u30a6\u30a3\u30fc\u30af\u30a8\u30f3\u30c9",
+                                "locale": "ja",
+                                "type": "Artist name",
+                                "primary": true,
+                                "begin-date": null,
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "Tesfaye, Abel Makkonen",
+                                "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                                "name": "Abel Makkonen Tesfaye",
+                                "locale": "en",
+                                "type": "Legal name",
+                                "primary": null,
+                                "begin-date": "1990-02-16",
+                                "end-date": null
+                            },
+                            {
+                                "sort-name": "The Weekend",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "The Weekend",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2023-03-03",
+            "releases": [
+                {
+                    "id": "53ad495e-e744-4f9a-8b8f-5616eca551b3",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "Live at SoFi Stadium",
+                    "status": "Official",
+                    "disambiguation": "clean",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b4f0a78c-ca71-4aaa-9d14-d29281a456d3",
+                        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Live at SoFi Stadium",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Live"
+                        ],
+                        "secondary-type-ids": [
+                            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                        ]
+                    },
+                    "track-count": 31,
+                    "media": [
+                        {
+                            "id": "e23d35de-2040-3df2-8d59-f4ddbb16b78e",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "8d86af96-489e-4940-98b1-52eff3b0e743",
+                                    "number": "30",
+                                    "title": "Blinding Lights (live)",
+                                    "length": 253365
+                                }
+                            ],
+                            "track-count": 31,
+                            "track-offset": 29
+                        }
+                    ]
+                },
+                {
+                    "id": "a226da99-9dd9-406c-bf1d-3e9509f9f31a",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "Live at SoFi Stadium",
+                    "status": "Official",
+                    "disambiguation": "explicit",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b4f0a78c-ca71-4aaa-9d14-d29281a456d3",
+                        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Live at SoFi Stadium",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Live"
+                        ],
+                        "secondary-type-ids": [
+                            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                        ]
+                    },
+                    "track-count": 31,
+                    "media": [
+                        {
+                            "id": "50f1a751-4f8e-3d02-a819-52b0ccb19226",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "c9ceca7f-139f-4151-8978-454170d15e0b",
+                                    "number": "30",
+                                    "title": "Blinding Lights (live)",
+                                    "length": 253000
+                                }
+                            ],
+                            "track-count": 31,
+                            "track-offset": 29
+                        }
+                    ]
+                },
+                {
+                    "id": "171b8e24-b8db-4db7-b7fe-ec97a3c89222",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "Live at SoFi Stadium",
+                    "status": "Official",
+                    "disambiguation": "explicit",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b4f0a78c-ca71-4aaa-9d14-d29281a456d3",
+                        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Live at SoFi Stadium",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Live"
+                        ],
+                        "secondary-type-ids": [
+                            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                        ]
+                    },
+                    "track-count": 31,
+                    "media": [
+                        {
+                            "id": "4fc9aeb1-7fb1-34a3-b95a-7097dd17a931",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "e3919f86-4aee-4253-97fe-50cf824f19af",
+                                    "number": "30",
+                                    "title": "Blinding Lights (live)",
+                                    "length": 253365
+                                }
+                            ],
+                            "track-count": 31,
+                            "track-offset": 29
+                        }
+                    ]
+                },
+                {
+                    "id": "c0ed65f3-db21-4d94-b3f9-92fd5d4dd15b",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "a429a4ec-9002-312a-b0c2-04d85e54a80c",
+                    "count": 1,
+                    "title": "Live at SoFi Stadium",
+                    "status": "Official",
+                    "disambiguation": "clean",
+                    "artist-credit": [
+                        {
+                            "name": "The Weeknd",
+                            "artist": {
+                                "id": "c8b03190-306c-4120-bb0b-6f2ebfc06ea9",
+                                "name": "The Weeknd",
+                                "sort-name": "Weeknd, The",
+                                "disambiguation": "Canadian R&B singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b4f0a78c-ca71-4aaa-9d14-d29281a456d3",
+                        "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Live at SoFi Stadium",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Live"
+                        ],
+                        "secondary-type-ids": [
+                            "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+                        ]
+                    },
+                    "track-count": 31,
+                    "media": [
+                        {
+                            "id": "2f3e83c7-7514-33e2-83cc-c7d5a7b08b22",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "16892f92-b666-40f0-97bb-3be8578a4a63",
+                                    "number": "30",
+                                    "title": "Blinding Lights (live)",
+                                    "length": 253365
+                                }
+                            ],
+                            "track-count": 31,
+                            "track-offset": 29
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "USUG12301431",
+                "USUG12301675"
+            ]
+        }
+    ]
+}

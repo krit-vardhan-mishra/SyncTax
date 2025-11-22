@@ -462,6 +462,17 @@ class MusicRepository(private val context: Context) {
     fun getAllSongs(): Flow<List<Song>> = songDao.getAllSongs()
 
     /**
+     * Get songs with pagination
+     */
+    suspend fun getSongsPaginated(limit: Int, offset: Int): List<Song> =
+        songDao.getSongsPaginated(limit, offset)
+
+    /**
+     * Get total song count
+     */
+    suspend fun getSongCount(): Int = songDao.getSongCount()
+
+    /**
      * Get song by ID
      */
     suspend fun getSongById(songId: String): Song? = songDao.getSongById(songId)

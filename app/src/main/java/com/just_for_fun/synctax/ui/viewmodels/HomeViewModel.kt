@@ -19,6 +19,10 @@ import org.schabi.newpipe.extractor.timeago.patterns.it
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        const val PAGE_SIZE = 30  // Load 30 songs at a time
+    }
+
     private val repository = MusicRepository(application)
     private val recommendationManager = MusicRecommendationManager(application)
 
@@ -27,6 +31,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
     private val onlineManager = OnlineSearchManager()
     private val listenAgainManager = ListenAgainManager(getApplication())
+    private val speedDialManager = com.just_for_fun.synctax.core.data.cache.SpeedDialManager(repository)
+    private val quickAccessManager = com.just_for_fun.synctax.core.data.cache.QuickAccessManager(repository)
     
     private var lastQuickPicksRefresh = 0L
     private val quickPicksRefreshInterval = 15 * 60 * 1000L // 15 minutes in milliseconds
@@ -52,6 +58,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(listenAgain = list)
             }
         }
+        viewModelScope.launch {
+            speedDialManager.speedDialSongs.collect { list ->
+                _uiState.value = _uiState.value.copy(speedDialSongs = list)
+            }
+        }
+        viewModelScope.launch {
+            quickAccessManager.quickAccessSongs.collect { list ->
+                _uiState.value = _uiState.value.copy(quickAccessSongs = list)
+            }
+        }
     }
 
     private fun loadData() {
@@ -69,6 +85,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     // Generate recommendations if songs available
                     if (songs.isNotEmpty()) {
                         generateQuickPicks()
+                        // Refresh all sections
+                        refreshSections()
                     }
                 }
             } catch (e: Exception) {
@@ -110,8 +128,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     generateQuickPicks()
                 }
                 
-                // Refresh listen again cache after scanning
-                listenAgainManager.refresh()
+                // Refresh all sections after scanning
+                refreshSections()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
@@ -200,8 +218,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     generateQuickPicks()
                 }
 
-                // Refresh listen again cache after scanning
-                listenAgainManager.refresh()
+                // Refresh all sections after scanning
+                refreshSections()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
@@ -418,6 +436,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshAlbumArt() {
         refreshAlbumArtForSongs()
     }
+
+    /**
+     * Refresh all section managers
+     */
+    fun refreshSections() {
+        listenAgainManager.refresh()
+        speedDialManager.refresh()
+        quickAccessManager.refresh()
+    }
 }
 
 data class HomeUiState(
@@ -436,12 +463,15 @@ data class HomeUiState(
     val selectedArtistSongs: List<Song>? = null,
     val selectedAlbum: String? = null,
     val selectedAlbumArtist: String? = null,
-    val selectedAlbumSongs: List<Song>? = null
-    ,
+    val selectedAlbumSongs: List<Song>? = null,
     // Online search state (for SearchScreen)
     val isSearchingOnline: Boolean = false,
-    val onlineSearchResults: List<com.just_for_fun.synctax.core.network.OnlineSearchResult> = emptyList()
-    ,
-    // Listen again cache exposed to UI
-    val listenAgain: List<Song> = emptyList()
+    val onlineSearchResults: List<com.just_for_fun.synctax.core.network.OnlineSearchResult> = emptyList(),
+    // Section-specific song lists
+    val listenAgain: List<Song> = emptyList(),
+    val speedDialSongs: List<Song> = emptyList(),
+    val quickAccessSongs: List<Song> = emptyList(),
+    // Pagination state for all songs
+    val isLoadingMore: Boolean = false,
+    val hasMoreSongs: Boolean = true
 )

@@ -67,7 +67,8 @@ fun QuickPicksScreen(
                 showShuffleButton = true,
                 onShuffleClick = {
                     if (uiState.quickPicks.isNotEmpty()) {
-                        playerViewModel.shufflePlay(uiState.quickPicks)
+                        // QuickPicks screen uses smart shuffle by default
+                        playerViewModel.shufflePlayWithRecommendations(uiState.quickPicks)
                     }
                 }
             )

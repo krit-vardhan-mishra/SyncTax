@@ -61,9 +61,10 @@ fun LibraryScreen(
     playerViewModel: PlayerViewModel = viewModel(),
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
     userPreferences: UserPreferences,
-    onSearchClick: () -> Unit = {},
     onNavigateToArtist: (String, List<Song>) -> Unit = { _, _ -> },
-    onNavigateToAlbum: (String, String, List<Song>) -> Unit = { _, _, _ -> }
+    onNavigateToAlbum: (String, String, List<Song>) -> Unit = { _, _, _ -> },
+    onOpenSettings: () -> Unit = {},
+    onTrainClick: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -86,6 +87,7 @@ fun LibraryScreen(
                 albumColors = albumColors,
                 showSortButton = true,
                 showShuffleButton = true,
+                showRefreshButton = true,
                 showProfileButton = true,
                 onShuffleClick = {
                     val songsToShuffle = when (pagerState.currentPage) {
@@ -98,12 +100,15 @@ fun LibraryScreen(
                         playerViewModel.shufflePlay(songsToShuffle)
                     }
                 },
+                onRefreshClick = { homeViewModel.scanMusic() },
                 onSortOptionChange = { sortOption = it },
                 userPreferences = userPreferences,
                 userName = userName,
                 userInitial = userInitial,
                 sortOption = sortOption,
-                currentTab = pagerState.currentPage
+                currentTab = pagerState.currentPage,
+                onOpenSettings = onOpenSettings,
+                onTrainClick = onTrainClick
             )
         }
     ) { paddingValues ->

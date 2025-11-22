@@ -1,0 +1,1177 @@
+{
+    "created": "2025-11-21T15:57:24.860Z",
+    "count": 5,
+    "offset": 0,
+    "recordings": [
+        {
+            "id": "3e5bc764-dfa4-454d-a2a9-0ee84ae35db2",
+            "score": 100,
+            "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+            "title": "Tum Hi Ho",
+            "length": 262035,
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "Arijit Singh",
+                    "artist": {
+                        "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                        "name": "Arijit Singh",
+                        "sort-name": "Singh, Arijit",
+                        "disambiguation": "Indian singer",
+                        "aliases": [
+                            {
+                                "sort-name": "Arjit Singh",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "Arjit Singh",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2013-04-03",
+            "releases": [
+                {
+                    "id": "bc6b621a-05fb-4c2b-acc6-3e5793c733bd",
+                    "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+                    "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+                    "count": 1,
+                    "title": "Aashiqui 2",
+                    "status": "Bootleg",
+                    "artist-credit": [
+                        {
+                            "name": "Various Artists",
+                            "artist": {
+                                "id": "89ad4ac3-39f7-470e-963a-56509c546377",
+                                "name": "Various Artists",
+                                "sort-name": "Various Artists",
+                                "disambiguation": "add compilations to this artist"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b78e86bc-401e-4e8d-8627-2a18c72ee5f3",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Aashiqui 2",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "track-count": 11,
+                    "media": [
+                        {
+                            "id": "b9e5f767-fecc-39f5-9bd1-3e023cd5283a",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "7fc5c3d3-3be0-4402-b13b-1b169413ec28",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 262035
+                                }
+                            ],
+                            "track-count": 11,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "66fd46b6-74b8-455e-a0c3-e08eb2d40fec",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "cc048f54-805c-39df-b7dd-8bce6d07943c",
+                    "count": 1,
+                    "title": "Aashiqui 2",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "joinphrase": ", ",
+                            "name": "Jeet Gannguli",
+                            "artist": {
+                                "id": "6397f3be-faee-42e2-a943-4e1c42a4678a",
+                                "name": "Jeet Gannguli",
+                                "sort-name": "Gannguli, Jeet"
+                            }
+                        },
+                        {
+                            "joinphrase": " & ",
+                            "name": "Mithoon",
+                            "artist": {
+                                "id": "7f74ac10-e2f0-480a-be9b-82264d2078a9",
+                                "name": "Mithoon",
+                                "sort-name": "Mithoon",
+                                "disambiguation": "Indian composer and playback singer"
+                            }
+                        },
+                        {
+                            "name": "Ankit Tiwari",
+                            "artist": {
+                                "id": "8e94cd02-5047-4885-82fa-7f2b8bb2195f",
+                                "name": "Ankit Tiwari",
+                                "sort-name": "Tiwari, Ankit"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b78e86bc-401e-4e8d-8627-2a18c72ee5f3",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Aashiqui 2",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-03",
+                    "country": "IN",
+                    "release-events": [
+                        {
+                            "date": "2013-04-03",
+                            "area": {
+                                "id": "d31a9a15-537f-3669-ad53-25753ddd2772",
+                                "name": "India",
+                                "sort-name": "India",
+                                "iso-3166-1-codes": [
+                                    "IN"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 11,
+                    "media": [
+                        {
+                            "id": "cc4cc160-594d-3fd7-aa9d-93085e1e2c57",
+                            "position": 1,
+                            "format": "CD",
+                            "track": [
+                                {
+                                    "id": "8b01be15-7fa6-4723-97df-c3c5e98f160f",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 263986
+                                }
+                            ],
+                            "track-count": 11,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "270558d3-0497-4c8a-a3c8-30f5836de6c6",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 1,
+                    "title": "Best Of Arijit Singh",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "f59b9726-d466-4ab7-9d0f-8bc198105788",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Best Of Arijit Singh",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2013",
+                    "country": "XW",
+                    "release-events": [
+                        {
+                            "date": "2013",
+                            "area": {
+                                "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                                "name": "[Worldwide]",
+                                "sort-name": "[Worldwide]",
+                                "iso-3166-1-codes": [
+                                    "XW"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 12,
+                    "media": [
+                        {
+                            "id": "2784ba71-0123-33b1-a752-4c9ee456929a",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "0f91d51e-2595-4c0d-9a70-abd0e602a1a2",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 262000
+                                }
+                            ],
+                            "track-count": 12,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "52ce59d7-9d12-405a-acbb-1e50970b81bb",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 1,
+                    "title": "Tum Hi Ho",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "f937fcee-17e0-4bb7-b084-633c9a308fb9",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Tum Hi Ho",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2014-01-17",
+                    "country": "IN",
+                    "release-events": [
+                        {
+                            "date": "2014-01-17",
+                            "area": {
+                                "id": "d31a9a15-537f-3669-ad53-25753ddd2772",
+                                "name": "India",
+                                "sort-name": "India",
+                                "iso-3166-1-codes": [
+                                    "IN"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 14,
+                    "media": [
+                        {
+                            "id": "5468f02b-ff7c-3ee7-9b2b-c61e5efe53b2",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "091728de-f57c-4f13-9ddd-a25bba5ddd0d",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 261974
+                                }
+                            ],
+                            "track-count": 14,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "ecbebd00-0bcb-4d6a-978a-ed503e43c7ad",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "72eaea2d-13c9-3006-926b-a7035623c51c",
+                    "count": 1,
+                    "title": "Aashiqui 2",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "joinphrase": ", ",
+                            "name": "Mithoon",
+                            "artist": {
+                                "id": "7f74ac10-e2f0-480a-be9b-82264d2078a9",
+                                "name": "Mithoon",
+                                "sort-name": "Mithoon",
+                                "disambiguation": "Indian composer and playback singer"
+                            }
+                        },
+                        {
+                            "joinphrase": " & ",
+                            "name": "Ankit Tiwari",
+                            "artist": {
+                                "id": "8e94cd02-5047-4885-82fa-7f2b8bb2195f",
+                                "name": "Ankit Tiwari",
+                                "sort-name": "Tiwari, Ankit"
+                            }
+                        },
+                        {
+                            "name": "Jeet Gannguli",
+                            "artist": {
+                                "id": "6397f3be-faee-42e2-a943-4e1c42a4678a",
+                                "name": "Jeet Gannguli",
+                                "sort-name": "Gannguli, Jeet"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b78e86bc-401e-4e8d-8627-2a18c72ee5f3",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Aashiqui 2",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-03",
+                    "country": "XW",
+                    "release-events": [
+                        {
+                            "date": "2013-04-03",
+                            "area": {
+                                "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                                "name": "[Worldwide]",
+                                "sort-name": "[Worldwide]",
+                                "iso-3166-1-codes": [
+                                    "XW"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 11,
+                    "media": [
+                        {
+                            "id": "efee14c0-daa4-35a2-837c-17ede8ce78c7",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "ea3d0ef2-495b-4060-8082-06dbcc96eb37",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 262083
+                                }
+                            ],
+                            "track-count": 11,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "1df4e99d-f24c-48e1-97c7-fca1dfcbc0d5",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "72eaea2d-13c9-3006-926b-a7035623c51c",
+                    "count": 1,
+                    "title": "Aashiqui 2",
+                    "status": "Official",
+                    "disambiguation": "Original Motion Picture Soundtrack",
+                    "artist-credit": [
+                        {
+                            "joinphrase": ", ",
+                            "name": "Mithoon",
+                            "artist": {
+                                "id": "7f74ac10-e2f0-480a-be9b-82264d2078a9",
+                                "name": "Mithoon",
+                                "sort-name": "Mithoon",
+                                "disambiguation": "Indian composer and playback singer"
+                            }
+                        },
+                        {
+                            "joinphrase": " & ",
+                            "name": "Ankit Tiwari",
+                            "artist": {
+                                "id": "8e94cd02-5047-4885-82fa-7f2b8bb2195f",
+                                "name": "Ankit Tiwari",
+                                "sort-name": "Tiwari, Ankit"
+                            }
+                        },
+                        {
+                            "name": "Jeet Gannguli",
+                            "artist": {
+                                "id": "6397f3be-faee-42e2-a943-4e1c42a4678a",
+                                "name": "Jeet Gannguli",
+                                "sort-name": "Gannguli, Jeet"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b78e86bc-401e-4e8d-8627-2a18c72ee5f3",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Aashiqui 2",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-06",
+                    "country": "US",
+                    "release-events": [
+                        {
+                            "date": "2013-04-06",
+                            "area": {
+                                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                                "name": "United States",
+                                "sort-name": "United States",
+                                "iso-3166-1-codes": [
+                                    "US"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 12,
+                    "media": [
+                        {
+                            "id": "33fe1241-e751-3f5a-8310-83d0a2ed0bf6",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "d3a82953-ee2e-401e-9c6e-72d18a88f1b7",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 261974
+                                }
+                            ],
+                            "track-count": 12,
+                            "track-offset": 0
+                        }
+                    ]
+                },
+                {
+                    "id": "0fadf789-a227-4569-bdaa-2a01f52eda73",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 1,
+                    "title": "The Epic Collection",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "843062f8-44ef-454f-81da-edf5c7d01b73",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "The Epic Collection",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2015-09-23",
+                    "country": "XW",
+                    "release-events": [
+                        {
+                            "date": "2015-09-23",
+                            "area": {
+                                "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                                "name": "[Worldwide]",
+                                "sort-name": "[Worldwide]",
+                                "iso-3166-1-codes": [
+                                    "XW"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 28,
+                    "media": [
+                        {
+                            "id": "a2354b5d-6f52-3b3f-bddd-746d5429b6ed",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "fea4a0e8-e270-41e0-8a60-5788b4ea72f9",
+                                    "number": "11",
+                                    "title": "Tum hi ho",
+                                    "length": 262000
+                                }
+                            ],
+                            "track-count": 28,
+                            "track-offset": 10
+                        }
+                    ]
+                },
+                {
+                    "id": "0b237c31-3433-40fd-9708-32344d102b2c",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 1,
+                    "title": "Best Of Arijit Singh",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "f59b9726-d466-4ab7-9d0f-8bc198105788",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Best Of Arijit Singh",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2015",
+                    "country": "IN",
+                    "release-events": [
+                        {
+                            "date": "2015",
+                            "area": {
+                                "id": "d31a9a15-537f-3669-ad53-25753ddd2772",
+                                "name": "India",
+                                "sort-name": "India",
+                                "iso-3166-1-codes": [
+                                    "IN"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 8,
+                    "media": [
+                        {
+                            "id": "415a6cfb-cdff-39b8-a66b-d8acefbdf3dc",
+                            "position": 1,
+                            "format": "CD",
+                            "track": [
+                                {
+                                    "id": "fdf065e9-3885-4143-84e0-f0da42686889",
+                                    "number": "8",
+                                    "title": "Tum Hi Ho",
+                                    "length": 264000
+                                }
+                            ],
+                            "track-count": 8,
+                            "track-offset": 7
+                        }
+                    ]
+                },
+                {
+                    "id": "06075499-8b78-442d-b7b3-54a61f7a77db",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 2,
+                    "title": "Soulful Voice",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "0e5fdc03-0cb1-40e4-bcef-a90dc9e505bb",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Soulful Voice",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2014-04-01",
+                    "country": "IN",
+                    "release-events": [
+                        {
+                            "date": "2014-04-01",
+                            "area": {
+                                "id": "d31a9a15-537f-3669-ad53-25753ddd2772",
+                                "name": "India",
+                                "sort-name": "India",
+                                "iso-3166-1-codes": [
+                                    "IN"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 30,
+                    "media": [
+                        {
+                            "id": "4fb5b578-3be8-3fee-9f0c-a9064777481a",
+                            "position": 1,
+                            "format": "CD",
+                            "track": [
+                                {
+                                    "id": "81a0d415-2e31-479d-98c8-c76e780a211b",
+                                    "number": "1",
+                                    "title": "Tum Hi Ho",
+                                    "length": 264000
+                                }
+                            ],
+                            "track-count": 15,
+                            "track-offset": 0
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "INS181303031",
+                "USLZJ1609963"
+            ],
+            "tags": [
+                {
+                    "count": 1,
+                    "name": "soundtrack"
+                },
+                {
+                    "count": 1,
+                    "name": "soul"
+                },
+                {
+                    "count": 1,
+                    "name": "movie soundtrack"
+                }
+            ]
+        },
+        {
+            "id": "eddb92e6-68a5-4194-8077-4bec68b8c10b",
+            "score": 100,
+            "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+            "title": "Tum hi ho",
+            "length": 263986,
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "Arijit Singh",
+                    "artist": {
+                        "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                        "name": "Arijit Singh",
+                        "sort-name": "Singh, Arijit",
+                        "disambiguation": "Indian singer",
+                        "aliases": [
+                            {
+                                "sort-name": "Arjit Singh",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "Arjit Singh",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2018",
+            "releases": [
+                {
+                    "id": "0437e2d3-9a31-4a73-bfbd-bea6eb8d979d",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 2,
+                    "title": "Soulful Voice, Arijit Singh, Vol. 4",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b1ec3b56-219b-4a17-82f6-af169386e418",
+                        "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Soulful Voice, Arijit Singh, Vol. 4",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2018",
+                    "country": "IN",
+                    "release-events": [
+                        {
+                            "date": "2018",
+                            "area": {
+                                "id": "d31a9a15-537f-3669-ad53-25753ddd2772",
+                                "name": "India",
+                                "sort-name": "India",
+                                "iso-3166-1-codes": [
+                                    "IN"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 28,
+                    "media": [
+                        {
+                            "id": "de507723-ad56-303b-b50e-76f82428e587",
+                            "position": 1,
+                            "format": "CD",
+                            "track": [
+                                {
+                                    "id": "6b2a3734-4c38-4eb1-a562-998ffd96070d",
+                                    "number": "13",
+                                    "title": "Tum hi ho",
+                                    "length": 263986
+                                }
+                            ],
+                            "track-count": 14,
+                            "track-offset": 12
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "id": "bfc4e608-b1b9-4ff9-b2c8-076a8bf58f6c",
+            "score": 93,
+            "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+            "title": "Tum Hi Ho (Remix)",
+            "length": 237075,
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "Arijit Singh",
+                    "artist": {
+                        "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                        "name": "Arijit Singh",
+                        "sort-name": "Singh, Arijit",
+                        "disambiguation": "Indian singer",
+                        "aliases": [
+                            {
+                                "sort-name": "Arjit Singh",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "Arjit Singh",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2013-04-03",
+            "releases": [
+                {
+                    "id": "1df4e99d-f24c-48e1-97c7-fca1dfcbc0d5",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "72eaea2d-13c9-3006-926b-a7035623c51c",
+                    "count": 1,
+                    "title": "Aashiqui 2",
+                    "status": "Official",
+                    "disambiguation": "Original Motion Picture Soundtrack",
+                    "artist-credit": [
+                        {
+                            "joinphrase": ", ",
+                            "name": "Mithoon",
+                            "artist": {
+                                "id": "7f74ac10-e2f0-480a-be9b-82264d2078a9",
+                                "name": "Mithoon",
+                                "sort-name": "Mithoon",
+                                "disambiguation": "Indian composer and playback singer"
+                            }
+                        },
+                        {
+                            "joinphrase": " & ",
+                            "name": "Ankit Tiwari",
+                            "artist": {
+                                "id": "8e94cd02-5047-4885-82fa-7f2b8bb2195f",
+                                "name": "Ankit Tiwari",
+                                "sort-name": "Tiwari, Ankit"
+                            }
+                        },
+                        {
+                            "name": "Jeet Gannguli",
+                            "artist": {
+                                "id": "6397f3be-faee-42e2-a943-4e1c42a4678a",
+                                "name": "Jeet Gannguli",
+                                "sort-name": "Gannguli, Jeet"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b78e86bc-401e-4e8d-8627-2a18c72ee5f3",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Aashiqui 2",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-06",
+                    "country": "US",
+                    "release-events": [
+                        {
+                            "date": "2013-04-06",
+                            "area": {
+                                "id": "489ce91b-6658-3307-9877-795b68554c98",
+                                "name": "United States",
+                                "sort-name": "United States",
+                                "iso-3166-1-codes": [
+                                    "US"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 12,
+                    "media": [
+                        {
+                            "id": "33fe1241-e751-3f5a-8310-83d0a2ed0bf6",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "594b6be2-50a8-4940-8fe5-081a572dfac7",
+                                    "number": "12",
+                                    "title": "Tum Hi Ho (Remix)",
+                                    "length": 237337
+                                }
+                            ],
+                            "track-count": 12,
+                            "track-offset": 11
+                        }
+                    ]
+                },
+                {
+                    "id": "ecbebd00-0bcb-4d6a-978a-ed503e43c7ad",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "72eaea2d-13c9-3006-926b-a7035623c51c",
+                    "count": 1,
+                    "title": "Aashiqui 2",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "joinphrase": ", ",
+                            "name": "Mithoon",
+                            "artist": {
+                                "id": "7f74ac10-e2f0-480a-be9b-82264d2078a9",
+                                "name": "Mithoon",
+                                "sort-name": "Mithoon",
+                                "disambiguation": "Indian composer and playback singer"
+                            }
+                        },
+                        {
+                            "joinphrase": " & ",
+                            "name": "Ankit Tiwari",
+                            "artist": {
+                                "id": "8e94cd02-5047-4885-82fa-7f2b8bb2195f",
+                                "name": "Ankit Tiwari",
+                                "sort-name": "Tiwari, Ankit"
+                            }
+                        },
+                        {
+                            "name": "Jeet Gannguli",
+                            "artist": {
+                                "id": "6397f3be-faee-42e2-a943-4e1c42a4678a",
+                                "name": "Jeet Gannguli",
+                                "sort-name": "Gannguli, Jeet"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "b78e86bc-401e-4e8d-8627-2a18c72ee5f3",
+                        "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+                        "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+                        "title": "Aashiqui 2",
+                        "primary-type": "Album",
+                        "secondary-types": [
+                            "Soundtrack"
+                        ],
+                        "secondary-type-ids": [
+                            "22a628ad-c082-3c4f-b1b6-d41665107b88"
+                        ]
+                    },
+                    "date": "2013-04-03",
+                    "country": "XW",
+                    "release-events": [
+                        {
+                            "date": "2013-04-03",
+                            "area": {
+                                "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                                "name": "[Worldwide]",
+                                "sort-name": "[Worldwide]",
+                                "iso-3166-1-codes": [
+                                    "XW"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 11,
+                    "media": [
+                        {
+                            "id": "efee14c0-daa4-35a2-837c-17ede8ce78c7",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "0a9d0187-5b65-4183-a85e-141de56abde5",
+                                    "number": "11",
+                                    "title": "Tum Hi Ho (Remix)",
+                                    "length": 237075
+                                }
+                            ],
+                            "track-count": 11,
+                            "track-offset": 10
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "INS181303860"
+            ]
+        },
+        {
+            "id": "971502c7-905b-48e7-8274-7aa11d9718ae",
+            "score": 84,
+            "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+            "title": "Tum Hi Ho (From \u201cAashiqui 2\u201d)",
+            "length": 261974,
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "Arijit Singh",
+                    "artist": {
+                        "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                        "name": "Arijit Singh",
+                        "sort-name": "Singh, Arijit",
+                        "disambiguation": "Indian singer",
+                        "aliases": [
+                            {
+                                "sort-name": "Arjit Singh",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "Arjit Singh",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2024-11-05",
+            "releases": [
+                {
+                    "id": "3e063d04-3ce6-42f3-af59-2725af2d4c9d",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 1,
+                    "title": "Arijit\u2019s Aura",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "a4bd61ea-eadb-4f68-b552-482490462b2a",
+                        "title": "Arijit\u2019s Aura",
+                        "secondary-types": [
+                            "Compilation"
+                        ],
+                        "secondary-type-ids": [
+                            "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+                        ]
+                    },
+                    "date": "2024-11-05",
+                    "country": "XW",
+                    "release-events": [
+                        {
+                            "date": "2024-11-05",
+                            "area": {
+                                "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+                                "name": "[Worldwide]",
+                                "sort-name": "[Worldwide]",
+                                "iso-3166-1-codes": [
+                                    "XW"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 50,
+                    "media": [
+                        {
+                            "id": "8b182e40-a68b-34f4-ab26-1db29935bf18",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "82f626b9-ec69-4571-9ff7-d7799de4cf77",
+                                    "number": "4",
+                                    "title": "Tum Hi Ho (From \u201cAashiqui 2\u201d)",
+                                    "length": 261974
+                                }
+                            ],
+                            "track-count": 50,
+                            "track-offset": 3
+                        }
+                    ]
+                }
+            ],
+            "isrcs": [
+                "INS181303031"
+            ]
+        },
+        {
+            "id": "6e69ab88-8c9c-4720-a315-97be84cbd4dd",
+            "score": 84,
+            "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+            "title": "Tum Hi Ho (MTV Unplugged Version)",
+            "length": 604000,
+            "video": null,
+            "artist-credit": [
+                {
+                    "name": "Arijit Singh",
+                    "artist": {
+                        "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                        "name": "Arijit Singh",
+                        "sort-name": "Singh, Arijit",
+                        "disambiguation": "Indian singer",
+                        "aliases": [
+                            {
+                                "sort-name": "Arjit Singh",
+                                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                                "name": "Arjit Singh",
+                                "locale": null,
+                                "type": "Search hint",
+                                "primary": null,
+                                "begin-date": null,
+                                "end-date": null
+                            }
+                        ]
+                    }
+                }
+            ],
+            "first-release-date": "2013-12-01",
+            "releases": [
+                {
+                    "id": "3ebe4e40-6fe7-487a-8fa8-0b98ea5d3a84",
+                    "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+                    "artist-credit-id": "e2ea751b-b063-33b5-9d36-93da81be61b7",
+                    "count": 1,
+                    "title": "MTV Unplugged - Arijit Singh",
+                    "status": "Official",
+                    "artist-credit": [
+                        {
+                            "name": "Arijit Singh",
+                            "artist": {
+                                "id": "ed3f4831-e3e0-4dc0-9381-f5649e9df221",
+                                "name": "Arijit Singh",
+                                "sort-name": "Singh, Arijit",
+                                "disambiguation": "Indian singer"
+                            }
+                        }
+                    ],
+                    "release-group": {
+                        "id": "903c8711-aa2d-4a77-a852-a0bc0bb7a9e9",
+                        "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                        "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+                        "title": "MTV Unplugged - Arijit Singh",
+                        "primary-type": "EP"
+                    },
+                    "date": "2013-12-01",
+                    "country": "LK",
+                    "release-events": [
+                        {
+                            "date": "2013-12-01",
+                            "area": {
+                                "id": "6e2d562d-a754-3036-8484-7ac576606e27",
+                                "name": "Sri Lanka",
+                                "sort-name": "Sri Lanka",
+                                "iso-3166-1-codes": [
+                                    "LK"
+                                ]
+                            }
+                        }
+                    ],
+                    "track-count": 5,
+                    "media": [
+                        {
+                            "id": "b7e7eab9-4f88-33cc-b0dc-a9f52a8e1ac9",
+                            "position": 1,
+                            "format": "Digital Media",
+                            "track": [
+                                {
+                                    "id": "b5b9b31b-4bb5-43e2-9924-c5d5e8a05a5e",
+                                    "number": "5",
+                                    "title": "Tum Hi Ho (MTV Unplugged Version)",
+                                    "length": 604000
+                                }
+                            ],
+                            "track-count": 5,
+                            "track-offset": 4
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

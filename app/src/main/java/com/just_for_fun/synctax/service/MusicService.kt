@@ -15,6 +15,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.core.data.preferences.WidgetPreferences
 import com.just_for_fun.synctax.widget.MusicWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +45,8 @@ class MusicService : Service() {
     private var isPlaying = false
     private var currentPosition = 0L
     private var duration = 0L
+    
+    private val widgetPreferences by lazy { WidgetPreferences(this) }
     
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
@@ -75,6 +78,7 @@ class MusicService : Service() {
         const val ACTION_PAUSE = "ACTION_PAUSE"
         const val ACTION_NEXT = "ACTION_NEXT"
         const val ACTION_PREVIOUS = "ACTION_PREVIOUS"
+        const val ACTION_SHUFFLE = "ACTION_SHUFFLE"
         const val ACTION_STOP = "ACTION_STOP"
         const val ACTION_SEEK_TO = "ACTION_SEEK_TO"
     }
@@ -96,6 +100,7 @@ class MusicService : Service() {
             ACTION_PAUSE -> onPause()
             ACTION_NEXT -> onNext()
             ACTION_PREVIOUS -> onPrevious()
+            ACTION_SHUFFLE -> onShuffle()
             ACTION_STOP -> onStop()
         }
         return START_STICKY
@@ -258,7 +263,9 @@ class MusicService : Service() {
                 null
             }
         }
-    }    fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long) {
+    }
+
+    fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long, lyrics: String? = null) {
         // Request audio focus when starting playback
         if (isPlaying && !this.isPlaying) {
             if (!requestAudioFocus()) {
@@ -286,16 +293,30 @@ class MusicService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
 
+        // Save state to WidgetPreferences for widget access
+        widgetPreferences.savePlaybackState(
+            songTitle = song?.title,
+            songArtist = song?.artist,
+            songAlbum = song?.album,
+            albumArtUri = song?.albumArtUri,
+            isPlaying = isPlaying,
+            position = position,
+            duration = duration,
+            shuffleOn = false
+        )
+
         // Update widget
         MusicWidgetProvider.updateWidget(
             context = this,
             songTitle = song?.title,
             songArtist = song?.artist,
+            songAlbum = song?.album,
             albumArtUri = song?.albumArtUri,
             isPlaying = isPlaying,
             position = position,
             duration = duration,
-            shuffleOn = false // You can pass the actual shuffle state if available
+            shuffleOn = false,
+            lyrics = lyrics
         )
     }
 
@@ -314,6 +335,10 @@ class MusicService : Service() {
 
     private fun onPrevious() {
         sendBroadcast(Intent(ACTION_PREVIOUS))
+    }
+
+    private fun onShuffle() {
+        sendBroadcast(Intent(ACTION_SHUFFLE))
     }
 
     private fun onStop() {

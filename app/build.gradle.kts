@@ -93,7 +93,7 @@ dependencies {
 
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")
-    
+
     // Palette for extracting colors from images
     implementation("androidx.palette:palette-ktx:1.0.0")
 
@@ -126,10 +126,13 @@ dependencies {
 
     // Progress bar dependency
     implementation("ir.mahozad.multiplatform:wavy-slider:2.2.0")
-    
+
     // Retrofit for API calls (LRCLIB lyrics API)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Liquid library for shader effects
+    implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
 }

@@ -11,16 +11,18 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.RemoteViews
 import com.just_for_fun.synctax.MainActivity
 import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.service.MusicService
+import com.just_for_fun.synctax.core.data.preferences.WidgetPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.    net.HttpURLConnection
+import java.net.HttpURLConnection
 import java.net.URL
 
 class MusicWidgetProvider : AppWidgetProvider() {
@@ -33,11 +35,14 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
         const val EXTRA_SONG_TITLE = "extra_song_title"
         const val EXTRA_SONG_ARTIST = "extra_song_artist"
+        const val EXTRA_SONG_ALBUM = "extra_song_album"
         const val EXTRA_SONG_ALBUM_ART = "extra_song_album_art"
         const val EXTRA_IS_PLAYING = "extra_is_playing"
         const val EXTRA_POSITION = "extra_position"
         const val EXTRA_DURATION = "extra_duration"
         const val EXTRA_SHUFFLE_ON = "extra_shuffle_on"
+        const val EXTRA_IS_ONLINE = "extra_is_online"
+        const val EXTRA_LYRICS = "extra_lyrics"
 
         private val widgetScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -45,29 +50,48 @@ class MusicWidgetProvider : AppWidgetProvider() {
             context: Context,
             songTitle: String?,
             songArtist: String?,
+            songAlbum: String?,
             albumArtUri: String?,
             isPlaying: Boolean,
             position: Long,
             duration: Long,
-            shuffleOn: Boolean
+            shuffleOn: Boolean,
+            lyrics: String? = null
         ) {
             val appWidgetManager = AppWidgetManager.getInstance(context)
             val componentName = ComponentName(context, MusicWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+
+            val isOnline = albumArtUri?.startsWith("http") == true || songTitle?.startsWith("http") == true
 
             val intent = Intent(context, MusicWidgetProvider::class.java).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
                 putExtra(EXTRA_SONG_TITLE, songTitle)
                 putExtra(EXTRA_SONG_ARTIST, songArtist)
+                putExtra(EXTRA_SONG_ALBUM, songAlbum)
                 putExtra(EXTRA_SONG_ALBUM_ART, albumArtUri)
                 putExtra(EXTRA_IS_PLAYING, isPlaying)
                 putExtra(EXTRA_POSITION, position)
                 putExtra(EXTRA_DURATION, duration)
                 putExtra(EXTRA_SHUFFLE_ON, shuffleOn)
+                putExtra(EXTRA_IS_ONLINE, isOnline)
+                putExtra(EXTRA_LYRICS, lyrics)
             }
 
             context.sendBroadcast(intent)
+
+            // Also update MusicInfoWidgetProvider
+            val intent2 = Intent(context, MusicInfoWidgetProvider::class.java).apply {
+                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                putExtra(EXTRA_SONG_TITLE, songTitle)
+                putExtra(EXTRA_SONG_ARTIST, songArtist)
+                putExtra(EXTRA_SONG_ALBUM, songAlbum)
+                putExtra(EXTRA_SONG_ALBUM_ART, albumArtUri)
+                putExtra(EXTRA_IS_ONLINE, isOnline)
+            }
+
+            context.sendBroadcast(intent2)
         }
     }
 
@@ -76,18 +100,21 @@ class MusicWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
+        val widgetPrefs = WidgetPreferences(context)
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(
                 context,
                 appWidgetManager,
                 appWidgetId,
-                "",
-                "",
-                null,
-                false,
-                0L,
-                0L,
-                false
+                widgetPrefs.getSongTitle(),
+                widgetPrefs.getSongArtist(),
+                widgetPrefs.getSongAlbum(),
+                widgetPrefs.getAlbumArtUri(),
+                widgetPrefs.isPlaying(),
+                widgetPrefs.getPosition(),
+                widgetPrefs.getDuration(),
+                widgetPrefs.isShuffleOn(),
+                widgetPrefs.getAlbumArtUri()?.startsWith("http") == true || widgetPrefs.getSongTitle().startsWith("http")
             )
         }
     }
@@ -100,7 +127,23 @@ class MusicWidgetProvider : AppWidgetProvider() {
     ) {
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
         // Widget was resized, update with new layout
-        updateAppWidget(context, appWidgetManager, appWidgetId, "", "", null, false, 0L, 0L, false)
+        // We don't have the current state here, so we might need to persist it or wait for next update
+        // For now, just re-apply default state to switch layout
+        val widgetPrefs = WidgetPreferences(context)
+        updateAppWidget(
+            context, 
+            appWidgetManager, 
+            appWidgetId, 
+            widgetPrefs.getSongTitle(),
+            widgetPrefs.getSongArtist(),
+            widgetPrefs.getSongAlbum(),
+            widgetPrefs.getAlbumArtUri(),
+            widgetPrefs.isPlaying(),
+            widgetPrefs.getPosition(),
+            widgetPrefs.getDuration(),
+            widgetPrefs.isShuffleOn(),
+            widgetPrefs.getAlbumArtUri()?.startsWith("http") == true || widgetPrefs.getSongTitle().startsWith("http")
+        )
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -108,8 +151,12 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
         when (intent.action) {
             ACTION_PLAY_PAUSE -> {
+                val widgetPrefs = WidgetPreferences(context)
+                val isCurrentlyPlaying = widgetPrefs.isPlaying()
+                
+                val action = if (isCurrentlyPlaying) MusicService.ACTION_PAUSE else MusicService.ACTION_PLAY
                 val serviceIntent = Intent(context, MusicService::class.java).apply {
-                    action = MusicService.ACTION_PLAY
+                    this.action = action
                 }
                 context.startService(serviceIntent)
             }
@@ -126,7 +173,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 context.startService(serviceIntent)
             }
             ACTION_SHUFFLE -> {
-                // Handle shuffle action
+                val serviceIntent = Intent(context, MusicService::class.java).apply {
+                    action = MusicService.ACTION_SHUFFLE
+                }
+                context.startService(serviceIntent)
             }
             AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -135,11 +185,14 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
                 val songTitle = intent.getStringExtra(EXTRA_SONG_TITLE)
                 val songArtist = intent.getStringExtra(EXTRA_SONG_ARTIST)
+                val songAlbum = intent.getStringExtra(EXTRA_SONG_ALBUM)
                 val albumArtUri = intent.getStringExtra(EXTRA_SONG_ALBUM_ART)
                 val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
                 val position = intent.getLongExtra(EXTRA_POSITION, 0L)
                 val duration = intent.getLongExtra(EXTRA_DURATION, 0L)
                 val shuffleOn = intent.getBooleanExtra(EXTRA_SHUFFLE_ON, false)
+                val isOnline = intent.getBooleanExtra(EXTRA_IS_ONLINE, false)
+                val lyrics = intent.getStringExtra(EXTRA_LYRICS)
 
                 for (appWidgetId in appWidgetIds) {
                     updateAppWidget(
@@ -148,11 +201,14 @@ class MusicWidgetProvider : AppWidgetProvider() {
                         appWidgetId,
                         songTitle ?: "",
                         songArtist ?: "",
+                        songAlbum ?: "",
                         albumArtUri,
                         isPlaying,
                         position,
                         duration,
-                        shuffleOn
+                        shuffleOn,
+                        isOnline,
+                        lyrics
                     )
                 }
             }
@@ -169,14 +225,27 @@ class MusicWidgetProvider : AppWidgetProvider() {
             val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
             val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
 
-            // Choose layout based on size
+            // Breakpoints (approximate dp values)
+            // Cells: 1x1 ~ 60x60, 2x2 ~ 130x130, 4x1 ~ 270x60, 4x2 ~ 270x130, 4x4 ~ 270x270
+
             return when {
-                width < 150 || height < 80 -> R.layout.widget_music_small
-                height < 120 -> R.layout.widget_music_medium
-                else -> R.layout.widget_music_circular // Large layout
+                // Big Widget (4x4+) -> Lyrics support
+                width >= 300 && height >= 250 -> R.layout.widget_music_big
+                
+                // Large Widget -> Album art focus
+                width >= 250 && height >= 150 -> R.layout.widget_music_large
+                
+                // Circular Widget (2x2 approx) -> Circular design
+                width in 110..200 && height in 110..200 -> R.layout.widget_music_circular
+                
+                // Large Widget -> Album art focus (replaces medium)
+                width >= 200 && height >= 100 -> R.layout.widget_music_large
+                
+                // Small Widget (4x1 or smaller) -> Minimal
+                else -> R.layout.widget_music_small
             }
         }
-        return R.layout.widget_music_medium // Default
+        return R.layout.widget_music_large // Default
     }
 
     private fun updateAppWidget(
@@ -185,11 +254,14 @@ class MusicWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int,
         songTitle: String,
         songArtist: String,
+        songAlbum: String,
         albumArtUri: String?,
         isPlaying: Boolean,
         position: Long,
         duration: Long,
-        shuffleOn: Boolean
+        shuffleOn: Boolean,
+        isOnline: Boolean,
+        lyrics: String? = null
     ) {
         try {
             // Get appropriate layout based on widget size
@@ -224,6 +296,32 @@ class MusicWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_song_title, displayTitle)
             views.setTextViewText(R.id.widget_artist, displayArtist)
 
+            // Update Album Name (if view exists)
+            try {
+                if (isOnline) {
+                    views.setTextViewText(R.id.widget_album, "") // Hide album for online songs
+                } else {
+                    views.setTextViewText(R.id.widget_album, songAlbum)
+                }
+            } catch (e: Exception) {
+                // View might not exist
+            }
+
+            // Update Lyrics Placeholder (if view exists)
+            try {
+                if (lyrics != null && lyrics.isNotEmpty()) {
+                    views.setTextViewText(R.id.widget_lyrics, lyrics)
+                } else if (isOnline) {
+                     views.setTextViewText(R.id.widget_lyrics, "") // Blank space for online
+                } else {
+                    // Placeholder for lyrics as requested
+                    // In a real app, we would fetch lyrics from DB or API here
+                    views.setTextViewText(R.id.widget_lyrics, "Lyrics not available for this song.\n\n(Lyrics feature coming soon)")
+                }
+            } catch (e: Exception) {
+                // View might not exist
+            }
+
             // Update progress
             val progress = if (duration > 0) {
                 ((position.toFloat() / duration.toFloat()) * 100).toInt().coerceIn(0, 100)
@@ -242,9 +340,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             // Update play/pause icon
             val playPauseIcon = if (isPlaying) {
-                android.R.drawable.ic_media_pause
+                R.drawable.ic_pause
             } else {
-                android.R.drawable.ic_media_play
+                R.drawable.ic_play
             }
             views.setImageViewResource(R.id.widget_play_pause, playPauseIcon)
 
@@ -313,15 +411,15 @@ class MusicWidgetProvider : AppWidgetProvider() {
             // Button doesn't exist in this layout
         }
 
-        // Equalizer (if exists)
+        // Shuffle (if exists)
         try {
-            val equalizerIntent = Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            val shuffleIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+                action = ACTION_SHUFFLE
             }
             views.setOnClickPendingIntent(
                 R.id.widget_equalizer,
-                PendingIntent.getActivity(
-                    context, 5, equalizerIntent,
+                PendingIntent.getBroadcast(
+                    context, 4, shuffleIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )

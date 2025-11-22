@@ -45,7 +45,8 @@
 
         <receiver
             android:name=".widget.MusicWidgetProvider"
-            android:exported="true">
+            android:exported="true"
+            android:label="Music Player">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.just_for_fun.synctax.ACTION_PLAY_PAUSE" />
@@ -55,7 +56,19 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
+                android:resource="@xml/widget_music_metadata" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MusicInfoWidgetProvider"
+            android:exported="true"
+            android:label="Music Info">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_metadata" />
         </receiver>
     </application>
 

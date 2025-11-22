@@ -47,11 +47,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.core.network.LrcLibResponse
 import kotlin.math.max
+import io.github.fletchmckee.liquid.rememberLiquidState
+import io.github.fletchmckee.liquid.liquid
 
 @Composable
 fun LyricsOverlay(
@@ -67,7 +72,8 @@ fun LyricsOverlay(
     hasFailedFetch: Boolean = false,
     searchResults: List<LrcLibResponse> = emptyList(),
     onSelectLyrics: (Int) -> Unit = {},
-    hasSearchResults: Boolean = false
+    hasSearchResults: Boolean = false,
+    liquidState: io.github.fletchmckee.liquid.LiquidState
 ) {
 
     BackHandler {
@@ -80,9 +86,17 @@ fun LyricsOverlay(
     val customArtistName = remember { mutableStateOf(song.artist) }
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
-        // Blending the dark base with the faded song color for the background
-        color = Color.Black.copy(alpha = 0.9f).compositeOver(songDominantColor.copy(alpha = 0.1f))
+        modifier = Modifier
+            .fillMaxSize()
+            .liquid(liquidState)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { change: PointerInputChange, dragAmount: Float ->
+                    if (dragAmount > 100f) { // Swipe down threshold
+                        onDismiss()
+                    }
+                }
+            },
+        color = Color.Black.copy(alpha = 0.7f).compositeOver(songDominantColor.copy(alpha = 0.1f))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Bar with Back Button (Material 3 style)

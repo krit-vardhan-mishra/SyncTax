@@ -132,7 +132,8 @@ fun HomeScreen(
                     showProfileButton = true,
                     onShuffleClick = {
                         if (uiState.allSongs.isNotEmpty()) {
-                            playerViewModel.shufflePlay(uiState.allSongs)
+                            // Use smart shuffle with recommendations on Home screen
+                            playerViewModel.shufflePlayWithRecommendations(uiState.allSongs)
                         }
                     },
                     onRefreshClick = { homeViewModel.scanMusic() },
@@ -283,14 +284,10 @@ fun HomeScreen(
 
                                 // Speed Dial Section
                                 item {
-                                    val excludedIds = uiState.quickPicks.map { it.id }.toSet()
-                                    val speedDialSongs = remember(uiState.allSongs, excludedIds) {
-                                        uiState.allSongs.filter { it.id !in excludedIds }.shuffled().take(9)
-                                    }
                                     SpeedDialSection(
-                                        songs = speedDialSongs,
+                                        songs = uiState.speedDialSongs,
                                         onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.allSongs)
+                                            playerViewModel.playSong(song, uiState.speedDialSongs)
                                         },
                                         userInitial = userInitial,
                                         currentSong = playerState.currentSong
@@ -309,18 +306,34 @@ fun HomeScreen(
                                     )
                                 }
 
-                                items(sortedSongs, key = { it.id }) { song ->
-                                    AnimatedVisibility(
-                                        visible = true,
-                                        enter = fadeIn(animationSpec = tween(400)) +
-                                                expandVertically(animationSpec = tween(400))
-                                    ) {
-                                        SongCard(
-                                            song = song,
-                                            onClick = {
-                                                playerViewModel.playSong(song, uiState.allSongs)
-                                            }
-                                        )
+                                // Show limited songs initially for better performance
+                                val displaySongs = remember(sortedSongs) {
+                                    if (sortedSongs.size > 50) sortedSongs.take(50) else sortedSongs
+                                }
+                                
+                                items(
+                                    items = displaySongs,
+                                    key = { song -> song.id }
+                                ) { song ->
+                                    SongCard(
+                                        song = song,
+                                        onClick = {
+                                            playerViewModel.playSong(song, uiState.allSongs)
+                                        }
+                                    )
+                                }
+                                
+                                // Show "View All" button if there are more songs
+                                if (sortedSongs.size > 50) {
+                                    item {
+                                        Button(
+                                            onClick = { onNavigateToLibrary() },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                        ) {
+                                            Text("View All ${sortedSongs.size} Songs")
+                                        }
                                     }
                                 }
 
@@ -340,9 +353,9 @@ fun HomeScreen(
 
                                 item {
                                     QuickAccessGrid(
-                                        songs = uiState.allSongs,
+                                        songs = uiState.quickAccessSongs,
                                         onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.allSongs)
+                                            playerViewModel.playSong(song, uiState.quickAccessSongs)
                                         },
                                         currentSong = playerState.currentSong
                                     )

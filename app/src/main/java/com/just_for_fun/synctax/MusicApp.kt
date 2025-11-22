@@ -154,7 +154,6 @@ fun MusicApp(userPreferences: UserPreferences) {
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel,
                             userPreferences = userPreferences,
-                            onSearchClick = { navController.navigate("search") },
                             onNavigateToArtist = { artist, songs ->
                                 // Store in ViewModel temporarily
                                 homeViewModel.setSelectedArtist(artist, songs)
@@ -164,7 +163,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 // Store in ViewModel temporarily
                                 homeViewModel.setSelectedAlbum(album, artist, songs)
                                 navController.navigate("album/$album")
-                            }
+                            },
+                            onOpenSettings = { navController.navigate("settings") },
+                            onTrainClick = { navController.navigate("train") }
                         )
                     }
                     composable("quick_picks") {

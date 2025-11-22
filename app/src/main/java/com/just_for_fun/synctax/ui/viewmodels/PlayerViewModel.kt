@@ -12,6 +12,7 @@ import android.os.Environment
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
@@ -39,7 +40,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val repository = MusicRepository(application)
     private val player = MusicPlayer(application)
-    private val playbackCollector = PlaybackCollector(repository, player)
     private val playerPreferences = PlayerPreferences(application)
     private val chunkedStreamManager = ChunkedStreamManager(application)
     private val audioManager = application.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -47,8 +47,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val recommendationManager = MusicRecommendationManager(application)
     private val queueManager = QueueManager(application, repository, recommendationManager)
     
+    // PlaybackCollector with cache invalidation callback
+    private val playbackCollector = PlaybackCollector(
+        repository = repository,
+        player = player,
+        onPlaybackRecorded = {
+            // Invalidate Quick Picks cache when new playback is recorded
+            recommendationManager.invalidateQuickPicksCache()
+        }
+    )
+        
     // Track if we're currently handling song end to prevent multiple triggers
     private var isHandlingSongEnd = false
+    private var currentLyrics: String? = null
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -88,6 +99,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 MusicService.ACTION_NEXT -> next()
                 MusicService.ACTION_PREVIOUS -> previous()
+                MusicService.ACTION_SHUFFLE -> toggleShuffle()
                 MusicService.ACTION_STOP -> {
                     // Stop playback completely and clear song state
                     viewModelScope.launch {
@@ -101,7 +113,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
 
                     // Update notification and stop the foreground service
-                    musicService?.updatePlaybackState(null, false, 0L, 0L)
+                    musicService?.updatePlaybackState(null, false, 0L, 0L, null)
 
                     // Stop the service hosting playback
                     try {
@@ -130,6 +142,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             addAction(MusicService.ACTION_PAUSE)
             addAction(MusicService.ACTION_NEXT)
             addAction(MusicService.ACTION_PREVIOUS)
+            addAction(MusicService.ACTION_SHUFFLE)
             addAction(MusicService.ACTION_STOP)
             addAction(MusicService.ACTION_SEEK_TO)
         }
@@ -474,7 +487,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.value.currentSong,
                     false,
                     _uiState.value.position,
-                    _uiState.value.duration
+                    _uiState.value.duration,
+                    currentLyrics
                 )
                 PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(false))
             } else {
@@ -489,7 +503,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.value.currentSong,
                     true,
                     _uiState.value.position,
-                    _uiState.value.duration
+                    _uiState.value.duration,
+                    currentLyrics
                 )
                 PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(true))
             }
@@ -650,6 +665,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(repeatEnabled = enabled)
     }
 
+    /**
+     * Shuffle play with random shuffle (for Library screen)
+     */
     fun shufflePlay(playlist: List<Song>) {
         viewModelScope.launch {
             if (playlist.isEmpty()) return@launch
@@ -660,6 +678,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Start playing from the first song in shuffled list
             _uiState.value = _uiState.value.copy(shuffleEnabled = true)
             playSong(shuffledPlaylist[0], shuffledPlaylist)
+        }
+    }
+
+    /**
+     * Smart shuffle play based on recommendations (for Home screen)
+     */
+    fun shufflePlayWithRecommendations(playlist: List<Song>) {
+        viewModelScope.launch {
+            if (playlist.isEmpty()) return@launch
+
+            // Use smart shuffle with recommendations
+            queueManager.shuffleWithRecommendations(playlist)
+
+            val queueState = queueManager.queueState.value
+            val firstSong = queueState.currentPlaylist.firstOrNull()
+
+            if (firstSong != null) {
+                _uiState.value = _uiState.value.copy(shuffleEnabled = true)
+                playSong(firstSong, queueState.currentPlaylist)
+            }
         }
     }
 
@@ -980,7 +1018,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.value.currentSong,
             _uiState.value.isPlaying,
             _uiState.value.position,
-            _uiState.value.duration
+            _uiState.value.duration,
+            currentLyrics
         )
     }
 
@@ -998,10 +1037,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         player.release()
     }
 
-    /**
-     * Get current queue state for UI
-     */
-    fun getQueueState() = queueManager.queueState
+    fun setCurrentLyrics(lyrics: String?) {
+        currentLyrics = lyrics
+    }
 }
 
 data class PlayerUiState(
@@ -1017,5 +1055,5 @@ data class PlayerUiState(
     val downloadedSongs: Set<String> = emptySet(),
     val downloadingSongs: Set<String> = emptySet(),
     val downloadProgress: Map<String, Float> = emptyMap(), // songId to progress (0.0 to 1.0)
-    val downloadMessage: String? = null // Download location message for snackbar
+        val downloadMessage: String? = null // Download location message for snackbar
 )

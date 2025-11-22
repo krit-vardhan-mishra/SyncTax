@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.collect
  */
 class PlaybackCollector(
     private val repository: MusicRepository,
-    private val player: MusicPlayer
+    private val player: MusicPlayer,
+    private val onPlaybackRecorded: (() -> Unit)? = null
 ) {
 
     private var collectJob: Job? = null
@@ -59,6 +60,8 @@ class PlaybackCollector(
                 completionRate = completionRate,
                 skipped = skipped
             )
+            // Notify that playback was recorded (to invalidate cache)
+            onPlaybackRecorded?.invoke()
         }
     }
 }

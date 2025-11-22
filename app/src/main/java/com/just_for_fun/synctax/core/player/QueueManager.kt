@@ -246,6 +246,7 @@ class QueueManager(
 
     /**
      * Shuffle the queue, keeping current song at the front
+     * This is simple random shuffle
      */
     fun shuffle() {
         val state = _queueState.value
@@ -263,6 +264,54 @@ class QueueManager(
             currentPlaylist = shuffledPlaylist,
             currentIndex = 0
         )
+    }
+
+    /**
+     * Smart shuffle based on user recommendations
+     * Interleaves recommended songs with others for better discovery
+     */
+    suspend fun shuffleWithRecommendations(songs: List<Song>) {
+        try {
+            // Get recommendations
+            val recommendations = recommendationManager.generateQuickPicks(50)
+            val recommendedIds = recommendations.recommendations.map { it.songId }.toSet()
+            
+            // Split into recommended and others
+            val recommended = songs.filter { it.id in recommendedIds }
+            val others = songs.filter { it.id !in recommendedIds }
+            
+            // Shuffle each group
+            val shuffledRecommended = recommended.shuffled()
+            val shuffledOthers = others.shuffled()
+            
+            // Interleave: 2 recommended songs, then 1 other song
+            val shuffledPlaylist = mutableListOf<Song>()
+            var recIndex = 0
+            var othIndex = 0
+            
+            while (recIndex < shuffledRecommended.size || othIndex < shuffledOthers.size) {
+                // Add up to 2 recommended songs
+                repeat(2) {
+                    if (recIndex < shuffledRecommended.size) {
+                        shuffledPlaylist.add(shuffledRecommended[recIndex++])
+                    }
+                }
+                // Add 1 other song
+                if (othIndex < shuffledOthers.size) {
+                    shuffledPlaylist.add(shuffledOthers[othIndex++])
+                }
+            }
+            
+            _queueState.value = QueueState(
+                currentPlaylist = shuffledPlaylist,
+                currentIndex = 0,
+                playHistory = emptyList()
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Fallback to regular shuffle
+            setQueue(songs.shuffled(), 0)
+        }
     }
 
     /**

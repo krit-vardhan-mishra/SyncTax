@@ -30,30 +30,26 @@ class ListenAgainManager(private val context: Context, private val maxSize: Int 
     fun refresh() {
         scope.launch {
             try {
-                val recentHistory = repository.getRecentHistory(maxSize).first()
-                val recentSongIds = recentHistory.map { it.songId }
+                // Get last 50 listened songs
+                val recentHistory = repository.getRecentHistory(50).first()
+                val recentSongIds = recentHistory.map { it.songId }.distinct()
 
-                val topPrefs = repository.getTopPreferences(maxSize).first()
-                val mostPlayedSongIds = topPrefs.map { it.songId }
-
-                // merge, preserve order: recent first then most played that aren't already present
-                val merged = mutableListOf<Song>()
-
+                // Collect songs
+                val allRecentSongs = mutableListOf<Song>()
                 for (id in recentSongIds) {
-                    val local = repository.getSongById(id)
-                    if (local != null) merged.add(local)
+                    val song = repository.getSongById(id)
+                    if (song != null) allRecentSongs.add(song)
                 }
 
-                for (id in mostPlayedSongIds) {
-                    if (merged.any { it.id == id }) continue
-                    val local = repository.getSongById(id)
-                    if (local != null) merged.add(local)
+                // If we have 20 or more songs, randomly pick 20
+                // Otherwise, show all available songs
+                val selectedSongs = if (allRecentSongs.size >= 20) {
+                    allRecentSongs.shuffled().take(20)
+                } else {
+                    allRecentSongs
                 }
 
-                // trim to maxSize
-                val trimmed = if (merged.size > maxSize) merged.subList(0, maxSize) else merged
-
-                _listenAgain.value = trimmed
+                _listenAgain.value = selectedSongs
             } catch (e: Exception) {
                 e.printStackTrace()
             }

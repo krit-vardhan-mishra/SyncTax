@@ -1,70 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SMALL Widget Layout: Compact single-row design -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/widget_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="4dp">
+    android:background="@drawable/widget_background"
+    android:padding="8dp">
+
+    <ImageView
+        android:id="@+id/widget_album_art"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@mipmap/ic_launcher"
+        android:scaleType="centerCrop"
+        android:background="@drawable/album_art_background"
+        android:layout_centerVertical="true"
+        android:layout_alignParentStart="true"
+        android:clipToOutline="true" />
 
     <LinearLayout
-        android:id="@+id/widget_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/widget_glassmorphic_background"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="12dp">
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/widget_album_art"
+        android:layout_toStartOf="@id/widget_play_pause"
+        android:layout_centerVertical="true"
+        android:orientation="vertical"
+        android:layout_marginHorizontal="8dp">
 
-        <!-- Album Art -->
-        <ImageView
-            android:id="@+id/widget_album_art"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:scaleType="centerCrop"
-            android:contentDescription="Album Art"
-            android:background="@drawable/widget_circle_background"
-            android:src="@mipmap/ic_launcher" />
-
-        <!-- Song Info -->
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/widget_song_title"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="vertical">
+            android:text="Song Title"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:ellipsize="end"
+            android:maxLines="1" />
 
-            <TextView
-                android:id="@+id/widget_song_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="No song"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <TextView
-                android:id="@+id/widget_artist"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Tap to open"
-                android:textColor="#B3FFFFFF"
-                android:textSize="10sp"
-                android:maxLines="1"
-                android:ellipsize="end" />
-        </LinearLayout>
-
-        <!-- Play/Pause Button Only -->
-        <ImageButton
-            android:id="@+id/widget_play_pause"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="Play/Pause"
-            android:scaleType="fitCenter"
-            android:tint="#FFFFFF"
-            android:src="@android:drawable/ic_media_play" />
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Artist"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp"
+            android:ellipsize="end"
+            android:maxLines="1" />
     </LinearLayout>
-</FrameLayout>
+
+    <ImageButton
+        android:id="@+id/widget_play_pause"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:src="@drawable/ic_play"
+        android:background="@drawable/play_button_background"
+        android:contentDescription="Play/Pause"
+        app:tint="@android:color/black" />
+
+</RelativeLayout>

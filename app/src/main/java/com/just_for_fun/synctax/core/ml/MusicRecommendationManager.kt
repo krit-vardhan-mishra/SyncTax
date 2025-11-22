@@ -64,7 +64,13 @@ class MusicRecommendationManager(private val context: Context) {
             }.awaitAll()
 
             // Generate final recommendations
-            recommendationAgent.generateQuickPicks(results, count)
+            val quickPicks = recommendationAgent.generateQuickPicks(results, count)
+            
+            // Cache the result
+            cachedQuickPicks = quickPicks
+            cacheTimestamp = System.currentTimeMillis()
+            
+            quickPicks
         }
     }
 
