@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Audio Codec Options -->
+    <string-array name="audio_codec_names">
+        <item>Opus (Best for streaming)</item>
+        <item>AAC/MP4A (Universal compatibility)</item>
+        <item>Vorbis (Open format)</item>
+        <item>MP3 (Maximum compatibility)</item>
+    </string-array>
+
+    <string-array name="audio_codec_values">
+        <item>opus</item>
+        <item>mp4a</item>
+        <item>vorbis</item>
+        <item>mp3</item>
+    </string-array>
+
+    <!-- Audio Format/Container Options -->
+    <string-array name="audio_format_names">
+        <item>WebM (Opus codec)</item>
+        <item>M4A (AAC codec)</item>
+        <item>MP3 (Universal)</item>
+        <item>OGG (Vorbis codec)</item>
+    </string-array>
+
+    <string-array name="audio_format_values">
+        <item>webm</item>
+        <item>m4a</item>
+        <item>mp3</item>
+        <item>ogg</item>
+    </string-array>
+
+    <!-- Format Importance Options -->
+    <string-array name="format_importance_names">
+        <item>Codec → Container → File Size</item>
+        <item>Container → Codec → File Size</item>
+        <item>Bitrate → Codec → Container</item>
+        <item>File Size → Codec → Container</item>
+        <item>Format ID Only</item>
+    </string-array>
+
+    <string-array name="format_importance_values">
+        <item>codec,container,filesize</item>
+        <item>container,codec,filesize</item>
+        <item>bitrate,codec,container</item>
+        <item>filesize,codec,container</item>
+        <item>id</item>
+    </string-array>
+
+    <!-- Format Filter Options -->
+    <string-array name="format_filter_names">
+        <item>Suggested (Based on preferences)</item>
+        <item>All Formats</item>
+        <item>Smallest File Size</item>
+        <item>Generic/Fallback</item>
+    </string-array>
+
+    <string-array name="format_filter_values">
+        <item>SUGGESTED</item>
+        <item>ALL</item>
+        <item>SMALLEST</item>
+        <item>GENERIC</item>
+    </string-array>
+</resources>

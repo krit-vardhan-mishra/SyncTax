@@ -5,8 +5,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
     id("com.google.devtools.ksp")
     id("com.chaquo.python") version "16.0.0"
+    id ("kotlin-parcelize")
 }
 
 android {
@@ -60,17 +62,30 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        viewBinding = true
     }
 }
 
 chaquopy {
     defaultConfig {
-        version = "3.8"
+        version = "3.10"
+//        buildPython("C:\Users\theya\AppData\Local\Programs\Python\Python312\python.exe")
+//        buildPython("C:\Users\theya\AppData\Local\Microsoft\WindowsApps\python.exe")
         pip {
-            install("yt-dlp")
+            install("yt-dlp==2024.11.18") // Specify latest version
             install("mutagen")
+            install("requests") // Add requests library
+            install("urllib3")
         }
     }
+
+//    sourceSets {
+//        getByName("main") {
+//            python {
+//                srcDir("src/main/python")
+//            }
+//        }
+//    }
 }
 
 dependencies {
@@ -97,6 +112,9 @@ dependencies {
     // Palette for extracting colors from images
     implementation("androidx.palette:palette-ktx:1.0.0")
 
+    // Preferences
+    implementation("androidx.preference:preference-ktx:1.2.1")
+
     // Room Database
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
@@ -104,6 +122,9 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // kotlinx.serialization for JSON
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
     // DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")
@@ -120,6 +141,7 @@ dependencies {
 
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // NewPipe extractor - used to decode signatureCipher-obfuscated stream URLs
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.8")
@@ -137,5 +159,8 @@ dependencies {
     implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
 
     // FFmpeg for audio processing
-    implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
+    // implementation("com.github.arthenica:ffmpeg-kit:v6.0-2")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+    // Commented out due to jitpack.io 401 error - app handles FFmpeg absence gracefully
+    // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
 }

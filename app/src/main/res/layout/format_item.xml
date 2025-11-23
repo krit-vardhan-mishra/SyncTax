@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/format_card_constraintLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="8dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginBottom="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="2dp"
+    app:strokeColor="?attr/colorOutline"
+    app:strokeWidth="1dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/container"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="M4A"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="M4A" />
+
+        <TextView
+            android:id="@+id/format_note"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="192kbps"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp"
+            app:layout_constraintStart_toEndOf="@+id/container"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="192kbps" />
+
+        <TextView
+            android:id="@+id/codec"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="AAC"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp"
+            app:layout_constraintStart_toEndOf="@+id/format_note"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="AAC" />
+
+        <TextView
+            android:id="@+id/format_id"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="id: 140"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="10sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="id: 140" />
+
+        <TextView
+            android:id="@+id/audio_formats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="AAC"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="10sp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toStartOf="@+id/format_id"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="AAC"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/file_size"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="45.2 MB"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/container"
+            tools:text="45.2 MB" />
+
+        <TextView
+            android:id="@+id/bitrate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="4dp"
+            android:text="192kbps"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp"
+            app:layout_constraintStart_toEndOf="@+id/file_size"
+            app:layout_constraintTop_toBottomOf="@+id/container"
+            tools:text="192kbps" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

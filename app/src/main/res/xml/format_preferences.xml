@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="Download Format Preferences"
+        android:summary="Configure preferred audio formats and quality">
+
+        <ListPreference
+            android:key="audio_codec"
+            android:title="Preferred Audio Codec"
+            android:summary="Choose preferred audio codec for downloads"
+            android:entries="@array/audio_codec_names"
+            android:entryValues="@array/audio_codec_values"
+            android:defaultValue="opus" />
+
+        <ListPreference
+            android:key="audio_format"
+            android:title="Preferred Container Format"
+            android:summary="Choose preferred audio container/format"
+            android:entries="@array/audio_format_names"
+            android:entryValues="@array/audio_format_values"
+            android:defaultValue="webm" />
+
+        <EditTextPreference
+            android:key="audio_format_id_preference"
+            android:title="Preferred Format ID"
+            android:summary="Specific format ID to prefer (e.g., 140, 251)"
+            android:hint="Leave empty for auto selection"
+            android:inputType="text" />
+
+        <ListPreference
+            android:key="format_importance"
+            android:title="Format Selection Priority"
+            android:summary="Order of importance when selecting formats"
+            android:entries="@array/format_importance_names"
+            android:entryValues="@array/format_importance_values"
+            android:defaultValue="codec,container,filesize" />
+
+        <SwitchPreferenceCompat
+            android:key="prefer_container_over_codec"
+            android:title="Prefer Container Over Codec"
+            android:summary="Prioritize container format over codec when selecting"
+            android:defaultValue="false" />
+
+        <ListPreference
+            android:key="format_filter_default"
+            android:title="Default Format Filter"
+            android:summary="Default filter category when viewing formats"
+            android:entries="@array/format_filter_names"
+            android:entryValues="@array/format_filter_values"
+            android:defaultValue="SUGGESTED" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

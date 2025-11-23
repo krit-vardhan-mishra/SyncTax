@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -577,7 +578,7 @@ fun FullScreenPlayerContent(
                                 isDownloading = isDownloading,
                                 isDownloaded = isDownloaded,
                                 downloadProgress = downloadProgress,
-                                onClick = { playerViewModel.downloadCurrentSong() }
+                                onClick = { playerViewModel.startDownloadProcess() }
                             )
                         }
                     }
@@ -825,6 +826,40 @@ fun FullScreenPlayerContent(
                 onDismiss = {
                     userPreferences.setGuideShown(UserPreferences.GUIDE_PLAYER)
                     showGuide = false
+                }
+            )
+        }
+
+        // Loading indicator for format fetching
+        if (uiState.isLoadingFormats) {
+            AlertDialog(
+                onDismissRequest = { },
+                title = { Text("Loading Formats") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Fetching available download formats...")
+                    }
+                },
+                confirmButton = { }
+            )
+        }
+        
+        // Format Selection Dialog
+        if (uiState.showFormatDialog) {
+            FormatSelectionDialog(
+                formats = uiState.availableFormats,
+                onFormatSelected = { format ->
+                    playerViewModel.downloadWithFormat(format)
+                },
+                onDismiss = {
+                    playerViewModel.dismissFormatDialog()
                 }
             )
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.just_for_fun.synctax.core.data.model.Format
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -25,33 +26,50 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
         Log.d(TAG, "Chaquopy Audio Downloader initialized")
     }
 
-    suspend fun downloadAudio(url: String, outputDir: String): DownloadResult {
+    suspend fun downloadAudio(url: String, outputDir: String, formatId: String? = null): DownloadResult {
         return withContext(Dispatchers.IO) {
             try {
-                val resultJson = pythonModule.callAttr("download_audio", url, outputDir)
+                Log.d(TAG, "🎵 Starting download for URL: $url")
+                Log.d(TAG, "🎵 Output directory: $outputDir")
+                
+                val resultJson = if (formatId != null) {
+                    pythonModule.callAttr("download_audio", url, outputDir, false, formatId)
+                } else {
+                    pythonModule.callAttr("download_audio", url, outputDir, false, null)
+                }
+                
+                Log.d(TAG, "🎵 Python download_audio returned JSON: ${resultJson.toString()}")
+                
                 val result = JSONObject(resultJson.toString())
 
                 val success = result.optBoolean("success", false)
                 val message = result.optString("message", "Unknown error")
                 val filePath = result.optString("file_path", "")
-                val title = result.optString("title", "Unknown")
-                val artist = result.optString("artist", "Unknown")
-                val duration = result.optInt("duration", 0)
-                val thumbnailUrl = result.optString("thumbnail_url", "")
+                // val title = result.optString("title", "Unknown")
+                // val artist = result.optString("artist", "Unknown")
+                // val duration = result.optInt("duration", 0)
+                // val thumbnailUrl = result.optString("thumbnail_url", "")
+                val format = result.optString("format", "unknown")
+                val ffmpegAvailable = result.optBoolean("ffmpeg_available", false)
 
-                Log.d(TAG, "Download result: $message")
+                Log.d(TAG, "🎵 Download result - Success: $success")
+                Log.d(TAG, "🎵 Download result - Message: $message")
+                Log.d(TAG, "🎵 Download result - File path: $filePath")
+                Log.d(TAG, "🎵 Download result - Format: $format")
+                Log.d(TAG, "🎵 Download result - FFmpeg available: $ffmpegAvailable")
 
                 DownloadResult(
                     success = success,
                     message = message,
                     filePath = filePath,
-                    title = title,
-                    artist = artist,
-                    duration = duration,
-                    thumbnailUrl = thumbnailUrl
+                    title = "",  // Metadata disabled
+                    artist = "",  // Metadata disabled
+                    duration = 0,  // Metadata disabled
+                    thumbnailUrl = ""  // Metadata disabled
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Download failed", e)
+                Log.e(TAG, "🎵 ❌ Download failed: ${e.message}", e)
+                Log.e(TAG, "🎵 Stack trace:", e)
                 DownloadResult(
                     success = false,
                     message = "Download error: ${e.message}",
@@ -79,6 +97,30 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                 val thumbnailUrl = result.optString("thumbnail_url", "")
                 val description = result.optString("description", "")
 
+                // Parse formats with all available metadata
+                val formatsArray = result.optJSONArray("formats")
+                val formats = mutableListOf<com.just_for_fun.synctax.core.data.model.Format>()
+                if (formatsArray != null) {
+                    for (i in 0 until formatsArray.length()) {
+                        val formatJson = formatsArray.getJSONObject(i)
+                        val format = com.just_for_fun.synctax.core.data.model.Format(
+                            format_id = formatJson.optString("format_id", ""),
+                            container = formatJson.optString("container", formatJson.optString("ext", "")),
+                            vcodec = formatJson.optString("vcodec", ""),
+                            acodec = formatJson.optString("acodec", ""),
+                            encoding = formatJson.optString("encoding", ""),
+                            filesize = formatJson.optLong("filesize", 0),
+                            format_note = formatJson.optString("format_note", ""),
+                            fps = formatJson.optString("fps", ""),
+                            asr = formatJson.optString("asr", ""),
+                            url = formatJson.optString("url", ""),
+                            lang = formatJson.optString("lang", ""),
+                            tbr = formatJson.optString("tbr", "")
+                        )
+                        formats.add(format)
+                    }
+                }
+
                 VideoInfo(
                     success = success,
                     message = message,
@@ -86,7 +128,8 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                     artist = artist,
                     duration = duration,
                     thumbnailUrl = thumbnailUrl,
-                    description = description
+                    description = description,
+                    formats = formats
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get video info", e)
@@ -97,7 +140,8 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                     artist = "",
                     duration = 0,
                     thumbnailUrl = "",
-                    description = ""
+                    description = "",
+                    formats = emptyList()
                 )
             }
         }
@@ -136,5 +180,6 @@ data class VideoInfo(
     val artist: String,
     val duration: Int,
     val thumbnailUrl: String,
-    val description: String
+    val description: String,
+    val formats: List<com.just_for_fun.synctax.core.data.model.Format> = emptyList()
 )

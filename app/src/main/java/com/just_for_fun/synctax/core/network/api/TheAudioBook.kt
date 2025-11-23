@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.core.data.local.entities
+package com.just_for_fun.synctax.core.network.api
 
 import android.util.Log
 import okhttp3.OkHttpClient

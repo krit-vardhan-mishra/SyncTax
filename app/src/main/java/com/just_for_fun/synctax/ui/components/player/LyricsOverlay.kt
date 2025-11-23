@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.text.font.FontWeight
@@ -85,7 +86,7 @@ fun LyricsOverlay(
     val customSongName = remember { mutableStateOf(song.title) }
     val customArtistName = remember { mutableStateOf(song.artist) }
 
-    Surface(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .liquid(liquidState)
@@ -95,9 +96,21 @@ fun LyricsOverlay(
                         onDismiss()
                     }
                 }
-            },
-        color = Color.Black.copy(alpha = 0.7f).compositeOver(songDominantColor.copy(alpha = 0.1f))
+            }
     ) {
+        // Blurred background layer
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(radius = 20.dp)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color.Black.copy(alpha = 0.7f).compositeOver(songDominantColor.copy(alpha = 0.1f))
+            ) {}
+        }
+
+        // Content layer (not blurred)
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Bar with Back Button (Material 3 style)
             Row(

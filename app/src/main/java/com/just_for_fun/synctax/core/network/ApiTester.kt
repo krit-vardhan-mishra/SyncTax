@@ -1,21 +1,20 @@
 package com.just_for_fun.synctax.core.network
 
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.File
-import java.net.URL
-import java.io.IOException
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
-import java.util.*
-import kotlinx.coroutines.*
-import java.text.SimpleDateFormat
+import java.io.File
+import java.io.IOException
+import java.net.URL
 
 // Configure JSON parser to ignore fields not defined in our data classes
 val json = Json { ignoreUnknownKeys = true }
@@ -182,7 +181,6 @@ class TheAudioDB {
     }
 }
 
-@Serializable
 data class TestResult(
     val songTitle: String,
     val artistName: String,
@@ -226,7 +224,8 @@ fun main() = runBlocking {
         outputDir.mkdirs()
     }
     val outputFile = File(outputDir, "api_test_results.json")
-    val jsonString = Json.encodeToString(results)
+    // val jsonString = Json.encodeToString(results)
+    val jsonString = results.toString() // Temporary
     outputFile.writeText(jsonString)
 
     println("\nResults saved to ${outputFile.absolutePath}")
