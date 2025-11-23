@@ -1,5 +1,9 @@
 package com.just_for_fun.synctax.ui.components.card
 
+import android.content.ContentUris
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -37,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,6 +49,29 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import java.io.File
+
+/**
+ * Helper function to get MediaStore URI from file path
+ */
+private fun getUriFromFilePath(context: android.content.Context, filePath: String): Uri? {
+    val projection = arrayOf(MediaStore.Audio.Media._ID)
+    val selection = "${MediaStore.Audio.Media.DATA} = ?"
+    val selectionArgs = arrayOf(filePath)
+    
+    context.contentResolver.query(
+        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+        projection,
+        selection,
+        selectionArgs,
+        null
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
+            return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+        }
+    }
+    return null
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,6 +82,7 @@ fun SongCard(
     isPlaying: Boolean = false,
     onDelete: ((Song) -> Unit)? = null
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var isPressed by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
@@ -186,8 +215,8 @@ fun SongCard(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Delete Song") },
-            text = { 
-                Text("Are you sure you want to permanently delete \"${song.title}\"? This action cannot be undone.") 
+            text = {
+                Text("Are you sure you want to permanently delete \"${song.title}\"? This action cannot be undone.")
             },
             confirmButton = {
                 TextButton(
@@ -196,11 +225,54 @@ fun SongCard(
                         // Delete the file permanently
                         try {
                             val file = File(song.filePath)
-                            if (file.exists()) {
-                                file.delete()
+                            var deleted = false
+                            
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                // Android 10+ - Use MediaStore API
+                                try {
+                                    val uri = getUriFromFilePath(context, song.filePath)
+                                    if (uri != null) {
+                                        deleted = context.contentResolver.delete(uri, null, null) > 0
+                                        if (deleted) {
+                                            android.util.Log.d("SongCard", "Deleted via MediaStore: ${song.filePath}")
+                                        } else {
+                                            android.util.Log.w("SongCard", "MediaStore delete returned 0 rows")
+                                        }
+                                    } else {
+                                        android.util.Log.w("SongCard", "Could not find MediaStore URI for: ${song.filePath}")
+                                        // Fallback to direct file deletion
+                                        if (file.exists()) {
+                                            deleted = file.delete()
+                                            android.util.Log.d("SongCard", "Fallback file.delete() result: $deleted")
+                                        }
+                                    }
+                                } catch (e: SecurityException) {
+                                    android.util.Log.e("SongCard", "SecurityException with MediaStore, trying direct delete", e)
+                                    if (file.exists()) {
+                                        deleted = file.delete()
+                                    }
+                                }
+                            } else {
+                                // Android 9 and below - Direct file deletion
+                                if (file.exists()) {
+                                    deleted = file.delete()
+                                    if (deleted) {
+                                        android.util.Log.d("SongCard", "Deleted file: ${file.absolutePath}")
+                                    } else {
+                                        android.util.Log.w("SongCard", "Failed to delete file: ${file.absolutePath}")
+                                    }
+                                } else {
+                                    android.util.Log.w("SongCard", "File does not exist: ${file.path}")
+                                }
                             }
-                            onDelete?.invoke(song)
+                            
+                            if (deleted || !file.exists()) {
+                                onDelete?.invoke(song)
+                            } else {
+                                android.util.Log.e("SongCard", "Failed to delete file: ${song.filePath}")
+                            }
                         } catch (e: Exception) {
+                            android.util.Log.e("SongCard", "Error deleting file: ${song.filePath}", e)
                             e.printStackTrace()
                         }
                     }

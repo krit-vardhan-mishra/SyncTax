@@ -135,4 +135,7 @@ dependencies {
 
     // Liquid library for shader effects
     implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
+
+    // FFmpeg for audio processing
+    implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
 }

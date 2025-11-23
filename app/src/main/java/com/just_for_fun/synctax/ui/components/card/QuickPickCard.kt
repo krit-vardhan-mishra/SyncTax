@@ -174,7 +174,7 @@ fun QuickPickCard(
                 fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
                 // 3. Text Color: Change to Primary if playing, stay White if not
                 color = if (isPlaying) activeColor else Color.White,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(

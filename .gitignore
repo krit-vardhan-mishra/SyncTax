@@ -296,3 +296,7 @@ patch_lyrics_fix.ps1
 data/vectors.dat
 data/vectors.dat
 data/vectors.dat
+data/api_test_data/
+data/api_test_data
+test_download
+test_download/

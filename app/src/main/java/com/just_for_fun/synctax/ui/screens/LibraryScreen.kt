@@ -1,5 +1,13 @@
 package com.just_for_fun.synctax.ui.screens
 
+import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,6 +80,7 @@ fun LibraryScreen(
     onOpenSettings: () -> Unit = {},
     onTrainClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
     val userName by userPreferences.userName.collectAsState()
@@ -79,6 +89,42 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+    
+    // Storage permission launcher for Android 11+
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        // Permission result handled
+    }
+    
+    // Regular storage permissions for Android 10 and below
+    val writePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            android.util.Log.w("LibraryScreen", "Write storage permission denied")
+        }
+    }
+    
+    // Request storage permissions on first composition
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+ - Request MANAGE_EXTERNAL_STORAGE
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                    }
+                    storagePermissionLauncher.launch(intent)
+                } catch (e: Exception) {
+                    android.util.Log.e("LibraryScreen", "Error requesting storage permission", e)
+                }
+            }
+        } else {
+            // Android 10 and below - Request WRITE_EXTERNAL_STORAGE
+            writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }
 
     // Update colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -194,7 +240,8 @@ fun LibraryScreen(
                             sortOption = sortOption,
                             onSongClick = { song, queue ->
                                 playerViewModel.playSong(song, queue)
-                            }
+                            },
+                            homeViewModel = homeViewModel
                         )
 
                         1 -> ArtistsTab(
@@ -229,7 +276,8 @@ fun LibraryScreen(
 fun SongsTab(
     songs: List<Song>,
     sortOption: SortOption,
-    onSongClick: (Song, List<Song>) -> Unit
+    onSongClick: (Song, List<Song>) -> Unit,
+    homeViewModel: HomeViewModel
 ) {
     val lazyListState = rememberLazyListState()
     
@@ -351,6 +399,10 @@ fun SongsTab(
                     val index = sortedSongs.indexOf(song)
                     val queue = sortedSongs.drop(index) // O(n-index) creates sublist
                     onSongClick(song, queue)
+                },
+                onDelete = { deletedSong ->
+                    // Remove from local database and refresh UI
+                    homeViewModel.deleteSong(deletedSong)
                 }
             )
         }

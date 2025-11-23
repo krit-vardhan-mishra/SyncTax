@@ -45,7 +45,7 @@ fun DynamicGreetingSection(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         shape = MaterialTheme.shapes.large,
         color = androidx.compose.ui.graphics.Color.Transparent
     ) {

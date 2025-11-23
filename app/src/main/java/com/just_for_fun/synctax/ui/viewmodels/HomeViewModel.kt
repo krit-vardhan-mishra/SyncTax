@@ -444,6 +444,38 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         speedDialManager.refresh()
         quickAccessManager.refresh()
     }
+    
+    /**
+     * Delete a song from the database and update UI
+     */
+    fun deleteSong(song: Song) {
+        viewModelScope.launch {
+            try {
+                // Delete from database
+                repository.deleteSong(song.id)
+                
+                // Update UI state by removing the song from the list
+                val updatedSongs = _uiState.value.allSongs.filter { it.id != song.id }
+                _uiState.value = _uiState.value.copy(allSongs = updatedSongs)
+                
+                // Cleanup ML data for this song
+                repository.cleanupDeletedSongsData(listOf(song.id))
+                
+                // Refresh all sections
+                refreshSections()
+                
+                // Regenerate quick picks if songs still available
+                if (updatedSongs.isNotEmpty()) {
+                    generateQuickPicks()
+                }
+                
+                android.util.Log.d("HomeViewModel", "Song deleted successfully: ${song.title}")
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error deleting song from database", e)
+                _uiState.value = _uiState.value.copy(error = "Failed to delete song: ${e.message}")
+            }
+        }
+    }
 }
 
 data class HomeUiState(

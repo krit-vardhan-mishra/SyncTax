@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
+import androidx.core.net.toUri
 
 class MusicRepository(private val context: Context) {
 
@@ -442,7 +443,7 @@ class MusicRepository(private val context: Context) {
 
                 // Get album art URI - check for local image file first
                 var albumArtUri = ContentUris.withAppendedId(
-                    android.net.Uri.parse("content://media/external/audio/albumart"),
+                    "content://media/external/audio/albumart".toUri(),
                     albumId
                 ).toString()
 
@@ -625,4 +626,11 @@ class MusicRepository(private val context: Context) {
                 preferenceDao.deleteBySongId(songId)
             }
         }
+    
+    /**
+     * Delete a single song from the database
+     */
+    suspend fun deleteSong(songId: String) = withContext(Dispatchers.IO) {
+        songDao.deleteSongsByIds(listOf(songId))
+    }
 }

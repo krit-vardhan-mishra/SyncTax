@@ -240,7 +240,7 @@ fun HomeScreen(
                                 }
 
                                 item {
-                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Spacer(modifier = Modifier.height(15.dp))
                                 }
 
                                 item {
@@ -250,7 +250,7 @@ fun HomeScreen(
                                 }
 
                                 item {
-                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Spacer(modifier = Modifier.height(25.dp))
                                 }
 
                                 item {
@@ -264,13 +264,17 @@ fun HomeScreen(
                                 }
 
                                 item {
-                                    Spacer(modifier = Modifier.height(20.dp))
+                                    Spacer(modifier = Modifier.height(25.dp))
                                 }
 
                                 item {
                                     Divider(
                                         modifier = Modifier.padding(horizontal = 16.dp)
                                     )
+                                }
+
+                                item {
+                                    Spacer(modifier = Modifier.height(10.dp))
                                 }
 
                                 // Listen Again Section
