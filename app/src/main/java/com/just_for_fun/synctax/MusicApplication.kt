@@ -28,6 +28,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
 
         // Initialize Python runtime on background thread to avoid blocking main thread
         applicationScope.launch {
@@ -71,6 +72,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
 
     companion object {
         private const val TAG = "MusicApplication"
+            lateinit var instance: MusicApplication
     }
 }
 

@@ -261,6 +261,7 @@ fun SearchScreen(
                                             )
                                         }
                                     }
+
                                     items(uiState.onlineSearchResults) { result ->
                                         val coroutineScope = rememberCoroutineScope()
                                         OnlineResultCard(result) { res ->
@@ -298,6 +299,10 @@ fun SearchScreen(
                                                 }
                                             }
                                         }
+                                    }
+
+                                    item {
+                                        Spacer(modifier = Modifier.height(90.dp))
                                     }
                                 } else {
                                     // No online results either

@@ -336,9 +336,75 @@ class FormatUtil(private val context: Context) {
         return "$quality • $codec • $container$size"
     }
     
+    
+    /**
+     * Get the best audio format based on preferences
+     */
+    fun getBestAudioFormat(formats: List<Format>): Format? {
+        val sorted = sortAudioFormats(formats)
+        return sorted.firstOrNull()
+    }
+    
+    /**
+     * Get quality label based on bitrate/format
+     */
+    fun getQualityLabel(format: Format): String {
+        val bitrate = format.tbr?.replace("k", "")?.trim()?.toIntOrNull() ?: 0
+        
+        return when {
+            bitrate >= 192 -> "High quality"
+            bitrate >= 128 -> "Medium quality"
+            bitrate >= 96 -> "Good quality"
+            bitrate > 0 -> "Low quality"
+            else -> {
+                // Fallback to format note
+                when {
+                    format.format_note.contains("high", ignoreCase = true) -> "High quality"
+                    format.format_note.contains("medium", ignoreCase = true) -> "Medium quality"
+                    format.format_note.contains("low", ignoreCase = true) -> "Low quality"
+                    else -> "Audio"
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get display name for format (codec + bitrate)
+     */
+    fun getFormatDisplayName(format: Format): String {
+        val codec = when {
+            format.acodec.contains("opus", ignoreCase = true) -> "Opus"
+            format.acodec.contains("aac", ignoreCase = true) || 
+            format.acodec.contains("mp4a", ignoreCase = true) -> "AAC"
+            format.acodec.contains("mp3", ignoreCase = true) -> "MP3"
+            format.acodec.contains("vorbis", ignoreCase = true) -> "Vorbis"
+            format.container.isNotBlank() -> format.container.uppercase()
+            else -> "Audio"
+        }
+
+        val bitrate = formatBitrate(format.tbr)
+        return if (bitrate.isNotBlank()) "$codec • $bitrate" else codec
+    }
+    
+    /**
+     * Format bitrate to human-readable string
+     */
+    fun formatBitrate(tbr: String?): String {
+        if (tbr.isNullOrBlank()) return ""
+        
+        val cleaned = tbr.replace("k", "").trim()
+        val kbps = cleaned.toIntOrNull() ?: return tbr
+
+        return when {
+            kbps >= 1000 -> String.format("%.1f Mbps", kbps / 1000.0)
+            else -> "${kbps} kbps"
+        }
+    }
+    
     /**
      * Format file size to human-readable string
      */
+
     fun formatFileSize(bytes: Long): String {
         return when {
             bytes < 1024 -> "$bytes B"

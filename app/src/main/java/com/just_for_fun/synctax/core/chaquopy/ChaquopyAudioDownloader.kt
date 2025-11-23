@@ -26,16 +26,19 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
         Log.d(TAG, "Chaquopy Audio Downloader initialized")
     }
 
-    suspend fun downloadAudio(url: String, outputDir: String, formatId: String? = null): DownloadResult {
+    suspend fun downloadAudio(url: String, outputDir: String, formatId: String? = null, poToken: String? = null): DownloadResult {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "🎵 Starting download for URL: $url")
                 Log.d(TAG, "🎵 Output directory: $outputDir")
+                if (poToken != null) {
+                    Log.d(TAG, "🎵 PO Token provided (length: ${poToken.length})")
+                }
                 
                 val resultJson = if (formatId != null) {
-                    pythonModule.callAttr("download_audio", url, outputDir, false, formatId)
+                    pythonModule.callAttr("download_audio", url, outputDir, false, formatId, poToken)
                 } else {
-                    pythonModule.callAttr("download_audio", url, outputDir, false, null)
+                    pythonModule.callAttr("download_audio", url, outputDir, false, null, poToken)
                 }
                 
                 Log.d(TAG, "🎵 Python download_audio returned JSON: ${resultJson.toString()}")
@@ -83,10 +86,10 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
         }
     }
 
-    suspend fun getVideoInfo(url: String): VideoInfo {
+    suspend fun getVideoInfo(url: String, poToken: String? = null): VideoInfo {
         return withContext(Dispatchers.IO) {
             try {
-                val resultJson = pythonModule.callAttr("get_video_info", url)
+                val resultJson = pythonModule.callAttr("get_video_info", url, poToken)
                 val result = JSONObject(resultJson.toString())
 
                 val success = result.optBoolean("success", false)

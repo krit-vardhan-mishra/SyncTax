@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.core.network
+package com.just_for_fun.synctax.core.network.api
 
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlinx.coroutines.Dispatchers
@@ -124,62 +124,7 @@ fun fetchSongMetadata(songTitle: String, artistName: String): Song? {
     }
 }
 
-data class SongFromAudioDB(
-    val title: String,
-    val artist: String,
-    val album: String?,
-    val duration: Long,
-    val genre: String?,
-    val releaseYear: Int?,
-    val lyrics: String
-)
-
-class TheAudioDB {
-
-    private val apiUrl = "https://www.theaudiodb.com/api/v1/json/123/"
-
-    // Fetch song details from TheAudioDB API by song name
-    suspend fun fetchSongDetails(songName: String): SongFromAudioDB? {
-        return withContext(Dispatchers.IO) {
-            try {
-                val client = OkHttpClient()
-                val request = Request.Builder()
-                    .url("$apiUrl/searchtrack.php?s=${songName.replace(" ", "+")}")
-                    .build()
-
-                val response: Response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    val jsonResponse = response.body?.string()
-                    parseSongDetails(jsonResponse)
-                } else {
-                    null
-                }
-            } catch (e: IOException) {
-                println("API: Error making API call ${e.message}")
-                null
-            }
-        }
-    }
-
-    // Parse song details from JSON response
-    private fun parseSongDetails(jsonResponse: String?): SongFromAudioDB? {
-        if (jsonResponse == null) return null
-
-        val jsonObject = JSONObject(jsonResponse)
-        val trackArray = jsonObject.optJSONArray("track") ?: return null
-        val trackObject = trackArray.optJSONObject(0) ?: return null
-
-        val title = trackObject.optString("strTrack")
-        val artist = trackObject.optString("strArtist")
-        val album = trackObject.optString("strAlbum")
-        val genre = trackObject.optString("strGenre")
-        val releaseYear = trackObject.optInt("intYearReleased")
-        val duration = trackObject.optLong("intDuration")
-        val lyrics = trackObject.optString("strTrackLyrics")
-
-        return SongFromAudioDB(title, artist, album, duration, genre, releaseYear, lyrics)
-    }
-}
+// TheAudioDB class and SongFromAudioDB are now in TheAudioBook.kt
 
 data class TestResult(
     val songTitle: String,

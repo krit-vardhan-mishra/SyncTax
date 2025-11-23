@@ -82,6 +82,7 @@ import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.components.FormatSelectionDialog
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
@@ -860,6 +861,10 @@ fun FullScreenPlayerContent(
                 },
                 onDismiss = {
                     playerViewModel.dismissFormatDialog()
+                },
+                currentPoToken = uiState.poToken,
+                onPoTokenChanged = { token ->
+                    playerViewModel.updatePoToken(token)
                 }
             )
         }

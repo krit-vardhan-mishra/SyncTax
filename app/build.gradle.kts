@@ -158,6 +158,9 @@ dependencies {
     // Liquid library for shader effects
     implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
 
+    // Worker
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
+
     // FFmpeg for audio processing
     // implementation("com.github.arthenica:ffmpeg-kit:v6.0-2")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")

@@ -29,6 +29,7 @@ import com.just_for_fun.synctax.core.utils.AudioFormat
 import com.just_for_fun.synctax.core.utils.AudioProcessor
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
 import com.just_for_fun.synctax.service.MusicService
+import com.just_for_fun.synctax.util.FormatUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,7 +53,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val queueManager = QueueManager(application, repository, recommendationManager)
     private val audioProcessor = AudioProcessor(application)
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
-    
+
     // PlaybackCollector with cache invalidation callback
     private val playbackCollector = PlaybackCollector(
         repository = repository,
@@ -62,7 +63,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             recommendationManager.invalidateQuickPicksCache()
         }
     )
-        
+
     // Track if we're currently handling song end to prevent multiple triggers
     private var isHandlingSongEnd = false
     private var currentLyrics: String? = null
@@ -112,11 +113,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         togglePlayPause()
                     }
                 }
+
                 MusicService.ACTION_PAUSE -> {
                     if (_uiState.value.isPlaying) {
                         togglePlayPause()
                     }
                 }
+
                 MusicService.ACTION_NEXT -> next()
                 MusicService.ACTION_PREVIOUS -> previous()
                 MusicService.ACTION_SHUFFLE -> toggleShuffle()
@@ -137,11 +140,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                     // Stop the service hosting playback
                     try {
-                        getApplication<Application>().stopService(Intent(getApplication(), MusicService::class.java))
+                        getApplication<Application>().stopService(
+                            Intent(
+                                getApplication(),
+                                MusicService::class.java
+                            )
+                        )
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
                 }
+
                 MusicService.ACTION_SEEK_TO -> {
                     val position = intent.getLongExtra("position", 0L)
                     seekTo(position)
@@ -247,7 +256,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (playlist.isNotEmpty()) {
                         // Initialize queue manager with restored playlist
                         val actualIndex = savedIndex.coerceIn(0, playlist.size - 1)
-                        
+
                         // Ensure the current song is at the current index
                         if (actualIndex < playlist.size && playlist[actualIndex].id == song.id) {
                             queueManager.initializeQueue(playlist, actualIndex)
@@ -327,10 +336,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Emit playback events
             PlaybackEventBus.emit(PlaybackEvent.SongChanged(song))
             PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(true))
-            PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
-                upcomingQueue = queueManager.getUpcomingQueue(),
-                playHistory = queueManager.getPlayHistory()
-            ))
+            PlaybackEventBus.emit(
+                PlaybackEvent.QueueUpdated(
+                    upcomingQueue = queueManager.getUpcomingQueue(),
+                    playHistory = queueManager.getPlayHistory()
+                )
+            )
 
             // Update notification with new song
             updateNotification()
@@ -388,7 +399,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Play a remote stream using chunked progressive download for 30s segments.
      * This writes to a temp cache file and starts playback as soon as the first chunk is available.
      */
-    fun playChunkedStream(videoId: String, streamUrl: String, title: String, artist: String? = null, durationMs: Long = 0L, thumbnailUrl: String? = null) {
+    fun playChunkedStream(
+        videoId: String,
+        streamUrl: String,
+        title: String,
+        artist: String? = null,
+        durationMs: Long = 0L,
+        thumbnailUrl: String? = null
+    ) {
         viewModelScope.launch {
             // Clean up tmp file from previous stream if it's complete
             chunkedStreamManager.cleanupTmpFile()
@@ -406,12 +424,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     url.contains("ytimg.com") && url.contains("/default.jpg") -> {
                         url.replace("/default.jpg", "/maxresdefault.jpg")
                     }
+
                     url.contains("ytimg.com") && url.contains("/mqdefault.jpg") -> {
                         url.replace("/mqdefault.jpg", "/maxresdefault.jpg")
                     }
+
                     url.contains("ytimg.com") && url.contains("/hqdefault.jpg") -> {
                         url.replace("/hqdefault.jpg", "/maxresdefault.jpg")
                     }
+
                     url.contains("ytimg.com") && url.contains("/sddefault.jpg") -> {
                         url.replace("/sddefault.jpg", "/maxresdefault.jpg")
                     }
@@ -465,8 +486,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 chunkedStreamManager.state.collect { st ->
                     _uiState.value = _uiState.value.copy(
                         isBuffering = !st.isComplete,
-                        duration = if (durationMs > 0) durationMs else _uiState.value.duration
-                        , downloadPercent = st.percent
+                        duration = if (durationMs > 0) durationMs else _uiState.value.duration,
+                        downloadPercent = st.percent
                     )
                     if (st.isComplete) {
                         // Download complete - the tmp file now contains full content
@@ -527,7 +548,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.value.currentSong?.let { song ->
                     playbackCollector.startCollecting(song.id)
                 }
-                
+
                 // Update notification immediately
                 musicService?.updatePlaybackState(
                     _uiState.value.currentSong,
@@ -544,7 +565,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun seekTo(positionMs: Long) {
         player.seekTo(positionMs)
         _uiState.value = _uiState.value.copy(position = positionMs)
-        
+
         // Update notification with new position
         updateNotification()
     }
@@ -552,10 +573,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun next() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
-            
+
             // Use queue manager to move to next song (with auto-refill)
             val nextSong = queueManager.moveToNext(autoRefill = true)
-            
+
             if (nextSong != null) {
                 player.prepare(nextSong.filePath, nextSong.id)
                 player.play()
@@ -581,10 +602,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun previous() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
-            
+
             // Use queue manager to move to previous song
             val previousSong = queueManager.moveToPrevious()
-            
+
             if (previousSong != null) {
                 player.prepare(previousSong.filePath, previousSong.id)
                 player.play()
@@ -609,9 +630,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (isHandlingSongEnd) {
             return
         }
-        
+
         isHandlingSongEnd = true
-        
+
         viewModelScope.launch {
             try {
                 playbackCollector.stopCollecting(skipped = false)
@@ -639,7 +660,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     // Auto-play next song with queue refill enabled
                     val nextSong = queueManager.moveToNext(autoRefill = true)
-                    
+
                     if (nextSong != null) {
                         player.prepare(nextSong.filePath, nextSong.id)
                         player.play()
@@ -672,21 +693,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val currentSong = _uiState.value.currentSong
             val queueState = queueManager.queueState.value
-            
+
             if (currentSong != null && queueState.currentPlaylist.isNotEmpty()) {
                 // Use queue manager to shuffle
                 queueManager.shuffle()
-                
+
                 // Update UI state
                 _uiState.value = _uiState.value.copy(shuffleEnabled = true)
-                
+
                 savePlaylistState()
-                
+
                 PlaybackEventBus.emit(PlaybackEvent.QueueShuffled)
-                PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
-                    upcomingQueue = queueManager.getUpcomingQueue(),
-                    playHistory = queueManager.getPlayHistory()
-                ))
+                PlaybackEventBus.emit(
+                    PlaybackEvent.QueueUpdated(
+                        upcomingQueue = queueManager.getUpcomingQueue(),
+                        playHistory = queueManager.getPlayHistory()
+                    )
+                )
             } else {
                 // If no current song, just fetch and shuffle all songs
                 val allSongs = repository.getAllSongs().first()
@@ -710,10 +733,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun shufflePlay(playlist: List<Song>) {
         viewModelScope.launch {
             if (playlist.isEmpty()) return@launch
-            
+
             // Shuffle the playlist
             val shuffledPlaylist = playlist.shuffled()
-            
+
             // Start playing from the first song in shuffled list
             _uiState.value = _uiState.value.copy(shuffleEnabled = true)
             playSong(shuffledPlaylist[0], shuffledPlaylist)
@@ -744,7 +767,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val queueState = queueManager.queueState.value
             val songIndex = queueState.currentPlaylist.indexOf(song)
-            
+
             if (songIndex != -1) {
                 // If removing current song, stop playback
                 if (songIndex == queueState.currentIndex) {
@@ -759,12 +782,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Remove from queue using queue manager
                 queueManager.removeFromQueue(song)
                 savePlaylistState()
-                
+
                 PlaybackEventBus.emit(PlaybackEvent.SongRemovedFromQueue(song))
-                PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
-                    upcomingQueue = queueManager.getUpcomingQueue(),
-                    playHistory = queueManager.getPlayHistory()
-                ))
+                PlaybackEventBus.emit(
+                    PlaybackEvent.QueueUpdated(
+                        upcomingQueue = queueManager.getUpcomingQueue(),
+                        playHistory = queueManager.getPlayHistory()
+                    )
+                )
             }
         }
     }
@@ -774,10 +799,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             queueManager.placeNext(song)
             savePlaylistState()
             PlaybackEventBus.emit(PlaybackEvent.SongPlacedNext(song))
-            PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
-                upcomingQueue = queueManager.getUpcomingQueue(),
-                playHistory = queueManager.getPlayHistory()
-            ))
+            PlaybackEventBus.emit(
+                PlaybackEvent.QueueUpdated(
+                    upcomingQueue = queueManager.getUpcomingQueue(),
+                    playHistory = queueManager.getPlayHistory()
+                )
+            )
         }
     }
 
@@ -786,10 +813,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             queueManager.reorderQueue(fromIndex, toIndex)
             savePlaylistState()
             PlaybackEventBus.emit(PlaybackEvent.QueueReordered(fromIndex, toIndex))
-            PlaybackEventBus.emit(PlaybackEvent.QueueUpdated(
-                upcomingQueue = queueManager.getUpcomingQueue(),
-                playHistory = queueManager.getPlayHistory()
-            ))
+            PlaybackEventBus.emit(
+                PlaybackEvent.QueueUpdated(
+                    upcomingQueue = queueManager.getUpcomingQueue(),
+                    playHistory = queueManager.getPlayHistory()
+                )
+            )
         }
     }
 
@@ -800,10 +829,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun playFromQueue(song: Song) {
         viewModelScope.launch {
             val selectedSong = queueManager.playFromQueue(song)
-            
+
             if (selectedSong != null) {
                 playbackCollector.stopCollecting(skipped = true)
-                
+
                 player.prepare(selectedSong.filePath, selectedSong.id)
                 player.play()
                 playbackCollector.startCollecting(selectedSong.id)
@@ -825,11 +854,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setVolume(volume: Float) {
         // Clamp volume between 0 and 1
         val clampedVolume = volume.coerceIn(0f, 1f)
-        
+
         // Set system volume
         val volumeLevel = (clampedVolume * maxVolume).toInt().coerceIn(0, maxVolume)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volumeLevel, 0)
-        
+
         // Update UI state with actual system volume
         val actualVolume = getVolume()
         _uiState.value = _uiState.value.copy(volume = actualVolume)
@@ -842,15 +871,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun checkIfSongDownloaded(song: Song) {
         if (!song.id.startsWith("online:")) return
-        
+
         viewModelScope.launch {
             try {
-                val musicDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
+                val musicDir =
+                    File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
                 val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
-                val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
+                val safeArtist =
+                    song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
                 val audioFilename = "$safeTitle - $safeArtist.opus"
                 val audioFile = File(musicDir, audioFilename)
-                
+
                 if (audioFile.exists() && !_uiState.value.downloadedSongs.contains(song.id)) {
                     _uiState.value = _uiState.value.copy(
                         downloadedSongs = _uiState.value.downloadedSongs + song.id
@@ -865,17 +896,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshDownloadedSongsCheck(allSongs: List<Song>) {
         viewModelScope.launch {
             val onlineSongs = allSongs.filter { it.id.startsWith("online:") }
-            val musicDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
-            
+            val musicDir =
+                File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
+
             val downloadedSongIds = mutableSetOf<String>()
-            
+
             onlineSongs.forEach { song ->
                 try {
                     val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
-                    val safeArtist = song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
+                    val safeArtist =
+                        song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
                     val audioFilename = "$safeTitle - $safeArtist.opus"
                     val audioFile = File(musicDir, audioFilename)
-                    
+
                     if (audioFile.exists()) {
                         downloadedSongIds.add(song.id)
                     }
@@ -883,7 +916,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     // Ignore errors for individual songs
                 }
             }
-            
+
             _uiState.value = _uiState.value.copy(
                 downloadedSongs = downloadedSongIds,
                 downloadingSongs = emptySet() // Clear downloading state on refresh
@@ -900,9 +933,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             Log.w("PlayerViewModel", "📥 Download: No current song")
             return
         }
-        
+
         Log.d("PlayerViewModel", "📥 Download: Starting download process for '${currentSong.title}'")
-        
+
         // Only allow downloading online songs
         if (!currentSong.id.startsWith("online:")) {
             Log.w("PlayerViewModel", "📥 Download: Not an online song (id: ${currentSong.id})")
@@ -927,88 +960,87 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Extract URL from song ID (format: "online:${videoId}")
         val videoId = currentSong.id.substringAfter("online:")
         val url = "https://www.youtube.com/watch?v=$videoId"
-        
+
         Log.d("PlayerViewModel", "📥 Download: Video ID: $videoId")
         Log.d("PlayerViewModel", "📥 Download: URL: $url")
 
         viewModelScope.launch {
             try {
                 Log.d("PlayerViewModel", "📥 Download: Fetching available formats...")
-                
+
                 // Show loading indicator
                 _uiState.value = _uiState.value.copy(isLoadingFormats = true)
-                
+
                 // Get available formats using ChaquopyAudioDownloader (includes client fallback)
-                val videoInfo = chaquopyDownloader.getVideoInfo(url)
-                
-                Log.d("PlayerViewModel", "📥 Download: Video info - Success: ${videoInfo.success}, Message: ${videoInfo.message}")
+                val videoInfo = chaquopyDownloader.getVideoInfo(
+                    url,
+                    _uiState.value.poToken.ifEmpty { null }
+                )
+
+                Log.d(
+                    "PlayerViewModel",
+                    "📥 Download: Video info - Success: ${videoInfo.success}, Message: ${videoInfo.message}"
+                )
                 Log.d("PlayerViewModel", "📥 Download: Found ${videoInfo.formats.size} formats")
-                
+
                 // Hide loading indicator
                 _uiState.value = _uiState.value.copy(isLoadingFormats = false)
-                
+
                 if (videoInfo.success && videoInfo.formats.isNotEmpty()) {
-                    // Convert Format objects to AudioFormat objects for UI compatibility
-                    val audioFormats = videoInfo.formats
-                        .filter { fmt ->
-                            // Filter for audio formats (similar to AudioProcessor logic)
-                            val abr = fmt.tbr?.toIntOrNull()
-                            (fmt.container == "m4a" || fmt.container == "webm" || fmt.container == "mp4" || 
-                             fmt.container == "mp3" || fmt.container == "opus") &&
-                            abr != null && abr > 0 && fmt.acodec.isNotBlank() && fmt.acodec != "none"
-                        }
-                        .map { fmt ->
-                            val abr = fmt.tbr?.toIntOrNull() ?: 0
-                            val quality = when {
-                                abr >= 256 -> "High (${abr}kbps)"
-                                abr >= 128 -> "Medium (${abr}kbps)"
-                                else -> "Low (${abr}kbps)"
-                            }
-                            val size = if (fmt.filesize > 0) "${fmt.filesize / 1024 / 1024}MB" else "Unknown"
-                            AudioFormat(fmt.format_id, quality, "${abr}kbps", size)
-                        }
-                        .sortedByDescending { it.bitrate.split(" ")[0].toIntOrNull() ?: 0 }
-                        .distinctBy { it.quality }
-                        .take(3)
-                    
-                    Log.d("PlayerViewModel", "📥 Download: Converted to ${audioFormats.size} audio formats")
-                    
-                    // Log each format for debugging
-                    audioFormats.forEachIndexed { index, format ->
-                        Log.d("PlayerViewModel", "📥 Download: Format $index: ${format.quality} (${format.bitrate}) - ${format.formatId}")
+                    // Use FormatUtil to sort and filter audio formats (YTDLNIS-style)
+                    val formatUtil = FormatUtil(getApplication())
+                    val audioFormats = formatUtil.sortAudioFormats(videoInfo.formats)
+
+                    Log.d(
+                        "PlayerViewModel",
+                        "📥 Download: Sorted ${audioFormats.size} audio formats"
+                    )
+
+                    // Log top 5 formats for debugging
+                    audioFormats.take(5).forEachIndexed { index, format ->
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Download: Format $index: ${format.format_id} - ${format.acodec} • ${format.tbr}kbps • ${format.container}"
+                        )
                     }
-                    
+
                     if (audioFormats.isNotEmpty()) {
-                        // Show format selection dialog
+                        // Show format selection dialog with Format objects
                         _uiState.value = _uiState.value.copy(
                             showFormatDialog = true,
-                            availableFormats = audioFormats
+                            availableFormats = audioFormats  // Use sorted formats directly
                         )
                         Log.d("PlayerViewModel", "📥 Download: Showing format selection dialog")
                     } else {
                         // No audio formats available - use direct download with ChaquopyAudioDownloader
-                        Log.w("PlayerViewModel", "📥 Download: No audio formats available, using direct download")
+                        Log.w(
+                            "PlayerViewModel",
+                            "📥 Download: No audio formats available, using direct download"
+                        )
                         downloadDirectly(currentSong, url)
                     }
                 } else {
                     // Video info failed or no formats - use direct download with ChaquopyAudioDownloader
-                    Log.w("PlayerViewModel", "📥 Download: Video info failed or no formats, using direct download")
+                    Log.w(
+                        "PlayerViewModel",
+                        "📥 Download: Video info failed or no formats, using direct download"
+                    )
                     downloadDirectly(currentSong, url)
                 }
             } catch (e: Exception) {
                 Log.e("PlayerViewModel", "📥 Download: Error getting formats: ${e.message}", e)
                 Log.e("PlayerViewModel", "📥 Download: Stack trace:", e)
-                
+
                 // Hide loading indicator
                 _uiState.value = _uiState.value.copy(isLoadingFormats = false)
-                
+
                 // Fall back to direct download if format extraction fails
                 Log.d("PlayerViewModel", "📥 Download: Falling back to direct download")
                 downloadDirectly(currentSong, url)
             }
         }
     }
-    
+
     /**
      * Downloads a song directly without format selection using ChaquopyAudioDownloader.
      * This method embeds metadata and album art automatically.
@@ -1017,33 +1049,48 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             try {
                 Log.d("PlayerViewModel", "📥 Direct Download: Starting for '${song.title}'")
-                
+
                 // Mark as downloading
                 _uiState.value = _uiState.value.copy(
                     downloadingSongs = _uiState.value.downloadingSongs + song.id,
                     downloadProgress = _uiState.value.downloadProgress + (song.id to 0.0f),
                     downloadMessage = "Downloading ${song.title}..."
                 )
-                
+
                 // Use ChaquopyAudioDownloader which handles metadata embedding
-                val downloadDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax").apply {
+                val downloadDir = File(
+                    getApplication<Application>().getExternalFilesDir("downloads"),
+                    "SyncTax"
+                ).apply {
                     mkdirs()
                 }
-                
-                Log.d("PlayerViewModel", "📥 Direct Download: Download directory: ${downloadDir.absolutePath}")
+
+                Log.d(
+                    "PlayerViewModel",
+                    "📥 Direct Download: Download directory: ${downloadDir.absolutePath}"
+                )
                 Log.d("PlayerViewModel", "📥 Direct Download: Calling ChaquopyAudioDownloader...")
-                
+
                 val result = chaquopyDownloader.downloadAudio(url, downloadDir.absolutePath)
-                
-                Log.d("PlayerViewModel", "📥 Direct Download: Result - Success: ${result.success}, Message: ${result.message}")
-                
+
+                Log.d(
+                    "PlayerViewModel",
+                    "📥 Direct Download: Result - Success: ${result.success}, Message: ${result.message}"
+                )
+
                 if (result.success && result.filePath.isNotEmpty()) {
                     val downloadedFile = File(result.filePath)
-                    
+
                     if (downloadedFile.exists()) {
-                        Log.d("PlayerViewModel", "📥 Direct Download: File exists at: ${downloadedFile.absolutePath}")
-                        Log.d("PlayerViewModel", "📥 Direct Download: File size: ${downloadedFile.length() / 1024 / 1024}MB")
-                        
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Direct Download: File exists at: ${downloadedFile.absolutePath}"
+                        )
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Direct Download: File size: ${downloadedFile.length() / 1024 / 1024}MB"
+                        )
+
                         // Create downloaded song entry
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
@@ -1056,16 +1103,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             releaseYear = song.releaseYear,
                             albumArtUri = result.thumbnailUrl.ifEmpty { song.albumArtUri }
                         )
-                        
+
                         // Insert into database if not already present
                         val existingSong = repository.getSongById(downloadedFile.absolutePath)
                         if (existingSong == null) {
                             repository.insertSong(downloadedSong)
-                            Log.d("PlayerViewModel", "📥 Direct Download: Song inserted into database")
+                            Log.d(
+                                "PlayerViewModel",
+                                "📥 Direct Download: Song inserted into database"
+                            )
                         } else {
-                            Log.d("PlayerViewModel", "📥 Direct Download: Song already exists in database")
+                            Log.d(
+                                "PlayerViewModel",
+                                "📥 Direct Download: Song already exists in database"
+                            )
                         }
-                        
+
                         // Update UI state
                         _uiState.value = _uiState.value.copy(
                             downloadingSongs = _uiState.value.downloadingSongs - song.id,
@@ -1073,19 +1126,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             downloadProgress = _uiState.value.downloadProgress - song.id,
                             downloadMessage = "Downloaded to: ${downloadDir.absolutePath}"
                         )
-                        
-                        Log.d("PlayerViewModel", "📥 Direct Download: ✅ Download completed successfully")
+
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Direct Download: ✅ Download completed successfully"
+                        )
                     } else {
-                        Log.e("PlayerViewModel", "📥 Direct Download: File does not exist: ${downloadedFile.absolutePath}")
+                        Log.e(
+                            "PlayerViewModel",
+                            "📥 Direct Download: File does not exist: ${downloadedFile.absolutePath}"
+                        )
                         throw Exception("Downloaded file not found")
                     }
                 } else {
-                    Log.e("PlayerViewModel", "📥 Direct Download: Download failed - ${result.message}")
+                    Log.e(
+                        "PlayerViewModel",
+                        "📥 Direct Download: Download failed - ${result.message}"
+                    )
                     throw Exception(result.message)
                 }
             } catch (e: Exception) {
                 Log.e("PlayerViewModel", "📥 Direct Download: ❌ Error: ${e.message}", e)
-                
+
                 _uiState.value = _uiState.value.copy(
                     downloadingSongs = _uiState.value.downloadingSongs - song.id,
                     downloadProgress = _uiState.value.downloadProgress - song.id,
@@ -1095,15 +1157,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun downloadWithFormat(format: AudioFormat) {
+    fun downloadWithFormat(format: Format) {
         val currentSong = _uiState.value.currentSong ?: run {
             Log.w("PlayerViewModel", "📥 Format Download: No current song")
             return
         }
-        
-        Log.d("PlayerViewModel", "📥 Format Download: Starting download with format: ${format.quality} (${format.bitrate})")
-        Log.d("PlayerViewModel", "📥 Format Download: Format ID: ${format.formatId}")
-        
+
+//        Log.d(
+//            "PlayerViewModel",
+//            "📥 Format Download: Starting download with format: ${format.quality} (${format.bitrate})"
+//        )
+        Log.d("PlayerViewModel", "📥 Format Download: Format ID: ${format.format_id}")
+
         // Hide dialog
         _uiState.value = _uiState.value.copy(
             showFormatDialog = false,
@@ -1113,7 +1178,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Extract URL from song ID
         val videoId = currentSong.id.substringAfter("online:")
         val url = "https://www.youtube.com/watch?v=$videoId"
-        
+
         Log.d("PlayerViewModel", "📥 Format Download: Video ID: $videoId")
         Log.d("PlayerViewModel", "📥 Format Download: URL: $url")
 
@@ -1124,29 +1189,49 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.value = _uiState.value.copy(
                     downloadingSongs = _uiState.value.downloadingSongs + currentSong.id,
                     downloadProgress = _uiState.value.downloadProgress + (currentSong.id to 0.0f),
-                    downloadMessage = "Downloading ${currentSong.title} (${format.quality})..."
+                    downloadMessage = "Downloading ${currentSong.title} (${format.format_note})..."
                 )
-                
+
                 Log.d("PlayerViewModel", "📥 Format Download: Calling ChaquopyAudioDownloader...")
-                
+
                 // Download using ChaquopyAudioDownloader with format selection
-                val downloadDir = File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax").apply {
+                val downloadDir = File(
+                    getApplication<Application>().getExternalFilesDir("downloads"),
+                    "SyncTax"
+                ).apply {
                     mkdirs()
                 }
-                
-                Log.d("PlayerViewModel", "📥 Format Download: Download directory: ${downloadDir.absolutePath}")
-                
-                val result = chaquopyDownloader.downloadAudio(url, downloadDir.absolutePath, format.formatId)
-                
-                Log.d("PlayerViewModel", "📥 Format Download: Download result - Success: ${result.success}, Message: ${result.message}")
-                
+
+                Log.d(
+                    "PlayerViewModel",
+                    "📥 Format Download: Download directory: ${downloadDir.absolutePath}"
+                )
+
+                val result = chaquopyDownloader.downloadAudio(
+                    url,
+                    downloadDir.absolutePath,
+                    format.format_id,  // Use format_id from Format model
+                    _uiState.value.poToken.ifEmpty { null } // Pass PO Token if available
+                )
+
+                Log.d(
+                    "PlayerViewModel",
+                    "📥 Format Download: Download result - Success: ${result.success}, Message: ${result.message}"
+                )
+
                 if (result.success && result.filePath.isNotEmpty()) {
                     val downloadedFile = File(result.filePath)
-                    
+
                     if (downloadedFile.exists()) {
-                        Log.d("PlayerViewModel", "📥 Format Download: File exists at: ${downloadedFile.absolutePath}")
-                        Log.d("PlayerViewModel", "📥 Format Download: File size: ${downloadedFile.length() / 1024 / 1024}MB")
-                        
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Format Download: File exists at: ${downloadedFile.absolutePath}"
+                        )
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Format Download: File size: ${downloadedFile.length() / 1024 / 1024}MB"
+                        )
+
                         // Create downloaded song entry
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
@@ -1159,33 +1244,48 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             releaseYear = currentSong.releaseYear,
                             albumArtUri = result.thumbnailUrl.ifEmpty { currentSong.albumArtUri }
                         )
-                        
+
                         // Insert into database if not already present
                         val existingSong = repository.getSongById(downloadedFile.absolutePath)
                         if (existingSong == null) {
                             repository.insertSong(downloadedSong)
-                            Log.d("PlayerViewModel", "📥 Format Download: Song inserted into database")
+                            Log.d(
+                                "PlayerViewModel",
+                                "📥 Format Download: Song inserted into database"
+                            )
                         } else {
-                            Log.d("PlayerViewModel", "📥 Format Download: Song already exists in database")
+                            Log.d(
+                                "PlayerViewModel",
+                                "📥 Format Download: Song already exists in database"
+                            )
                         }
-                        
+
                         _uiState.value = _uiState.value.copy(
                             downloadedSongs = _uiState.value.downloadedSongs + currentSong.id,
                             downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
                             downloadProgress = _uiState.value.downloadProgress - currentSong.id,
                             downloadMessage = "Downloaded to: ${downloadDir.absolutePath}"
                         )
-                        
-                        Log.d("PlayerViewModel", "📥 Format Download: ✅ Download completed successfully")
+
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Format Download: ✅ Download completed successfully"
+                        )
                     } else {
-                        Log.e("PlayerViewModel", "📥 Format Download: File does not exist: ${downloadedFile.absolutePath}")
+                        Log.e(
+                            "PlayerViewModel",
+                            "📥 Format Download: File does not exist: ${downloadedFile.absolutePath}"
+                        )
                         throw Exception("Downloaded file not found")
                     }
                 } else {
-                    Log.e("PlayerViewModel", "📥 Format Download: Download failed - ${result.message}")
+                    Log.e(
+                        "PlayerViewModel",
+                        "📥 Format Download: Download failed - ${result.message}"
+                    )
                     throw Exception(result.message)
                 }
-                
+
             } catch (e: Exception) {
                 Log.e("PlayerViewModel", "📥 Format Download: ❌ Error: ${e.message}", e)
                 Log.e("PlayerViewModel", "📥 Format Download: Stack trace:", e)
@@ -1198,11 +1298,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun selectFormat(format: Format) {
+        _uiState.value = _uiState.value.copy(selectedFormat = format)
+    }
+
     fun dismissFormatDialog() {
         _uiState.value = _uiState.value.copy(
             showFormatDialog = false,
             availableFormats = emptyList()
         )
+    }
+
+    fun updatePoToken(token: String) {
+        _uiState.value = _uiState.value.copy(poToken = token)
+    }
+
+    fun showPoTokenDialog() {
+        _uiState.value = _uiState.value.copy(showPoTokenDialog = true)
+    }
+
+    fun dismissPoTokenDialog() {
+        _uiState.value = _uiState.value.copy(showPoTokenDialog = false)
     }
 
     private fun updateNotification() {
@@ -1249,6 +1365,9 @@ data class PlayerUiState(
     val downloadProgress: Map<String, Float> = emptyMap(), // songId to progress (0.0 to 1.0)
     val downloadMessage: String? = null, // Download location message for snackbar
     val showFormatDialog: Boolean = false,
-    val availableFormats: List<AudioFormat> = emptyList(),
-    val isLoadingFormats: Boolean = false // Loading indicator for format selection
+    val availableFormats: List<Format> = emptyList(),  // Changed from AudioFormat to Format
+    val isLoadingFormats: Boolean = false, // Loading indicator for format selection
+    val selectedFormat: Format? = null,  // Currently selected format for download
+    val poToken: String = "", // PO Token for YouTube
+    val showPoTokenDialog: Boolean = false // Dialog to enter PO Token
 )

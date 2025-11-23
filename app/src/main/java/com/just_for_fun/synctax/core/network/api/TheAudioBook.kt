@@ -11,7 +11,8 @@ import java.util.*
 import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 
-data class Song(
+// Data class for AudioDB-specific song data (includes lyrics)
+data class SongFromAudioDB(
     val title: String,
     val artist: String,
     val album: String?,
@@ -26,7 +27,7 @@ class TheAudioDB {
     private val apiUrl = "https://www.theaudiodb.com/api/v1/json/123/"
 
     // Fetch song details from TheAudioDB API by song name
-    suspend fun fetchSongDetails(songName: String): Song? {
+    suspend fun fetchSongDetails(songName: String): SongFromAudioDB? {
         return withContext(Dispatchers.IO) {
             try {
                 val client = OkHttpClient()
@@ -49,7 +50,7 @@ class TheAudioDB {
     }
 
     // Parse song details from JSON response
-    private fun parseSongDetails(jsonResponse: String?): Song? {
+    private fun parseSongDetails(jsonResponse: String?): SongFromAudioDB? {
         if (jsonResponse == null) return null
 
         val jsonObject = JSONObject(jsonResponse)
@@ -64,12 +65,12 @@ class TheAudioDB {
         val duration = trackObject.optLong("intDuration")
         val lyrics = trackObject.optString("strTrackLyrics")
 
-        return Song(title, artist, album, duration, genre, releaseYear, lyrics)
+        return SongFromAudioDB(title, artist, album, duration, genre, releaseYear, lyrics)
     }
 
     // Convert song lyrics to LRC file format
     fun convertLyricsToLRC(lyrics: String, songTitle: String, outputPath: String): Boolean {
-        val timestampedLyrics = generateLRCContent(lyrics)
+        val timestampedLyrics = generateLRCContentFromLyrics(lyrics)
 
         // Write the content to an LRC file
         return try {
@@ -84,7 +85,7 @@ class TheAudioDB {
     }
 
     // Generate LRC content with dummy timestamps for each lyric line
-    private fun generateLRCContent(lyrics: String): String {
+    private fun generateLRCContentFromLyrics(lyrics: String): String {
         val lines = lyrics.split("\n")
         val lrcContent = StringBuilder()
 

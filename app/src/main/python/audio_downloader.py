@@ -7,7 +7,43 @@ import os
 from typing import Dict, Any
 
 
-def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_id: str = None) -> str:
+def map_format_id_to_selector(format_id: str) -> str:
+    """
+    Maps format IDs to format selectors to bypass YouTube restrictions.
+    YouTube blocks specific format ID downloads but allows format selectors.
+    
+    Format ID examples:
+    - 251: Opus ~160kbps (webm)
+    - 250: Opus ~70kbps (webm)
+    - 249: Opus ~50kbps (webm)
+    - 140: AAC 128kbps (m4a)
+    - 139: AAC 48kbps (m4a)
+    
+    Args:
+        format_id: The specific format ID selected by the user
+        
+    Returns:
+        Format selector string that YouTube accepts
+    """
+    # Opus formats (webm container)
+    if format_id in ['251', '250', '249', '600']:
+        return 'bestaudio[ext=webm]/bestaudio'
+    
+    # AAC formats (m4a container)
+    elif format_id in ['140', '139', '141']:
+        return 'bestaudio[ext=m4a]/bestaudio'
+    
+    # Generic audio formats
+    elif format_id in ['ba', 'bestaudio']:
+        return 'bestaudio'
+    
+    # If specific format ID, try it but fallback to bestaudio
+    else:
+        return f'{format_id}/bestaudio'
+
+
+
+def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_id: str = None, po_token: str = None) -> str:
     """
     Download audio from a URL using yt-dlp with embedded album art
     
@@ -16,6 +52,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
         output_dir: Directory to save the downloaded file
         prefer_mp3: If True and FFmpeg is available, convert to MP3. Otherwise use M4A with embedded art.
         format_id: Specific format ID to download. If None, uses best audio format.
+        po_token: Optional PO Token for YouTube authentication (bypasses 403 errors)
         
     Returns:
         JSON string with download result
@@ -25,6 +62,8 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
         print(f"🎵 Python: Starting download_audio", file=sys.stderr)
         print(f"🎵 Python: URL: {url}", file=sys.stderr)
         print(f"🎵 Python: Output directory: {output_dir}", file=sys.stderr)
+        if po_token:
+            print(f"🎵 Python: PO Token provided (length: {len(po_token)})", file=sys.stderr)
         
         import yt_dlp
         
@@ -96,10 +135,26 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                     },
                 }
                 
+                # Add PO Token if provided
+                if po_token:
+                    # PO Token format: "web+TOKEN" or "android+TOKEN"
+                    # Extract client type from token if present
+                    if '+' in po_token:
+                        token_client, token_value = po_token.split('+', 1)
+                        ydl_opts['extractor_args']['youtube']['po_token'] = [f'{token_client}+{token_value}']
+                        print(f"🎵 Python: Using PO Token for {token_client} client", file=sys.stderr)
+                    else:
+                        # If no client specified, use for current client
+                        ydl_opts['extractor_args']['youtube']['po_token'] = [f'{client}+{po_token}']
+                        print(f"🎵 Python: Using PO Token for {client} client (no client prefix found)", file=sys.stderr)
+                
                 # Set format based on whether format_id is specified
                 if format_id:
-                    ydl_opts['format'] = format_id
+                    # Map format ID to format selector to bypass YouTube restrictions
+                    format_selector = map_format_id_to_selector(format_id)
+                    ydl_opts['format'] = format_selector
                     print(f"🎵 Python: Using specified format: {format_id}", file=sys.stderr)
+                    print(f"🎵 Python: Mapped to format selector: {format_selector}", file=sys.stderr)
                 else:
                     # Select best audio format - prefer audio-only, fallback to smallest video+audio for audio extraction
                     # YouTube audio formats: 140 (m4a 128k), 139 (m4a 48k), 141 (m4a 256k), 251 (webm opus), 250 (webm opus), 249 (webm opus)
@@ -107,16 +162,41 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                     ydl_opts['format'] = 'bestaudio/best[height<=360]'
                     print(f"🎵 Python: Using audio format selection (prefer audio-only, fallback to video with audio)", file=sys.stderr)
                 
-                # Add post-processing to extract audio if FFmpeg is available
+                # Add post-processing to extract audio and embed metadata if FFmpeg is available
                 if ffmpeg_available and ffmpeg_path:
                     ydl_opts['ffmpeg_location'] = ffmpeg_path
-                    # Add audio extraction post-processor
-                    ydl_opts['postprocessors'] = [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'm4a',
-                        'preferredquality': '192',
-                    }]
-                    print(f"🎵 Python: FFmpeg available - will extract audio from video if needed", file=sys.stderr)
+                    
+                    # Determine preferred codec based on format_id or default to opus
+                    preferred_codec = 'opus'  # Default: best quality/compression
+                    if format_id:
+                        # Try to infer codec from format_id
+                        if '140' in format_id or '141' in format_id or '139' in format_id:
+                            preferred_codec = 'm4a'
+                        elif '251' in format_id or '250' in format_id or '249' in format_id:
+                            preferred_codec = 'opus'
+                    
+                    # YTDLNIS-style post-processors for high-quality audio with metadata
+                    ydl_opts['postprocessors'] = [
+                        {
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': preferred_codec,
+                            'preferredquality': '0',  # Best quality
+                        },
+                        {
+                            'key': 'FFmpegMetadata',
+                            'add_metadata': True,
+                        },
+                        {
+                            'key': 'EmbedThumbnail',
+                            'already_have_thumbnail': False,
+                        },
+                    ]
+                    
+                    # Write metadata to file
+                    ydl_opts['writethumbnail'] = True
+                    ydl_opts['writeinfojson'] = False  # Don't create .info.json files
+                    
+                    print(f"🎵 Python: FFmpeg available - will extract {preferred_codec} with metadata", file=sys.stderr)
                 else:
                     # Without FFmpeg, we still need to extract audio from video formats
                     # yt-dlp can do basic audio extraction without FFmpeg for some formats
@@ -131,21 +211,35 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                     print(f"🎵 Python: Title: {info.get('title', 'Unknown')}", file=sys.stderr)
                     
                     # Get the final filename (already includes output directory from outtmpl)
-                    filename = ydl.prepare_filename(info)
+                    base_filename = ydl.prepare_filename(info)
                     
-                    # Use the actual extension from the downloaded file
-                    actual_ext = info.get('ext', 'mp4')
-                    filename = os.path.splitext(filename)[0] + '.' + actual_ext
+                    # After post-processing, the extension might change
+                    # Check for the actual file with the post-processed extension
+                    possible_extensions = ['opus', 'm4a', 'mp3', 'webm', info.get('ext', 'mp4')]
+                    filename = None
                     
-                    # yt-dlp may remove the [ID] part during conversion, so also try without it
-                    base_filename = os.path.splitext(filename)[0]
-                    if '[' in base_filename and ']' in base_filename:
-                        # Remove the [ID] part
-                        title_part = base_filename.split(' [')[0]
-                        filename_no_id = title_part + os.path.splitext(filename)[1]
-                        filename_no_id_full = os.path.join(output_dir, filename_no_id)
-                        if os.path.exists(filename_no_id_full):
-                            filename = filename_no_id_full
+                    base_without_ext = os.path.splitext(base_filename)[0]
+                    
+                    for ext in possible_extensions:
+                        test_path = base_without_ext + '.' + ext
+                        if os.path.exists(test_path):
+                            filename = test_path
+                            print(f"🎵 Python: Found file with extension: {ext}", file=sys.stderr)
+                            break
+                    
+                    # Fallback: try without ID suffix (yt-dlp may remove it)
+                    if not filename and '[' in base_without_ext and ']' in base_without_ext:
+                        title_part = base_without_ext.split(' [')[0]
+                        for ext in possible_extensions:
+                            test_path = title_part + '.' + ext
+                            if os.path.exists(test_path):
+                                filename = test_path
+                                print(f"🎵 Python: Found file without ID suffix: {ext}", file=sys.stderr)
+                                break
+                    
+                    if not filename:
+                        # Last resort: use the original filename
+                        filename = base_filename
                     
                     print(f"🎵 Python: Final file path: {filename}", file=sys.stderr)
                     print(f"🎵 Python: File exists: {os.path.exists(filename)}", file=sys.stderr)
@@ -173,9 +267,17 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
         
         # If we get here, all clients failed
         print(f"🎵 Python: ❌ All clients failed, last error: {last_error}", file=sys.stderr)
+        
+        # Check if error is related to missing PO Token
+        error_message = f"Download failed with all clients. Last error: {last_error}"
+        if not po_token and ('403' in last_error or 'Forbidden' in last_error or 'Signature extraction failed' in last_error):
+            error_message = "⚠️ YouTube PO Token Required!\n\nYouTube now requires a PO Token for downloading. Please:\n1. Click the 🔑 button in the format dialog\n2. Follow the guide to get a token\n3. Enter the token and try again\n\nLast error: " + last_error
+        elif po_token and ('403' in last_error or 'Forbidden' in last_error):
+            error_message = "⚠️ PO Token expired or invalid!\n\nYour PO Token may have expired (tokens last ~6 hours). Please:\n1. Get a new token from the guide\n2. Update it in the format dialog\n3. Try downloading again\n\nLast error: " + last_error
+        
         return json.dumps({
             "success": False,
-            "message": f"Download failed with all clients. Last error: {last_error}",
+            "message": error_message,
             "file_path": "",
         })
             
@@ -200,43 +302,62 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
         })
 
 
-def get_video_info(url: str) -> str:
+def get_video_info(url: str, po_token: str = None) -> str:
     """
     Get video information including all available formats from all clients
     
     Args:
         url: Video/audio URL
+        po_token: Optional PO Token for YouTube authentication
         
     Returns:
         JSON string with video information and formats
     """
     try:
         import yt_dlp
+        import sys
         
-        # List of YouTube clients to try in order
+        print(f"🎵 Python: Getting video info for URL: {url}", file=sys.stderr)
+        if po_token:
+            print(f"🎵 Python: PO Token provided for get_video_info", file=sys.stderr)
+        
+        # List of YouTube clients to try
         clients_to_try = ['android', 'web', 'tv', 'ios', 'mweb']
         
         all_formats = []
-        successful_client = None
         video_info = {}
+        successful_client = None
         
         for client in clients_to_try:
             try:
+                print(f"🎵 Python: Trying client: {client}", file=sys.stderr)
+                
                 ydl_opts = {
                     'quiet': True,
                     'no_warnings': True,
+                    'extract_flat': False,
                     'extractor_args': {
                         'youtube': {
+                            'skip': ['hls', 'dash'],
                             'player_client': [client],
                         }
                     },
                 }
                 
+                # Add PO Token if provided
+                if po_token:
+                    if '+' in po_token:
+                        token_client, token_value = po_token.split('+', 1)
+                        ydl_opts['extractor_args']['youtube']['po_token'] = [f'{token_client}+{token_value}']
+                        print(f"🎵 Python: Using PO Token for {token_client} client in get_video_info", file=sys.stderr)
+                    else:
+                        ydl_opts['extractor_args']['youtube']['po_token'] = [f'{client}+{po_token}']
+                        print(f"🎵 Python: Using PO Token for {client} client in get_video_info", file=sys.stderr)
+                
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                     
-                    # Store video info from the first successful client
-                    if not successful_client:
+                    if info:
                         successful_client = client
                         video_info = {
                             "success": True,
@@ -296,20 +417,27 @@ def get_video_info(url: str) -> str:
                                 }
                                 all_formats.append(format_info)
                     
+                    break  # Success, exit loop
+                    
             except Exception as e:
+                print(f"🎵 Python: Client {client} failed: {str(e)}", file=sys.stderr)
                 # Continue to next client
                 continue
         
         if successful_client:
             video_info["formats"] = all_formats
+            print(f"🎵 Python: ✅ Got video info with {len(all_formats)} formats using {successful_client} client", file=sys.stderr)
             return json.dumps(video_info, default=str)
         else:
+            print(f"🎵 Python: ❌ Failed to get video info with all clients", file=sys.stderr)
             return json.dumps({
                 "success": False,
                 "message": f"Failed to get video info with all clients",
             })
             
     except Exception as e:
+        import sys
+        print(f"🎵 Python: ❌ Exception in get_video_info: {str(e)}", file=sys.stderr)
         return json.dumps({
             "success": False,
             "message": f"Failed to get video info: {str(e)}",
