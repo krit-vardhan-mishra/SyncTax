@@ -876,15 +876,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             try {
-                val musicDir =
-                    File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
+                // Use public Download directory
+                val musicDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "SyncTax"
+                )
                 val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                 val safeArtist =
                     song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
-                val audioFilename = "$safeTitle - $safeArtist.opus"
-                val audioFile = File(musicDir, audioFilename)
+                
+                // Check for WebM (primary) or Opus (fallback)
+                val webmFile = File(musicDir, "$safeArtist - $safeTitle.webm")
+                val opusFile = File(musicDir, "$safeTitle - $safeArtist.opus")
+                val audioFile = when {
+                    webmFile.exists() -> webmFile
+                    opusFile.exists() -> opusFile
+                    else -> null
+                }
 
-                if (audioFile.exists() && !_uiState.value.downloadedSongs.contains(song.id)) {
+                if (audioFile != null && audioFile.exists() && !_uiState.value.downloadedSongs.contains(song.id)) {
                     _uiState.value = _uiState.value.copy(
                         downloadedSongs = _uiState.value.downloadedSongs + song.id
                     )
@@ -898,8 +908,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun refreshDownloadedSongsCheck(allSongs: List<Song>) {
         viewModelScope.launch {
             val onlineSongs = allSongs.filter { it.id.startsWith("online:") }
-            val musicDir =
-                File(getApplication<Application>().getExternalFilesDir("downloads"), "SyncTax")
+            // Use public Download directory
+            val musicDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "SyncTax"
+            )
 
             val downloadedSongIds = mutableSetOf<String>()
 
@@ -908,10 +921,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                     val safeArtist =
                         song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
-                    val audioFilename = "$safeTitle - $safeArtist.opus"
-                    val audioFile = File(musicDir, audioFilename)
+                    
+                    // Check for WebM (primary from NewPipe) or Opus (legacy)
+                    val webmFile = File(musicDir, "$safeArtist - $safeTitle.webm")
+                    val opusFile = File(musicDir, "$safeTitle - $safeArtist.opus")
 
-                    if (audioFile.exists()) {
+                    if (webmFile.exists() || opusFile.exists()) {
                         downloadedSongIds.add(song.id)
                     }
                 } catch (e: Exception) {
@@ -1071,8 +1086,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 )
 
                 // Use ChaquopyAudioDownloader which handles metadata embedding
+                // Use public Download directory for user access
                 val downloadDir = File(
-                    getApplication<Application>().getExternalFilesDir("downloads"),
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                     "SyncTax"
                 ).apply {
                     mkdirs()
@@ -1215,11 +1231,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     downloadMessage = "Downloading ${currentSong.title} (${format.format_note})..."
                 )
 
-                Log.d("PlayerViewModel", "📥 Format Download: Calling ChaquopyAudioDownloader...")
+                Log.d("PlayerViewModel", "📥 Format Download: Using NewPipe direct download (primary method)...")
 
-                // Download using ChaquopyAudioDownloader with format selection
+                // Use public Download directory for user access
                 val downloadDir = File(
-                    getApplication<Application>().getExternalFilesDir("downloads"),
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                     "SyncTax"
                 ).apply {
                     mkdirs()
@@ -1230,40 +1246,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     "📥 Format Download: Download directory: ${downloadDir.absolutePath}"
                 )
 
-                val result = chaquopyDownloader.downloadAudio(
-                    url,
-                    downloadDir.absolutePath,
-                    format.format_id,
-                    _uiState.value.poTokenData.ifEmpty { null } // Pass PO Token data if available
-                )
+                // PRIMARY: Use NewPipe for direct download (reliable, no bot detection issues)
+                val newPipeResult = try {
+                    com.just_for_fun.synctax.core.download.NewPipeAudioDownloader.downloadAudio(
+                        videoId,
+                        downloadDir,
+                        null // Let NewPipe choose best format
+                    )
+                } catch (e: Exception) {
+                    Log.e("PlayerViewModel", "📥 Format Download: NewPipe failed", e)
+                    com.just_for_fun.synctax.core.download.NewPipeAudioDownloader.DownloadResult(
+                        success = false,
+                        message = "NewPipe error: ${e.message}"
+                    )
+                }
 
                 Log.d(
                     "PlayerViewModel",
-                    "📥 Format Download: Download result - Success: ${result.success}, Message: ${result.message}"
+                    "📥 Format Download: NewPipe result - Success: ${newPipeResult.success}, Message: ${newPipeResult.message}"
                 )
 
-                // If yt-dlp fails, try NewPipe direct download as fallback
-                val (finalSuccess, finalFilePath, finalMessage) = if (!result.success) {
-                    Log.d("PlayerViewModel", "📥 Format Download: yt-dlp failed, trying NewPipe direct download...")
+                // FALLBACK: If NewPipe fails, try yt-dlp (commented out by default)
+                val (finalSuccess, finalFilePath, finalMessage) = if (!newPipeResult.success) {
+                    Log.d("PlayerViewModel", "📥 Format Download: NewPipe failed, trying yt-dlp fallback...")
                     try {
-                        val newPipeResult = com.just_for_fun.synctax.core.download.NewPipeAudioDownloader.downloadAudio(
-                            videoId,
-                            downloadDir,
-                            null // Let NewPipe choose best format
+                        val result = chaquopyDownloader.downloadAudio(
+                            url,
+                            downloadDir.absolutePath,
+                            format.format_id,
+                            _uiState.value.poTokenData.ifEmpty { null }
                         )
                         
-                        if (newPipeResult.success) {
-                            Log.d("PlayerViewModel", "📥 Format Download: ✅ NewPipe download successful!")
-                            Triple(true, newPipeResult.filePath ?: "", newPipeResult.message)
+                        if (result.success) {
+                            Log.d("PlayerViewModel", "📥 Format Download: ✅ yt-dlp fallback successful!")
+                            Triple(true, result.filePath, result.message)
                         } else {
-                            Triple(result.success, result.filePath, result.message)
+                            Triple(newPipeResult.success, newPipeResult.filePath ?: "", newPipeResult.message)
                         }
                     } catch (e: Exception) {
-                        Log.e("PlayerViewModel", "📥 Format Download: NewPipe also failed", e)
-                        Triple(result.success, result.filePath, result.message)
+                        Log.e("PlayerViewModel", "📥 Format Download: yt-dlp also failed", e)
+                        Triple(newPipeResult.success, newPipeResult.filePath ?: "", newPipeResult.message)
                     }
                 } else {
-                    Triple(result.success, result.filePath, result.message)
+                    Log.d("PlayerViewModel", "📥 Format Download: ✅ NewPipe download successful!")
+                    Triple(newPipeResult.success, newPipeResult.filePath ?: "", newPipeResult.message)
                 }
 
                 if (finalSuccess && finalFilePath.isNotEmpty()) {
@@ -1279,17 +1305,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "📥 Format Download: File size: ${downloadedFile.length() / 1024 / 1024}MB"
                         )
 
-                        // Create downloaded song entry (use original result for metadata)
+                        // Create downloaded song entry
+                        // Use NewPipe metadata (title, artist) from the result
+                        val finalTitle = if (newPipeResult.title.isNotEmpty()) {
+                            newPipeResult.title
+                        } else {
+                            currentSong.title
+                        }
+                        
+                        val finalArtist = if (newPipeResult.artist.isNotEmpty()) {
+                            newPipeResult.artist
+                        } else {
+                            currentSong.artist
+                        }
+                        
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
-                            title = if (result.title.isNotEmpty()) result.title else currentSong.title,
-                            artist = if (result.artist.isNotEmpty()) result.artist else currentSong.artist,
+                            title = finalTitle,
+                            artist = finalArtist,
                             album = currentSong.album,
-                            duration = if (result.duration > 0) result.duration.toLong() else currentSong.duration,
+                            duration = currentSong.duration, // Use original duration, will be updated on playback
                             filePath = downloadedFile.absolutePath,
                             genre = currentSong.genre,
                             releaseYear = currentSong.releaseYear,
-                            albumArtUri = if (result.thumbnailUrl.isNotEmpty()) result.thumbnailUrl else currentSong.albumArtUri
+                            albumArtUri = currentSong.albumArtUri // Metadata embedded in WebM file
                         )
 
                         // Insert into database if not already present

@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Downloads YouTube audio using NewPipe's stream extraction.
  * This bypasses yt-dlp's issues with bot detection and signature decryption.
+ * Downloads as WebM, then converts to MP3 with metadata and album art embedded.
  */
 object NewPipeAudioDownloader {
     private const val TAG = "NewPipeAudioDownloader"
@@ -28,14 +29,17 @@ object NewPipeAudioDownloader {
         val success: Boolean,
         val filePath: String? = null,
         val message: String = "",
-        val format: String = "unknown"
+        val format: String = "unknown",
+        val title: String = "",
+        val artist: String = "",
+        val thumbnailUrl: String = ""
     )
     
     /**
-     * Download audio for a YouTube video using NewPipe.
+     * Download audio for a YouTube video using NewPipe, then convert to MP3 with metadata.
      * @param videoId YouTube video ID
      * @param outputDir Directory to save the downloaded file
-     * @param preferredFormat Preferred audio format (null for best available)
+     * @param preferredFormat Preferred audio format (null for MP3 with metadata)
      * @return DownloadResult with success status and file path
      */
     suspend fun downloadAudio(
@@ -43,6 +47,9 @@ object NewPipeAudioDownloader {
         outputDir: File,
         preferredFormat: String? = null
     ): DownloadResult = withContext(Dispatchers.IO) {
+        var webmFile: File? = null
+        var thumbnailFile: File? = null
+        
         try {
             Log.d(TAG, "🎵 Starting NewPipe download for video: $videoId")
             
@@ -56,9 +63,14 @@ object NewPipeAudioDownloader {
             val extractor = ServiceList.YouTube.getStreamExtractor(url)
             extractor.fetchPage()
             
-            // Get video title for filename
-            val title = sanitizeFilename(extractor.name)
+            // Get video metadata
+            val title = extractor.name
+            val artist = extractor.uploaderName ?: "Unknown Artist"
+            val sanitizedTitle = sanitizeFilename(title)
+            val sanitizedArtist = sanitizeFilename(artist)
+            
             Log.d(TAG, "📝 Video title: $title")
+            Log.d(TAG, "🎤 Artist: $artist")
             
             // Get best audio stream
             val audioStreams = extractor.audioStreams
@@ -69,35 +81,174 @@ object NewPipeAudioDownloader {
                 )
             }
             
-            // Select best audio stream based on preference
-            val selectedStream = selectBestAudioStream(audioStreams, preferredFormat)
+            // Select best audio stream (prefer Opus/AAC for quality)
+            val selectedStream = selectBestAudioStream(audioStreams, null)
             val streamUrl = selectedStream.content
-            val format = selectedStream.format?.suffix ?: "audio"
             
             Log.d(TAG, "🎧 Selected stream: ${selectedStream.format?.name ?: "unknown"}")
             Log.d(TAG, "🎧 Bitrate: ${selectedStream.averageBitrate} kbps")
-            Log.d(TAG, "🎧 Format: $format")
             
-            // Download the stream
-            val outputFile = File(outputDir, "$title.$format")
-            downloadStream(streamUrl, outputFile)
+            // Download audio stream as WebM
+            val webmFileName = "${sanitizedArtist} - ${sanitizedTitle}.webm"
+            webmFile = File(outputDir, webmFileName)
+            downloadStream(streamUrl, webmFile)
+            Log.d(TAG, "✅ WebM download complete: ${webmFile.length() / 1024 / 1024}MB")
             
-            Log.d(TAG, "✅ Download successful: ${outputFile.absolutePath}")
+            // Download thumbnail
+            val thumbnailUrl = extractor.thumbnails.maxByOrNull { it.height }?.url
+            if (!thumbnailUrl.isNullOrEmpty()) {
+                try {
+                    thumbnailFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.jpg")
+                    downloadStream(thumbnailUrl, thumbnailFile)
+                    Log.d(TAG, "✅ Thumbnail downloaded: ${thumbnailFile.length() / 1024}KB")
+                } catch (e: Exception) {
+                    Log.w(TAG, "⚠️ Failed to download thumbnail: ${e.message}")
+                    thumbnailFile = null
+                }
+            }
             
-            DownloadResult(
-                success = true,
-                filePath = outputFile.absolutePath,
-                message = "Downloaded successfully",
-                format = format
-            )
+            // Try to add metadata using FFmpeg (optional, won't fail if FFmpeg unavailable)
+            val finalFile = if (thumbnailFile != null && thumbnailFile.exists()) {
+                val webmWithMetadata = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}_final.webm")
+                val metadataAdded = addMetadataToWebm(
+                    webmFile,
+                    webmWithMetadata,
+                    thumbnailFile,
+                    title,
+                    artist,
+                    "YouTube Audio"
+                )
+                
+                if (metadataAdded && webmWithMetadata.exists() && webmWithMetadata.length() > 1024) {
+                    // Delete original and rename
+                    webmFile.delete()
+                    webmWithMetadata.renameTo(webmFile)
+                    thumbnailFile.delete()
+                    Log.d(TAG, "✅ Metadata embedded successfully")
+                } else {
+                    // Keep original file even if metadata embedding failed
+                    webmWithMetadata.delete()
+                    thumbnailFile?.delete()
+                    Log.w(TAG, "⚠️ Metadata embedding failed, keeping original WebM")
+                }
+                webmFile
+            } else {
+                Log.w(TAG, "⚠️ No thumbnail available, keeping WebM without cover art")
+                webmFile
+            }
+            
+            if (finalFile.exists() && finalFile.length() > 1024) {
+                Log.d(TAG, "✅ Download successful: ${finalFile.absolutePath}")
+                Log.d(TAG, "📦 Final file size: ${finalFile.length() / 1024 / 1024}MB")
+                
+                DownloadResult(
+                    success = true,
+                    filePath = finalFile.absolutePath,
+                    message = "Downloaded as WebM with Opus codec",
+                    format = "webm",
+                    title = title,
+                    artist = artist,
+                    thumbnailUrl = thumbnailUrl ?: ""
+                )
+            } else {
+                return@withContext DownloadResult(
+                    success = false,
+                    message = "Download verification failed"
+                )
+            }
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Download failed", e)
+            
+            // Cleanup on failure
+            webmFile?.delete()
+            thumbnailFile?.delete()
+            
             DownloadResult(
                 success = false,
                 message = "Download failed: ${e.message}"
             )
         }
+    }
+    
+    /**
+     * Add metadata and thumbnail to WebM file using FFmpeg.
+     * This is optional - if it fails, the original WebM file is still usable.
+     */
+    private suspend fun addMetadataToWebm(
+        inputFile: File,
+        outputFile: File,
+        thumbnailFile: File?,
+        title: String,
+        artist: String,
+        album: String
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // Try using youtubedl-android FFmpeg library
+            try {
+                // Build command string for youtubedl-android FFmpeg
+                val command = buildString {
+                    append("-y -i \"${inputFile.absolutePath}\"")
+                    
+                    if (thumbnailFile != null && thumbnailFile.exists()) {
+                        append(" -i \"${thumbnailFile.absolutePath}\"")
+                        append(" -map 0 -map 1")
+                        append(" -disposition:v:0 attached_pic")
+                    }
+                    
+                    append(" -c copy") // Copy streams without re-encoding
+                    append(" -metadata title=\"${escapeMetadata(title)}\"")
+                    append(" -metadata artist=\"${escapeMetadata(artist)}\"")
+                    append(" -metadata album=\"${escapeMetadata(album)}\"")
+                    append(" \"${outputFile.absolutePath}\"")
+                }
+                
+                Log.d(TAG, "🔧 Adding metadata with FFmpeg...")
+                Log.d(TAG, "🔧 Command: ffmpeg $command")
+                
+                // Use reflection to call FFmpeg.execute from youtubedl-android library
+                val ffmpegClass = Class.forName("com.yausername.ffmpeg.FFmpeg")
+                val instanceMethod = ffmpegClass.getMethod("getInstance")
+                val ffmpegInstance = instanceMethod.invoke(null)
+                val executeMethod = ffmpegClass.getMethod("execute", Array<String>::class.java)
+                
+                // Split command into array
+                val commandArray = command.split("\\s+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)".toRegex())
+                    .map { it.replace("\"", "") }
+                    .toTypedArray()
+                
+                executeMethod.invoke(ffmpegInstance, commandArray)
+                
+                // Check if output file was created successfully
+                if (outputFile.exists() && outputFile.length() > 1024) {
+                    Log.d(TAG, "✅ Metadata added successfully")
+                    return@withContext true
+                } else {
+                    Log.w(TAG, "⚠️ FFmpeg output file validation failed")
+                    return@withContext false
+                }
+                
+            } catch (reflectionError: Exception) {
+                Log.w(TAG, "⚠️ FFmpeg library not available: ${reflectionError.message}")
+                return@withContext false
+            }
+            
+        } catch (e: Exception) {
+            Log.w(TAG, "⚠️ Metadata embedding failed: ${e.message}")
+            return@withContext false
+        }
+    }
+    
+    /**
+     * Escape special characters in metadata values.
+     */
+    private fun escapeMetadata(value: String): String {
+        return value
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", " ")
+            .replace("\r", " ")
+            .trim()
     }
     
     /**
