@@ -862,9 +862,9 @@ fun FullScreenPlayerContent(
                 onDismiss = {
                     playerViewModel.dismissFormatDialog()
                 },
-                currentPoToken = uiState.poToken,
+                currentPoToken = uiState.poTokenData,
                 onPoTokenChanged = { token ->
-                    playerViewModel.updatePoToken(token)
+                    playerViewModel.updatePoTokenData(token)
                 }
             )
         }

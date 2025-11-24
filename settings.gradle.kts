@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Youtube Music"
+rootProject.name = "SyncTax"
 include(":app")

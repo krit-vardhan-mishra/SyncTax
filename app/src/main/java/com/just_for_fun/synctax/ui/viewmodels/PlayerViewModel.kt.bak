@@ -28,7 +28,6 @@ import com.just_for_fun.synctax.core.player.QueueManager
 import com.just_for_fun.synctax.core.utils.AudioFormat
 import com.just_for_fun.synctax.core.utils.AudioProcessor
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
-import com.just_for_fun.synctax.potoken.PoTokenHelper
 import com.just_for_fun.synctax.service.MusicService
 import com.just_for_fun.synctax.util.FormatUtil
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +36,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -973,15 +971,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Show loading indicator
                 _uiState.value = _uiState.value.copy(isLoadingFormats = true)
 
-                // Generate PO tokens if needed
-                Log.d("PlayerViewModel", "📥 Download: Ensuring valid PO tokens...")
-                ensureValidPoTokens(videoId)
-                Log.d("PlayerViewModel", "📥 Download: PO tokens ready")
-
                 // Get available formats using ChaquopyAudioDownloader (includes client fallback)
                 val videoInfo = chaquopyDownloader.getVideoInfo(
                     url,
-                    _uiState.value.poTokenData.ifEmpty { null }
+                    _uiState.value.poToken.ifEmpty { null }
                 )
 
                 Log.d(
@@ -1057,12 +1050,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 Log.d("PlayerViewModel", "📥 Direct Download: Starting for '${song.title}'")
 
-                // Generate PO tokens before download
-                val videoId = song.id.substringAfter("online:")
-                Log.d("PlayerViewModel", "📥 Direct Download: Ensuring valid PO tokens...")
-                ensureValidPoTokens(videoId)
-                Log.d("PlayerViewModel", "📥 Direct Download: PO tokens ready")
-
                 // Mark as downloading
                 _uiState.value = _uiState.value.copy(
                     downloadingSongs = _uiState.value.downloadingSongs + song.id,
@@ -1084,12 +1071,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 Log.d("PlayerViewModel", "📥 Direct Download: Calling ChaquopyAudioDownloader...")
 
-                val result = chaquopyDownloader.downloadAudio(
-                    url,
-                    downloadDir.absolutePath,
-                    null,
-                    _uiState.value.poTokenData.ifEmpty { null }
-                )
+                val result = chaquopyDownloader.downloadAudio(url, downloadDir.absolutePath)
 
                 Log.d(
                     "PlayerViewModel",
@@ -1202,11 +1184,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch {
             try {
-                // Generate PO tokens if needed before downloading
-                Log.d("PlayerViewModel", "📥 Format Download: Ensuring valid PO tokens...")
-                ensureValidPoTokens(videoId)
-                Log.d("PlayerViewModel", "📥 Format Download: PO tokens ready")
-
                 Log.d("PlayerViewModel", "📥 Format Download: Marking song as downloading...")
                 // Mark as downloading
                 _uiState.value = _uiState.value.copy(
@@ -1233,8 +1210,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val result = chaquopyDownloader.downloadAudio(
                     url,
                     downloadDir.absolutePath,
-                    format.format_id,
-                    _uiState.value.poTokenData.ifEmpty { null } // Pass PO Token data if available
+                    format.format_id,  // Use format_id from Format model
+                    _uiState.value.poToken.ifEmpty { null } // Pass PO Token if available
                 )
 
                 Log.d(
@@ -1242,32 +1219,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     "📥 Format Download: Download result - Success: ${result.success}, Message: ${result.message}"
                 )
 
-                // If yt-dlp fails, try NewPipe direct download as fallback
-                val (finalSuccess, finalFilePath, finalMessage) = if (!result.success) {
-                    Log.d("PlayerViewModel", "📥 Format Download: yt-dlp failed, trying NewPipe direct download...")
-                    try {
-                        val newPipeResult = com.just_for_fun.synctax.core.download.NewPipeAudioDownloader.downloadAudio(
-                            videoId,
-                            downloadDir,
-                            null // Let NewPipe choose best format
-                        )
-                        
-                        if (newPipeResult.success) {
-                            Log.d("PlayerViewModel", "📥 Format Download: ✅ NewPipe download successful!")
-                            Triple(true, newPipeResult.filePath ?: "", newPipeResult.message)
-                        } else {
-                            Triple(result.success, result.filePath, result.message)
-                        }
-                    } catch (e: Exception) {
-                        Log.e("PlayerViewModel", "📥 Format Download: NewPipe also failed", e)
-                        Triple(result.success, result.filePath, result.message)
-                    }
-                } else {
-                    Triple(result.success, result.filePath, result.message)
-                }
-
-                if (finalSuccess && finalFilePath.isNotEmpty()) {
-                    val downloadedFile = File(finalFilePath)
+                if (result.success && result.filePath.isNotEmpty()) {
+                    val downloadedFile = File(result.filePath)
 
                     if (downloadedFile.exists()) {
                         Log.d(
@@ -1279,17 +1232,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "📥 Format Download: File size: ${downloadedFile.length() / 1024 / 1024}MB"
                         )
 
-                        // Create downloaded song entry (use original result for metadata)
+                        // Create downloaded song entry
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
-                            title = if (result.title.isNotEmpty()) result.title else currentSong.title,
-                            artist = if (result.artist.isNotEmpty()) result.artist else currentSong.artist,
+                            title = result.title.ifEmpty { currentSong.title },
+                            artist = result.artist.ifEmpty { currentSong.artist },
                             album = currentSong.album,
                             duration = if (result.duration > 0) result.duration.toLong() else currentSong.duration,
                             filePath = downloadedFile.absolutePath,
                             genre = currentSong.genre,
                             releaseYear = currentSong.releaseYear,
-                            albumArtUri = if (result.thumbnailUrl.isNotEmpty()) result.thumbnailUrl else currentSong.albumArtUri
+                            albumArtUri = result.thumbnailUrl.ifEmpty { currentSong.albumArtUri }
                         )
 
                         // Insert into database if not already present
@@ -1328,9 +1281,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     Log.e(
                         "PlayerViewModel",
-                        "📥 Format Download: Download failed - $finalMessage"
+                        "📥 Format Download: Download failed - ${result.message}"
                     )
-                    throw Exception(finalMessage)
+                    throw Exception(result.message)
                 }
 
             } catch (e: Exception) {
@@ -1356,48 +1309,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    fun updatePoTokenData(tokenData: String) {
-        _uiState.value = _uiState.value.copy(poTokenData = tokenData)
-    }
-
-    // Helper method to generate and store PO tokens
-    suspend fun generateAndStorePoTokens(videoId: String) {
-        try {
-            val result = PoTokenHelper.generatePoToken(getApplication(), videoId)
-            result.onSuccess { poToken ->
-                // Convert to JSON format expected by Python
-                // PoTokenResult has public final fields: visitorData, playerRequestPoToken, streamingDataPoToken
-                val tokenJson = JSONObject().apply {
-                    put("visitor_data", poToken.visitorData)
-                    put("android", poToken.streamingDataPoToken) // Use streaming token for Android
-                    put("web", poToken.playerRequestPoToken) // Use player token for Web
-                    put("ios", poToken.streamingDataPoToken) // Use streaming token for iOS
-                    put("tv", poToken.streamingDataPoToken) // Use streaming token for TV
-                    put("mweb", poToken.playerRequestPoToken) // Use player token for mobile web
-                }.toString()
-
-                updatePoTokenData(tokenJson)
-                Log.d("PlayerViewModel", "✅ PO tokens generated and stored for video: $videoId")
-                Log.d("PlayerViewModel", "✅ Visitor Data: ${poToken.visitorData}")
-                Log.d("PlayerViewModel", "✅ Token JSON: $tokenJson")
-            }.onFailure { error ->
-                Log.e("PlayerViewModel", "❌ Failed to generate PO tokens", error)
-            }
-        } catch (e: Exception) {
-            Log.e("PlayerViewModel", "❌ Error generating PO tokens", e)
-        }
-    }
-
-    fun isPoTokenExpired(): Boolean {
-        // Check if poTokenData is empty or expired
-        return _uiState.value.poTokenData.isEmpty()
-    }
-
-    // Auto-refresh tokens when needed
-    suspend fun ensureValidPoTokens(videoId: String) {
-        if (isPoTokenExpired()) {
-            generateAndStorePoTokens(videoId)
-        }
+    fun updatePoToken(token: String) {
+        _uiState.value = _uiState.value.copy(poToken = token)
     }
 
     fun showPoTokenDialog() {
@@ -1455,6 +1368,6 @@ data class PlayerUiState(
     val availableFormats: List<Format> = emptyList(),  // Changed from AudioFormat to Format
     val isLoadingFormats: Boolean = false, // Loading indicator for format selection
     val selectedFormat: Format? = null,  // Currently selected format for download
-    val poTokenData: String = "", // PO Token data (JSON) for YouTube
+    val poToken: String = "", // PO Token for YouTube
     val showPoTokenDialog: Boolean = false // Dialog to enter PO Token
 )

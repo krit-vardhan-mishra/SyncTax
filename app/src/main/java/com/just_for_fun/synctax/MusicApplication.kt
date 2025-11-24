@@ -3,6 +3,7 @@ package com.just_for_fun.synctax
 import android.app.Application
 import android.net.Uri
 import android.util.Log
+import android.webkit.WebView
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.DataSource
@@ -15,12 +16,18 @@ import coil.memory.MemoryCache
 import coil.request.Options
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.just_for_fun.synctax.potoken.NewPipeDownloaderImpl
+import com.just_for_fun.synctax.potoken.NewPipePoTokenGenerator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import okio.buffer
 import okio.source
+import org.schabi.newpipe.extractor.NewPipe
+import org.schabi.newpipe.extractor.localization.Localization
+import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
@@ -29,6 +36,26 @@ class MusicApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        // Initialize WebView on main thread (required for Android 10+)
+        try {
+            WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+            Log.d(TAG, "✅ WebView initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize WebView", e)
+        }
+
+        // Initialize NewPipe extractor with PO token support
+        try {
+            NewPipe.init(
+                NewPipeDownloaderImpl(OkHttpClient.Builder()),
+                Localization("en", "US")
+            )
+            YoutubeStreamExtractor.setPoTokenProvider(NewPipePoTokenGenerator())
+            Log.d(TAG, "✅ NewPipe initialized with PO token support")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize NewPipe", e)
+        }
 
         // Initialize Python runtime on background thread to avoid blocking main thread
         applicationScope.launch {

@@ -15,7 +15,16 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 
 class NewPipePoTokenGenerator : PoTokenProvider {
     val TAG = NewPipePoTokenGenerator::class.simpleName
-    private val supportsWebView by lazy { runCatching { CookieManager.getInstance() }.isSuccess }
+    private val supportsWebView by lazy { 
+        val result = runCatching { 
+            CookieManager.getInstance()
+            true
+        }
+        result.onFailure { error ->
+            Log.e(TAG, "❌ CookieManager initialization failed - WebView not available", error)
+        }
+        result.getOrDefault(false)
+    }
 
     private object WebPoTokenGenLock
     private var webPoTokenVisitorData: String? = null
@@ -25,12 +34,18 @@ class NewPipePoTokenGenerator : PoTokenProvider {
 
     override fun getWebClientPoToken(videoId: String): PoTokenResult? {
         if (!supportsWebView) {
+            Log.e(TAG, "WebView is not supported on this device")
             return null
         }
 
         val result = kotlin.runCatching {
             getWebClientPoToken(videoId, false)
         }
+        
+        result.onFailure { error ->
+            Log.e(TAG, "Failed to generate PO token for video $videoId", error)
+        }
+        
         return result.getOrNull()
     }
 
@@ -52,15 +67,18 @@ class NewPipePoTokenGenerator : PoTokenProvider {
                     innertubeClientRequestInfo.clientInfo.clientVersion =
                         YoutubeParsingHelper.getClientVersion()
 
-                    webPoTokenVisitorData = YoutubeParsingHelper.getVisitorDataFromInnertube(
-                        innertubeClientRequestInfo,
-                        NewPipe.getPreferredLocalization(),
-                        NewPipe.getPreferredContentCountry(),
-                        YoutubeParsingHelper.getYouTubeHeaders(),
-                        YoutubeParsingHelper.YOUTUBEI_V1_URL,
-                        null,
-                        false
-                    )
+                    // Fetch visitor data on IO thread to avoid NetworkOnMainThreadException
+                    webPoTokenVisitorData = runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                        YoutubeParsingHelper.getVisitorDataFromInnertube(
+                            innertubeClientRequestInfo,
+                            NewPipe.getPreferredLocalization(),
+                            NewPipe.getPreferredContentCountry(),
+                            YoutubeParsingHelper.getYouTubeHeaders(),
+                            YoutubeParsingHelper.YOUTUBEI_V1_URL,
+                            null,
+                            false
+                        )
+                    }
 
                     runBlocking {
                         // close the current webPoTokenGenerator on the main thread

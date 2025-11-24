@@ -38,14 +38,21 @@ object PoTokenHelper {
      * @param videoId YouTube video ID (e.g., "dQw4w9WgXcQ")
      * @return Result containing PoTokenResult with visitor_data and tokens, or an exception
      */
-    suspend fun generatePoToken(context: Context, videoId: String): Result<PoTokenResult> = withContext(Dispatchers.Main) {
+    suspend fun generatePoToken(context: Context, videoId: String): Result<PoTokenResult> = withContext(Dispatchers.IO) {
         runCatching {
+            Log.d(TAG, "Attempting to generate PO token for video: $videoId")
             val generator = NewPipePoTokenGenerator()
             val result = generator.getWebClientPoToken(videoId)
-                ?: throw Exception("Failed to generate poToken - WebView not supported or error occurred")
             
-            Log.d(TAG, "Successfully generated poToken for video: $videoId")
-            Log.d(TAG, "Visitor Data: ${result.visitorData}")
+            if (result == null) {
+                Log.e(TAG, "getWebClientPoToken returned null - WebView not supported or initialization failed")
+                throw Exception("Failed to generate poToken - WebView not supported or initialization failed. Check logs for details.")
+            }
+            
+            Log.d(TAG, "✅ Successfully generated poToken for video: $videoId")
+            Log.d(TAG, "✅ Visitor Data: ${result.visitorData}")
+            Log.d(TAG, "✅ Player Request Token: ${result.playerRequestPoToken}")
+            Log.d(TAG, "✅ Streaming Data Token: ${result.streamingDataPoToken}")
             result
         }
     }

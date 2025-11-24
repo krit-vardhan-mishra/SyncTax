@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.unit.dp
@@ -337,7 +338,7 @@ fun LyricsOverlay(
 
     // Custom Search Input Dialog
     if (showCustomSearchDialog.value) {
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { showCustomSearchDialog.value = false },
             containerColor = Color.Black.copy(alpha = 0.9f),
             titleContentColor = Color.White,
