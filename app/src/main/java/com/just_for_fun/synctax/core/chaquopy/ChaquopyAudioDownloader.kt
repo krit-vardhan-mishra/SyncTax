@@ -115,6 +115,7 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                 val message = result.optString("message", "")
                 val title = result.optString("title", "Unknown")
                 val artist = result.optString("artist", "Unknown")
+                val album = result.optString("album", "YouTube Audio")
                 val duration = result.optInt("duration", 0)
                 val thumbnailUrl = result.optString("thumbnail_url", "")
                 val description = result.optString("description", "")
@@ -151,6 +152,7 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                     message = message,
                     title = title,
                     artist = artist,
+                    album = album,
                     duration = duration,
                     thumbnailUrl = thumbnailUrl,
                     description = description,
@@ -163,6 +165,7 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                     message = "Error: ${e.message}",
                     title = "",
                     artist = "",
+                    album = "YouTube Audio",
                     duration = 0,
                     thumbnailUrl = "",
                     description = "",
@@ -203,6 +206,7 @@ data class VideoInfo(
     val message: String,
     val title: String,
     val artist: String,
+    val album: String,
     val duration: Int,
     val thumbnailUrl: String,
     val description: String,

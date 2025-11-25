@@ -157,6 +157,7 @@ dependencies {
 
     // Liquid library for shader effects
     implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
 
     // Worker
     implementation("androidx.work:work-runtime-ktx:2.10.0")

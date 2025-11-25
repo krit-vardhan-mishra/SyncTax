@@ -2,6 +2,7 @@ package com.just_for_fun.synctax.ui.components.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,11 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,14 +36,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.compositeOver
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.input.ImeAction
@@ -53,11 +51,13 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.alpha
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.core.network.LrcLibResponse
 import kotlin.math.max
-import io.github.fletchmckee.liquid.rememberLiquidState
 import io.github.fletchmckee.liquid.liquid
 
 @Composable
@@ -87,64 +87,83 @@ fun LyricsOverlay(
     val customSongName = remember { mutableStateOf(song.title) }
     val customArtistName = remember { mutableStateOf(song.artist) }
 
+    // The overlay now uses the same background as FullScreenPlayer
+    // which is transparent to show the blurred album art behind it
     Box(
         modifier = Modifier
             .fillMaxSize()
             .liquid(liquidState)
+            .background(Color.Transparent) // Let the blurred background show through
             .pointerInput(Unit) {
                 detectVerticalDragGestures { change: PointerInputChange, dragAmount: Float ->
-                    if (dragAmount > 100f) { // Swipe down threshold
+                    if (dragAmount > 100f) {
                         onDismiss()
                     }
                 }
             }
     ) {
-        // Blurred background layer
+        // Additional dark scrim for better text contrast
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .blur(radius = 20.dp)
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = Color.Black.copy(alpha = 0.7f).compositeOver(songDominantColor.copy(alpha = 0.1f))
-            ) {}
-        }
+                .background(Color.Black.copy(alpha = 0.8f))
+        )
 
-        // Content layer (not blurred)
         Column(modifier = Modifier.fillMaxSize()) {
-            // Top Bar with Back Button (Material 3 style)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 48.dp, start = 8.dp, end = 24.dp, bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Modern Top Bar
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.Transparent
             ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Return to Player",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.Start) {
-                    Text(
-                        text = song.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song.artist,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp, start = 8.dp, end = 24.dp, bottom = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Glass-morphic back button
+                    Surface(
+                        onClick = onDismiss,
+                        shape = RoundedCornerShape(25.dp),
+                        color = Color.White.copy(alpha = 0.15f),
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = "Return to Player",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(
+                        horizontalAlignment = Alignment.Start,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = song.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = song.artist,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -156,70 +175,74 @@ fun LyricsOverlay(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(24.dp),
+                        modifier = Modifier.padding(horizontal = 32.dp)
                     ) {
                         if (isFetchingLyrics) {
-                            // Show loading indicator
+                            // Modern loading state
                             CircularProgressIndicator(
                                 color = Color.White,
-                                modifier = Modifier.size(48.dp)
+                                strokeWidth = 3.dp,
+                                modifier = Modifier.size(56.dp)
                             )
                             Text(
                                 text = "Fetching lyrics...",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontWeight = FontWeight.Medium
                             )
                         } else if (hasSearchResults && searchResults.isNotEmpty()) {
-                            // Show search results for user selection
+                            // Search results section
                             Text(
-                                text = "Select lyrics to use:",
-                                style = MaterialTheme.typography.headlineSmall,
+                                text = "Select Lyrics",
+                                style = MaterialTheme.typography.headlineMedium,
                                 color = Color.White,
+                                fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center
                             )
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
                             LazyColumn(
                                 modifier = Modifier
-                                    .fillMaxWidth(0.9f)
+                                    .fillMaxWidth()
                                     .weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                                 contentPadding = PaddingValues(vertical = 16.dp)
                             ) {
                                 items(searchResults) { result ->
                                     val index = searchResults.indexOf(result)
-                                    Button(
+                                    Surface(
                                         onClick = { onSelectLyrics(index) },
                                         modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = songDominantColor.copy(alpha = 0.8f),
-                                            contentColor = Color.White
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
+                                        color = Color.White.copy(alpha = 0.12f),
+                                        shape = RoundedCornerShape(16.dp)
                                     ) {
                                         Column(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalAlignment = Alignment.Start
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(20.dp)
                                         ) {
                                             Text(
                                                 text = result.trackName ?: "Unknown Title",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
+                                                color = Color.White,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
+                                            Spacer(modifier = Modifier.height(4.dp))
                                             Text(
                                                 text = result.artistName ?: "Unknown Artist",
                                                 style = MaterialTheme.typography.bodyMedium,
+                                                color = Color.White.copy(alpha = 0.8f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             if (!result.albumName.isNullOrBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
                                                 Text(
                                                     text = result.albumName,
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = Color.White.copy(alpha = 0.7f),
+                                                    color = Color.White.copy(alpha = 0.6f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -229,49 +252,77 @@ fun LyricsOverlay(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-
                             Text(
-                                text = "Not the right lyrics? Try searching again",
+                                text = "Not finding the right lyrics?",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.5f),
+                                color = Color.White.copy(alpha = 0.6f),
                                 textAlign = TextAlign.Center
                             )
                         } else {
-                            // Show fetch button or failure message
+                            // Empty state
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .background(
+                                        Color.White.copy(alpha = 0.15f),
+                                        RoundedCornerShape(20.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Search,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+
                             Text(
-                                text = if (hasFailedFetch) "Lyrics not available for this song" else (lyricsError
-                                    ?: "No Lyrics Found"),
+                                text = if (hasFailedFetch) "Lyrics Unavailable" else "No Lyrics Found",
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = Color.White,
+                                fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
-
                             if (!hasFailedFetch) {
+                                Text(
+                                    text = "Search for synced lyrics from LRCLIB",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
                                 Button(
                                     onClick = { showCustomSearchDialog.value = true },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = songDominantColor,
+                                        containerColor = Color.White.copy(alpha = 0.2f),
                                         contentColor = Color.White
                                     ),
-                                    shape = RoundedCornerShape(12.dp)
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.height(56.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Rounded.Download,
                                         contentDescription = null,
                                         modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Fetch Lyrics from LRCLIB")
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        "Fetch Lyrics",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
 
                                 if (lyricsError != null) {
                                     Text(
-                                        text = "Tap to try again",
+                                        text = lyricsError,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color.White.copy(alpha = 0.5f)
+                                        color = Color(0xFFFF6B6B),
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -281,7 +332,7 @@ fun LyricsOverlay(
             } else {
                 val listState = rememberLazyListState()
 
-                // Auto-scroll to current lyric. Scroll to keep the current line near the 3rd line of the visible area.
+                // Auto-scroll to current lyric
                 LaunchedEffect(currentLyricIndex) {
                     if (currentLyricIndex >= 0) {
                         listState.animateScrollToItem(
@@ -290,72 +341,112 @@ fun LyricsOverlay(
                     }
                 }
 
-                // 2. Reduced Viewport: Use Spacers to push the lyrics list into a smaller vertical window.
-                Spacer(modifier = Modifier.weight(0.15f)) // Pushes content down
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Top fade gradient for smooth edge
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.7f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                            .align(Alignment.TopCenter)
+                    )
 
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.7f) // Occupies only 70% of the remaining vertical space
-                        .padding(horizontal = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    // Use padding to ensure the top and bottom lines of the list are visible
-                    contentPadding = PaddingValues(vertical = 40.dp)
-                ) {
-                    items(lyrics) { lyric ->
-                        val index = lyrics.indexOf(lyric)
-                        val isCurrentLine = index == currentLyricIndex
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        contentPadding = PaddingValues(vertical = 120.dp)
+                    ) {
+                        items(lyrics) { lyric ->
+                            val index = lyrics.indexOf(lyric)
+                            val isCurrentLine = index == currentLyricIndex
 
-                        // Animate opacity and scale for highlighting
-                        val targetAlpha = if (isCurrentLine) 1.0f else 0.4f
-                        val targetScale = if (isCurrentLine) 1.0f else 0.95f
+                            // Smooth animations
+                            val targetAlpha = if (isCurrentLine) 1.0f else 0.4f
+                            val targetScale = if (isCurrentLine) 1.0f else 0.94f
 
-                        val alpha by animateFloatAsState(targetValue = targetAlpha, label = "alpha")
-                        val scale by animateFloatAsState(targetValue = targetScale, label = "scale")
+                            val alpha by animateFloatAsState(
+                                targetValue = targetAlpha,
+                                animationSpec = tween(300),
+                                label = "alpha"
+                            )
+                            val scale by animateFloatAsState(
+                                targetValue = targetScale,
+                                animationSpec = tween(300),
+                                label = "scale"
+                            )
 
-                        Text(
-                            text = lyric.text,
-                            style = if (isCurrentLine)
-                                MaterialTheme.typography.headlineMedium
-                            else
-                                MaterialTheme.typography.titleLarge,
-                            color = Color.White.copy(alpha = alpha),
-                            textAlign = TextAlign.Center,
-                            fontWeight = if (isCurrentLine) FontWeight.Bold else FontWeight.Normal,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .scale(scale)
-                                .padding(vertical = 12.dp) // Generous padding for mobile tap/read
-                        )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp)
+                            ) {
+                                Text(
+                                    text = lyric.text,
+                                    style = if (isCurrentLine)
+                                        MaterialTheme.typography.headlineMedium
+                                    else
+                                        MaterialTheme.typography.titleLarge,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center,
+                                    fontWeight = if (isCurrentLine) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .scale(scale)
+                                        .alpha(alpha)
+                                )
+                            }
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.weight(0.15f)) // Pushes content up
+                    // Bottom fade gradient for smooth edge
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Black.copy(alpha = 0.7f)
+                                    )
+                                )
+                            )
+                            .align(Alignment.BottomCenter)
+                    )
+                }
             }
         }
     }
 
-    // Custom Search Input Dialog
+    // Modern Search Dialog
     if (showCustomSearchDialog.value) {
         AlertDialog(
             onDismissRequest = { showCustomSearchDialog.value = false },
-            containerColor = Color.Black.copy(alpha = 0.9f),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
+            containerColor = Color.Black.copy(alpha = 0.92f),
             title = {
                 Text(
                     text = "Search Lyrics",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Text(
-                        text = "Enter the song name and artist for more accurate results:",
+                        text = "Enter song details for accurate results",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f)
                     )
@@ -369,10 +460,11 @@ fun LyricsOverlay(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = songDominantColor,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                            cursorColor = songDominantColor
+                            focusedBorderColor = Color.White.copy(alpha = 0.6f),
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                            cursorColor = Color.White
                         ),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -385,10 +477,11 @@ fun LyricsOverlay(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = songDominantColor,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
-                            cursorColor = songDominantColor
+                            focusedBorderColor = Color.White.copy(alpha = 0.6f),
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                            cursorColor = Color.White
                         ),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -405,12 +498,13 @@ fun LyricsOverlay(
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = songDominantColor,
+                        containerColor = Color.White.copy(alpha = 0.2f),
                         contentColor = Color.White
                     ),
+                    shape = RoundedCornerShape(12.dp),
                     enabled = customSongName.value.isNotBlank() && customArtistName.value.isNotBlank()
                 ) {
-                    Text("Search")
+                    Text("Search", fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -423,7 +517,8 @@ fun LyricsOverlay(
                 ) {
                     Text("Cancel")
                 }
-            }
+            },
+            shape = RoundedCornerShape(24.dp)
         )
     }
 }

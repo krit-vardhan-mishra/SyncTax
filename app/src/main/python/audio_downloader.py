@@ -328,6 +328,7 @@ def get_video_info(url: str, po_token_data: str = None) -> str:
                     "success": True,
                     "title": info.get('title', 'Unknown'),
                     "artist": info.get('artist') or info.get('uploader', 'Unknown'),
+                    "album": info.get('album', 'YouTube Audio'),
                     "duration": info.get('duration', 0),
                     "thumbnail_url": info.get('thumbnail', ''),
                     "description": info.get('description', ''),

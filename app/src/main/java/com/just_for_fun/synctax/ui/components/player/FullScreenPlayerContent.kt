@@ -262,9 +262,9 @@ fun FullScreenPlayerContent(
                     progress = progress,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(2.dp),
-                    color = Color.Green,
-                    trackColor = Color.White,
+                        .height(4.dp),
+                    color = Color(0xFF4CAF50), // Bright green color
+                    trackColor = Color.White.copy(alpha = 0.3f),
                 )
             }
         }

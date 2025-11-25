@@ -71,17 +71,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var currentLyrics: String? = null
 
     private fun logSongDetails(song: Song) {
-        Log.d("PlayerViewModel", "🎵 Now Playing Song Details:")
-        Log.d("PlayerViewModel", "  ID: ${song.id}")
-        Log.d("PlayerViewModel", "  Title: ${song.title}")
-        Log.d("PlayerViewModel", "  Artist: ${song.artist}")
-        Log.d("PlayerViewModel", "  Album: ${song.album ?: "Unknown"}")
-        Log.d("PlayerViewModel", "  Duration: ${song.duration}ms")
-        Log.d("PlayerViewModel", "  File Path: ${song.filePath}")
-        Log.d("PlayerViewModel", "  Genre: ${song.genre ?: "Unknown"}")
-        Log.d("PlayerViewModel", "  Release Year: ${song.releaseYear ?: "Unknown"}")
-        Log.d("PlayerViewModel", "  Album Art URI: ${song.albumArtUri ?: "None"}")
-        Log.d("PlayerViewModel", "  Added Timestamp: ${song.addedTimestamp}")
+        // Simplified playback log; detailed metadata is logged when fetched via yt-dlp
+        Log.d("PlayerViewModel", "🎵 Playing: ${song.title} — ${song.artist} (${song.album ?: "Unknown"})")
     }
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -395,6 +386,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             checkIfSongDownloaded(onlineSong)
             savePlaylistState()
             updateNotification()
+
+            // Fetch richer metadata via yt-dlp and update the UI song fields
+            viewModelScope.launch {
+                try {
+                    val videoId = title.substringAfter("online:", "") // best-effort; if not available, fallback
+                    val resolvedUrl = if (url.startsWith("http")) url else "https://www.youtube.com/watch?v=$videoId"
+                    val info = try {
+                        chaquopyDownloader.getVideoInfo(resolvedUrl, _uiState.value.poTokenData.ifEmpty { null })
+                    } catch (e: Exception) { null }
+
+                    if (info != null) {
+                        val updated = onlineSong.copy(
+                            title = info.title.takeIf { it.isNotEmpty() } ?: onlineSong.title,
+                            artist = info.artist.takeIf { it.isNotEmpty() } ?: onlineSong.artist,
+                            album = info.album.takeIf { it.isNotEmpty() } ?: onlineSong.album
+                        )
+                        _uiState.value = _uiState.value.copy(currentSong = updated)
+                        Log.d("PlayerViewModel", "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}")
+                        updateNotification()
+                    }
+                } catch (e: Exception) {
+                    Log.w("PlayerViewModel", "📥 Metadata fetch failed for playUrl: ${e.message}")
+                }
+            }
         }
     }
 
@@ -521,6 +536,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             savePlaylistState()
             updateNotification()
+
+            // Fetch richer metadata via yt-dlp and update the UI song fields for full-screen player
+            viewModelScope.launch {
+                try {
+                    val url = "https://www.youtube.com/watch?v=$videoId"
+                    val info = try {
+                        chaquopyDownloader.getVideoInfo(url, _uiState.value.poTokenData.ifEmpty { null })
+                    } catch (e: Exception) { null }
+
+                    if (info != null) {
+                        val updated = onlineSong.copy(
+                            title = info.title.takeIf { it.isNotEmpty() } ?: onlineSong.title,
+                            artist = info.artist.takeIf { it.isNotEmpty() } ?: onlineSong.artist,
+                            album = info.album.takeIf { it.isNotEmpty() } ?: onlineSong.album
+                        )
+                        _uiState.value = _uiState.value.copy(currentSong = updated)
+                        Log.d("PlayerViewModel", "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}")
+                        updateNotification()
+                    }
+                } catch (e: Exception) {
+                    Log.w("PlayerViewModel", "📥 Metadata fetch failed for stream: ${e.message}")
+                }
+            }
         }
     }
 
@@ -1223,12 +1261,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 ensureValidPoTokens(videoId)
                 Log.d("PlayerViewModel", "📥 Format Download: PO tokens ready")
 
+                // Fetch detailed metadata from yt-dlp first
+                Log.d("PlayerViewModel", "📥 Format Download: Fetching metadata from yt-dlp...")
+                val videoInfo = try {
+                    chaquopyDownloader.getVideoInfo(url, _uiState.value.poTokenData.ifEmpty { null })
+                } catch (e: Exception) {
+                    Log.w("PlayerViewModel", "📥 Format Download: yt-dlp metadata fetch failed: ${e.message}")
+                    null
+                }
+                
+                val metadataTitle = videoInfo?.title?.takeIf { it.isNotEmpty() } ?: currentSong.title
+                val metadataArtist = videoInfo?.artist?.takeIf { it.isNotEmpty() } ?: currentSong.artist
+                val metadataAlbum = videoInfo?.album?.takeIf { it.isNotEmpty() } ?: "YouTube Audio"
+                
+                Log.d("PlayerViewModel", "📥 Format Download: Metadata from yt-dlp:")
+                Log.d("PlayerViewModel", "📥 Format Download: - Title: $metadataTitle")
+                Log.d("PlayerViewModel", "📥 Format Download: - Artist: $metadataArtist")
+                Log.d("PlayerViewModel", "📥 Format Download: - Album: $metadataAlbum")
+
                 Log.d("PlayerViewModel", "📥 Format Download: Marking song as downloading...")
                 // Mark as downloading
                 _uiState.value = _uiState.value.copy(
                     downloadingSongs = _uiState.value.downloadingSongs + currentSong.id,
                     downloadProgress = _uiState.value.downloadProgress + (currentSong.id to 0.0f),
-                    downloadMessage = "Downloading ${currentSong.title} (${format.format_note})..."
+                    downloadMessage = "Downloading $metadataTitle (${format.format_note})..."
                 )
 
                 Log.d("PlayerViewModel", "📥 Format Download: Using NewPipe direct download (primary method)...")
@@ -1249,9 +1305,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // PRIMARY: Use NewPipe for direct download (reliable, no bot detection issues)
                 val newPipeResult = try {
                     com.just_for_fun.synctax.core.download.NewPipeAudioDownloader.downloadAudio(
-                        videoId,
-                        downloadDir,
-                        null // Let NewPipe choose best format
+                        context = getApplication(), // Pass application context
+                        videoId = videoId,
+                        outputDir = downloadDir,
+                        preferredFormat = null, // Let NewPipe choose best format
+                        metadataTitle = metadataTitle,
+                        metadataArtist = metadataArtist,
+                        metadataAlbum = metadataAlbum
                     )
                 } catch (e: Exception) {
                     Log.e("PlayerViewModel", "📥 Format Download: NewPipe failed", e)
@@ -1306,29 +1366,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         )
 
                         // Create downloaded song entry
-                        // Use NewPipe metadata (title, artist) from the result
-                        val finalTitle = if (newPipeResult.title.isNotEmpty()) {
-                            newPipeResult.title
-                        } else {
-                            currentSong.title
-                        }
+                        // Priority: yt-dlp metadata > NewPipe metadata > current song data
+                        val finalTitle = metadataTitle.takeIf { it.isNotEmpty() }
+                            ?: newPipeResult.title.takeIf { it.isNotEmpty() }
+                            ?: currentSong.title
                         
-                        val finalArtist = if (newPipeResult.artist.isNotEmpty()) {
-                            newPipeResult.artist
-                        } else {
-                            currentSong.artist
-                        }
+                        val finalArtist = metadataArtist.takeIf { it.isNotEmpty() }
+                            ?: newPipeResult.artist.takeIf { it.isNotEmpty() }
+                            ?: currentSong.artist
+                        
+                        val finalAlbum = metadataAlbum.takeIf { it.isNotEmpty() }
+                            ?: currentSong.album
+                        
+                        Log.d("PlayerViewModel", "📥 Format Download: Final metadata - Title: $finalTitle, Artist: $finalArtist, Album: $finalAlbum")
                         
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
                             title = finalTitle,
                             artist = finalArtist,
-                            album = currentSong.album,
+                            album = finalAlbum,
                             duration = currentSong.duration, // Use original duration, will be updated on playback
                             filePath = downloadedFile.absolutePath,
                             genre = currentSong.genre,
                             releaseYear = currentSong.releaseYear,
-                            albumArtUri = currentSong.albumArtUri // Metadata embedded in WebM file
+                            albumArtUri = newPipeResult.thumbnailUrl.takeIf { it.isNotEmpty() } ?: currentSong.albumArtUri
                         )
 
                         // Insert into database if not already present

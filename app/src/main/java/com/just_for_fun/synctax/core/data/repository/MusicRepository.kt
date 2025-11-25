@@ -94,7 +94,7 @@ class MusicRepository(private val context: Context) {
                     // Check if it's an audio file and not a deleted/trash file
                     if (fileName.matches(
                             Regex(
-                                ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
+                                ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac|webm)$",
                                 RegexOption.IGNORE_CASE
                             )
                         ) &&
@@ -226,7 +226,7 @@ class MusicRepository(private val context: Context) {
                     if ((mimeType?.startsWith("audio/") == true ||
                                 fileName.matches(
                                     Regex(
-                                        ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac)$",
+                                        ".*\\.(mp3|opus|m4a|flac|wav|aac|ogg|wma|ape|alac|webm)$",
                                         RegexOption.IGNORE_CASE
                                     )
                                 )) &&
