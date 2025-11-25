@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
     id("com.google.devtools.ksp")
-    id("com.chaquo.python") version "16.0.0"
+    id("com.chaquo.python") version "16.1.0"
     id ("kotlin-parcelize")
 }
 
@@ -69,23 +69,16 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.10"
-//        buildPython("C:\Users\theya\AppData\Local\Programs\Python\Python312\python.exe")
-//        buildPython("C:\Users\theya\AppData\Local\Microsoft\WindowsApps\python.exe")
         pip {
-            install("yt-dlp==2024.11.18") // Specify latest version
+            install("yt-dlp==2025.11.12")
+            install("ffmpeg")
+            install("ffprobe")
+            install("pillow")
             install("mutagen")
             install("requests") // Add requests library
             install("urllib3")
         }
     }
-
-//    sourceSets {
-//        getByName("main") {
-//            python {
-//                srcDir("src/main/python")
-//            }
-//        }
-//    }
 }
 
 dependencies {
@@ -164,7 +157,12 @@ dependencies {
 
     // FFmpeg for audio processing
     // implementation("com.github.arthenica:ffmpeg-kit:v6.0-2")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
-    // Commented out due to jitpack.io 401 error - app handles FFmpeg absence gracefully
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+//implementation "io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1"
+    implementation("io.github.junkfood02.youtubedl-android:aria2c:0.18.1")
+//    implementation "io.github.junkfood02.youtubedl-android:library:0.17.4"
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")    // Commented out due to jitpack.io 401 error - app handles FFmpeg absence gracefully
     // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
+
+    implementation("com.afollestad.material-dialogs:core:3.3.0")
 }

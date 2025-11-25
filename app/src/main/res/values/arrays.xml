@@ -61,4 +61,300 @@
         <item>SMALLEST</item>
         <item>GENERIC</item>
     </string-array>
+
+
+    <string-array name="audio_containers_values">
+        <item></item>
+        <item>mp3</item>
+        <item>m4a</item>
+        <item>aac</item>
+        <item>alac</item>
+        <item>flac</item>
+        <item>opus</item>
+        <item>wav</item>
+    </string-array>
+
+
+    <string-array name="video_containers_values">
+        <item></item>
+        <item>mp4</item>
+        <item>webm</item>
+        <item>mkv</item>
+        <item>mov</item>
+        <item>avi</item>
+        <item>flv</item>
+        <item>gif</item>
+    </string-array>
+
+
+    <string-array name="video_formats_values">
+        <item>best</item>
+        <item>2160p_ytdlnisgeneric</item>
+        <item>1440p_ytdlnisgeneric</item>
+        <item>1080p_ytdlnisgeneric</item>
+        <item>720p_ytdlnisgeneric</item>
+        <item>480p_ytdlnisgeneric</item>
+        <item>360p_ytdlnisgeneric</item>
+        <item>240p_ytdlnisgeneric</item>
+        <item>worst</item>
+    </string-array>
+
+    <string-array name="audio_formats_values">
+        <item>ba</item>
+        <item>192kbps_ytdlnisgeneric</item>
+        <item>160kbps_ytdlnisgeneric</item>
+        <item>128kbps_ytdlnisgeneric</item>
+        <item>96kbps_ytdlnisgeneric</item>
+        <item>64kbps_ytdlnisgeneric</item>
+        <item>wa</item>
+    </string-array>
+
+
+    <string-array name="format_ordering_values">
+        <item>filesize</item>
+        <item>container</item>
+        <item>codec</item>
+        <item>id</item>
+    </string-array>
+
+
+    <string-array name="sponsorblock_settings_values">
+        <item>music_offtopic</item>
+        <item>sponsor</item>
+        <item>intro</item>
+        <item>outro</item>
+        <item>selfpromo</item>
+        <item>preview</item>
+        <item>filler</item>
+        <item>interaction</item>
+    </string-array>
+
+    <string-array name="sponsorblock_settings_default">
+        <item>music_offtopic</item>
+    </string-array>
+
+
+    <string-array name="language_entries">
+        <item>System</item>
+        <item>English</item>
+        <item>العربية</item>
+        <item>Azərbaycanca</item>
+        <item>বাংলা</item>
+        <item>বাংলা (India)</item>
+        <item>български</item>
+        <item>Босански</item>
+        <item>Deutsch</item>
+        <item>Ἑλληνική</item>
+        <item>Español</item>
+        <item>فارسی</item>
+        <item>Français</item>
+        <item>हिन्दी</item>
+        <item>Hrvatski</item>
+        <item>Magyar</item>
+        <item>Bahasa Indonesia</item>
+        <item>Italiano</item>
+        <item>日本語</item>
+        <item>ꦧꦱꦗꦮ</item>
+        <item>조선말</item>
+        <item>latviešu</item>
+        <item>بهاس ملايو</item>
+        <item>Norsk Bokmål</item>
+        <item>Norsk Nynorsk</item>
+        <item>पंजाबी</item>
+        <item>polski</item>
+        <item>Português</item>
+        <item>Português Brazil</item>
+        <item>Русский</item>
+        <item>Română</item>
+        <item>Slovenčina</item>
+        <item>Српски</item>
+        <item>Shqip</item>
+        <item>தமிழ்</item>
+        <item>తెలుగు</item>
+        <item>ภาษาไทย</item>
+        <item>Türkçe</item>
+        <item>தமிழ்</item>
+        <item>Українська</item>
+        <item>Tiếng Việt Nam</item>
+        <item>中文</item>
+    </string-array>
+
+    <string-array name="language_values">
+        <item>system</item>
+        <item>en</item>
+        <item>ar</item>
+        <item>az</item>
+        <item>bn</item>
+        <item>bn-IN</item>
+        <item>bg</item>
+        <item>bs</item>
+        <item>de</item>
+        <item>el</item>
+        <item>es</item>
+        <item>fa</item>
+        <item>fr</item>
+        <item>hi</item>
+        <item>hr</item>
+        <item>hu</item>
+        <item>in</item>
+        <item>it</item>
+        <item>ja</item>
+        <item>jv</item>
+        <item>ko</item>
+        <item>lv</item>
+        <item>ms</item>
+        <item>nb</item>
+        <item>nn</item>
+        <item>pa</item>
+        <item>pl</item>
+        <item>pt</item>
+        <item>pt-BR</item>
+        <item>ru</item>
+        <item>ro</item>
+        <item>sk</item>
+        <item>sr</item>
+        <item>sq</item>
+        <item>ta</item>
+        <item>te</item>
+        <item>th</item>
+        <item>tr</item>
+        <item>ta</item>
+        <item>uk</item>
+        <item>vi</item>
+        <item>zh</item>
+    </string-array>
+
+
+
+    <string-array name="download_types_values">
+        <item>auto</item>
+        <item>audio</item>
+        <item>video</item>
+        <item>command</item>
+    </string-array>
+
+    <array name="initial_slider_values">
+        <item>0.0</item>
+        <item>100.0</item>
+    </array>
+
+    <array name="formats_source">
+        <item>NewPipe</item>
+        <item>yt-dlp</item>
+    </array>
+
+    <array name="formats_source_values">
+        <item>newpipe</item>
+        <item>yt-dlp</item>
+    </array>
+
+    <array name="search_engines">
+        <item>YouTube</item>
+        <item>YouTube Music</item>
+        <item>Soundcloud</item>
+        <item>Bilibili</item>
+        <item>Nico video</item>
+        <item>PRX Series</item>
+        <item>PRX Stories</item>
+        <item>Rokfin</item>
+        <item>Yahoo screen</item>
+        <item>Google Video</item>
+        <item>Netverse</item>
+    </array>
+
+    <array name="search_engines_values">
+        <item>ytsearch</item>
+        <item>ytsearchmusic</item>
+        <item>scsearch</item>
+        <item>bilisearch</item>
+        <item>nicosearch</item>
+        <item>prxseries</item>
+        <item>prxstories</item>
+        <item>rkfnsearch</item>
+        <item>yvsearch</item>
+        <item>gvsearch</item>
+        <item>netsearch</item>
+    </array>
+
+
+
+
+
+    <array name="backup_category_values">
+        <item>settings</item>
+        <item>downloads</item>
+        <item>queued</item>
+        <item>scheduled</item>
+        <item>cancelled</item>
+        <item>errored</item>
+        <item>saved</item>
+        <item>cookies</item>
+        <item>templates</item>
+        <item>shortcuts</item>
+        <item>searchHistory</item>
+        <item>observeSources</item>
+    </array>
+
+
+    <string-array name="sub_formats_values">
+        <item></item>
+        <item>srt</item>
+        <item>ass</item>
+        <item>lrc</item>
+        <item>vtt</item>
+    </string-array>
+
+    <string-array name="audio_codec">
+        <item>Default Value</item>
+        <item>M4A</item>
+        <item>OPUS</item>
+    </string-array>
+
+    <string-array name="format_importance_audio_values">
+        <item>id</item>
+        <item>language</item>
+        <item>codec</item>
+        <item>container</item>
+        <item>file_size</item>
+    </string-array>
+
+    <string-array name="audio_codec_values_ytdlp">
+        <item></item>
+        <item>aac</item>
+        <item>opus</item>
+    </string-array>
+
+
+
+    <string-array name="hide_thumbnail_values">
+        <item>home</item>
+        <item>downloads</item>
+        <item>queue</item>
+    </string-array>
+
+    <string-array name="audio_formats">
+        <item>Best Quality</item>
+        <item>~192kbps</item>
+        <item>~160kbps</item>
+        <item>~128kbps</item>
+        <item>~96kbps</item>
+        <item>~64kbps</item>
+        <item>Worst Quality</item>
+    </string-array>
+
+    <string-array name="video_codec_values">
+        <item></item>
+        <item>av[01]</item>
+        <item>vp[09]</item>
+        <item>avc|h264</item>
+        <item>hev|h265</item>
+    </string-array>
+
+    <string-array name="video_codec_values_ytdlp">
+        <item></item>
+        <item>av01</item>
+        <item>vp9</item>
+        <item>h264</item>
+        <item>h265</item>
+    </string-array>
 </resources>

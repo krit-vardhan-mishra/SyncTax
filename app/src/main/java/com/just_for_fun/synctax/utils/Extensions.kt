@@ -1,6 +1,5 @@
 package com.just_for_fun.synctax.utils
 
-
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Dialog

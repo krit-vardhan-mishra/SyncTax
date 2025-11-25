@@ -11,12 +11,23 @@ import android.util.Patterns
 import android.widget.Toast
 import androidx.preference.PreferenceManager
 import com.afollestad.materialdialogs.utils.MDUtil.getStringArray
-import com.anggrayudi.storage.extension.count
+import com.just_for_fun.synctax.utils.Extensions.getIDFromYoutubeURL
+import com.just_for_fun.synctax.utils.Extensions.getIntByAny
+import com.just_for_fun.synctax.utils.Extensions.getStringByAny
+import com.just_for_fun.synctax.utils.Extensions.isURL
+import com.just_for_fun.synctax.utils.Extensions.isYoutubeURL
+import com.just_for_fun.synctax.utils.Extensions.isYoutubeWatchVideosURL
+import com.just_for_fun.synctax.utils.Extensions.toStringDuration
+import com.just_for_fun.synctax.utils.FileUtil
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.just_for_fun.synctax.util.FormatUtil
-import com.yausername.youtubedl_android.YoutubeDLRequest
+import com.just_for_fun.synctax.core.data.local.dao.CommandTemplateDao
+import com.just_for_fun.synctax.core.data.local.entities.ChapterItem
+import com.just_for_fun.synctax.core.data.local.entities.Format
+import com.just_for_fun.synctax.core.data.local.entities.ResultItem
+import com.just_for_fun.synctax.utils.FormatUtil
 import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -28,7 +39,8 @@ import java.util.Locale
 import java.util.StringJoiner
 import java.util.UUID
 
-class SyncTaxUtil(private val context: Context, private val commandTemplateDao: CommandTemplateDao) {
+
+class YTDLPUtil(private val context: Context, private val commandTemplateDao: CommandTemplateDao) {
     private var sharedPreferences: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val formatUtil = FormatUtil(context)
     private val handler = Handler(Looper.getMainLooper())

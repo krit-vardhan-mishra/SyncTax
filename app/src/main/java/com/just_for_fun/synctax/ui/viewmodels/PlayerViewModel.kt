@@ -30,7 +30,7 @@ import com.just_for_fun.synctax.core.utils.AudioProcessor
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
 import com.just_for_fun.synctax.potoken.PoTokenHelper
 import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.util.FormatUtil
+import com.just_for_fun.synctax.utils.FormatUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
