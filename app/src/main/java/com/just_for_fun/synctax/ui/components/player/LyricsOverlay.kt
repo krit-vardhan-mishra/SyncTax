@@ -471,7 +471,8 @@ fun LyricsOverlay(
                     OutlinedTextField(
                         value = customArtistName.value,
                         onValueChange = { customArtistName.value = it },
-                        label = { Text("Artist Name", color = Color.White.copy(alpha = 0.7f)) },
+                        label = { Text("Artist Name (optional)", color = Color.White.copy(alpha = 0.7f)) },
+                        placeholder = { Text("Leave empty to search by title only", color = Color.White.copy(alpha = 0.45f)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -489,7 +490,7 @@ fun LyricsOverlay(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (customSongName.value.isNotBlank() && customArtistName.value.isNotBlank()) {
+                        if (customSongName.value.isNotBlank()) {
                             onFetchLyricsWithCustomQuery(
                                 customSongName.value.trim(),
                                 customArtistName.value.trim()
@@ -502,7 +503,7 @@ fun LyricsOverlay(
                         contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = customSongName.value.isNotBlank() && customArtistName.value.isNotBlank()
+                    enabled = customSongName.value.isNotBlank()
                 ) {
                     Text("Search", fontWeight = FontWeight.SemiBold)
                 }

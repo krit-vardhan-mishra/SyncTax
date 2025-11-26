@@ -314,3 +314,5 @@ ytdlnis-main/
 .externalNativeBuild
 /benchmark
 *.png
+
+METADATA_DOWNLOAD_FIX_SUMMARY.md

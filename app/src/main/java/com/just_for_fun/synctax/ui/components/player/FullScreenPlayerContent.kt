@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -162,11 +163,19 @@ fun FullScreenPlayerContent(
     // Get PlayerViewModel for download functionality
     val uiState by playerViewModel.uiState.collectAsState()
 
+    // Smoothly animate download progress changes for the current song
+    val liveProgress = uiState.downloadProgress[song.id] ?: 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = liveProgress,
+        animationSpec = tween(durationMillis = 300)
+    )
+
     // Liquid state for shader effects
     val liquidState = rememberLiquidState()
     // --- Local UI States ---
     var showPlayerMenu by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) } // State to control the lyrics overlay
+    var showCancelDownloadDialog by remember { mutableStateOf(false) } // State for download cancellation dialog
 
     // Load lyrics when song changes
     LaunchedEffect(song.id) {
@@ -257,7 +266,7 @@ fun FullScreenPlayerContent(
         bottomBar = {
             // Show download progress bar at bottom when downloading
             if (uiState.downloadingSongs.contains(song.id)) {
-                val progress = uiState.downloadProgress[song.id] ?: 0f
+                val progress = animatedProgress
                 LinearProgressIndicator(
                     progress = progress,
                     modifier = Modifier
@@ -590,7 +599,7 @@ fun FullScreenPlayerContent(
                         ) {
                             val isDownloaded = uiState.downloadedSongs.contains(song.id)
                             val isDownloading = uiState.downloadingSongs.contains(song.id)
-                            val downloadProgress = uiState.downloadProgress[song.id] ?: 0f
+                            val downloadProgress = animatedProgress
 
                             AnimatedDownloadButton(
                                 isDownloading = isDownloading,
@@ -626,9 +635,10 @@ fun FullScreenPlayerContent(
                     )
 
                     // Optional: Download Progress for Online songs
-                    if (downloadPercent in 1..99) {
+                    val downloadPercentInt = (animatedProgress.times(100f).toInt()).coerceIn(0, 100)
+                    if (downloadPercentInt in 1..99) {
                         Text(
-                            text = "Downloading $downloadPercent%",
+                            text = "Downloading $downloadPercentInt%",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -719,37 +729,46 @@ fun FullScreenPlayerContent(
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // =====================================================================
-                // UP NEXT BUTTON
+                // UP NEXT BUTTON (for both offline and online songs)
                 // =====================================================================
-                if (!song.id.startsWith("online:")) {
-                    Surface(
-                        onClick = { onShowUpNextChange(true) },
-                        shape = RoundedCornerShape(12.dp),
-                        // Make this slightly transparent too
-                        color = PlayerSurfaceVariant.copy(alpha = 0.5f),
+                Surface(
+                    onClick = { onShowUpNextChange(true) },
+                    shape = RoundedCornerShape(12.dp),
+                    // Make this slightly transparent too
+                    color = PlayerSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.PlaylistPlay,
-                                contentDescription = null,
-                                tint = PlayerTextSecondary
+                        Icon(
+                            imageVector = Icons.Rounded.PlaylistPlay,
+                            contentDescription = null,
+                            tint = PlayerTextSecondary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = if (song.id.startsWith("online:") || song.id.startsWith("youtube:")) 
+                                "Recommended" else "Up Next",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = PlayerTextSecondary
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        
+                        // Show loading indicator if fetching recommendations
+                        if (uiState.isLoadingRecommendations && (song.id.startsWith("online:") || song.id.startsWith("youtube:"))) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = PlayerTextSecondary,
+                                strokeWidth = 2.dp
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "Up Next",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = PlayerTextSecondary
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
+                        } else {
                             Icon(
                                 imageVector = Icons.Rounded.KeyboardArrowUp,
                                 contentDescription = null,
@@ -797,10 +816,12 @@ fun FullScreenPlayerContent(
             }
 
             // =====================================================================
-            // BOTTOM SHEET (Up Next)
+            // BOTTOM SHEET (Up Next / Recommendations)
             // =====================================================================
-            if (showUpNext && !song.id.startsWith("online:")) {
+            if (showUpNext) {
                 val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+                val isOnlineSong = song.id.startsWith("online:") || song.id.startsWith("youtube:")
+                
                 ModalBottomSheet(
                     onDismissRequest = { onShowUpNextChange(false) },
                     sheetState = sheetState,
@@ -808,20 +829,86 @@ fun FullScreenPlayerContent(
                     containerColor = PlayerSurface.copy(alpha = 0.85f),
                     scrimColor = Color.Black.copy(alpha = 0.6f)
                 ) {
-                    UpNextSheet(
-                        upcomingItems = upNext,
-                        historyItems = playHistory,
-                        onSelect = onSelectSong,
-                        onPlaceNext = onPlaceNext,
-                        onRemoveFromQueue = onRemoveFromQueue,
-                        onReorderQueue = onReorderQueue,
-                        snackbarHostState = snackbarHostState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                        color = Color.Transparent
-                    )
+                    if (isOnlineSong) {
+                        // YouTube Recommendations Sheet for online songs
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Recommended for You",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = PlayerTextPrimary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            
+                            Text(
+                                text = "Based on current song (Genre → Artist → Album → Year)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = PlayerTextSecondary,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            
+                            if (uiState.isLoadingRecommendations) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = PlayerAccent)
+                                }
+                            } else if (uiState.upNextRecommendations.isEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No recommendations available",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = PlayerTextSecondary
+                                    )
+                                }
+                            } else {
+                                // Display recommendations as a list
+                                androidx.compose.foundation.lazy.LazyColumn(
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(uiState.upNextRecommendations.size) { index ->
+                                        val recommendedSong = uiState.upNextRecommendations[index]
+                                        RecommendedSongItem(
+                                            song = recommendedSong,
+                                            index = index + 1,
+                                            onClick = {
+                                                playerViewModel.playRecommendedSong(recommendedSong)
+                                                onShowUpNextChange(false)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Normal Up Next sheet for offline songs
+                        UpNextSheet(
+                            upcomingItems = upNext,
+                            historyItems = playHistory,
+                            onSelect = onSelectSong,
+                            onPlaceNext = onPlaceNext,
+                            onRemoveFromQueue = onRemoveFromQueue,
+                            onReorderQueue = onReorderQueue,
+                            snackbarHostState = snackbarHostState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                            color = Color.Transparent
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
@@ -894,4 +981,80 @@ fun formatTime(millis: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%02d:%02d".format(minutes, seconds)
+}
+
+// Composable for displaying recommended songs
+@Composable
+fun RecommendedSongItem(
+    song: Song,
+    index: Int,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = PlayerSurfaceVariant.copy(alpha = 0.3f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Index number
+            Text(
+                text = "$index",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold,
+                color = PlayerTextSecondary,
+                modifier = Modifier.width(32.dp)
+            )
+            
+            // Thumbnail
+            AsyncImage(
+                model = song.albumArtUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(56.dp)
+                    .shadow(4.dp, RoundedCornerShape(8.dp))
+                    .background(PlayerSurfaceVariant, RoundedCornerShape(8.dp))
+            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            // Song info
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = PlayerTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = PlayerTextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Play icon
+            Icon(
+                imageVector = Icons.Rounded.PlayArrow,
+                contentDescription = "Play",
+                tint = PlayerAccent,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+    }
 }

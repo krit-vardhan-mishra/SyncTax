@@ -73,24 +73,45 @@ class LyricsRepository {
             val durationSeconds = if (song.duration > 0) {
                 (song.duration / 1000).toInt()
             } else null
-            
-            val response = api.getLyrics(
-                trackName = customSongName,
-                artistName = customArtistName,
-                albumName = song.album,
-                duration = durationSeconds
-            )
-            
-            // Prefer synced lyrics, fallback to plain lyrics
-            val lyrics = response.syncedLyrics ?: response.plainLyrics
-            
-            if (lyrics != null) {
-                Log.d("LyricsRepository", "Successfully fetched lyrics with custom query (${if (response.syncedLyrics != null) "synced" else "plain"})")
+            // If artist name is blank, fall back to the more flexible search endpoint
+            if (customArtistName.isBlank()) {
+                Log.d("LyricsRepository", "Artist blank in custom query, using search endpoint for: $customSongName")
+                val results = api.searchLyrics(
+                    trackName = customSongName,
+                    artistName = null,
+                    query = customSongName
+                )
+
+                if (results.isNotEmpty()) {
+                    val best = results.first()
+                    val lyrics = best.syncedLyrics ?: best.plainLyrics
+                    if (lyrics != null) {
+                        Log.d("LyricsRepository", "Found lyrics via search for custom query (synced=${best.syncedLyrics != null})")
+                        return@withContext lyrics
+                    }
+                }
+
+                Log.w("LyricsRepository", "No lyrics found with custom query (search)")
+                null
             } else {
-                Log.w("LyricsRepository", "No lyrics found with custom query")
+                val response = api.getLyrics(
+                    trackName = customSongName,
+                    artistName = customArtistName,
+                    albumName = song.album,
+                    duration = durationSeconds
+                )
+
+                // Prefer synced lyrics, fallback to plain lyrics
+                val lyrics = response.syncedLyrics ?: response.plainLyrics
+
+                if (lyrics != null) {
+                    Log.d("LyricsRepository", "Successfully fetched lyrics with custom query (${if (response.syncedLyrics != null) "synced" else "plain"})")
+                } else {
+                    Log.w("LyricsRepository", "No lyrics found with custom query")
+                }
+
+                lyrics
             }
-            
-            lyrics
         } catch (e: Exception) {
             Log.e("LyricsRepository", "Failed to fetch lyrics with custom query from API", e)
             null

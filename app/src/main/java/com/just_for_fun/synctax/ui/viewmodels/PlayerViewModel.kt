@@ -31,6 +31,9 @@ import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
 import com.just_for_fun.synctax.potoken.PoTokenHelper
 import com.just_for_fun.synctax.service.MusicService
 import com.just_for_fun.synctax.util.FormatUtil
+import com.just_for_fun.synctax.util.YoutubeRecommender
+import com.just_for_fun.synctax.util.RecommendedSong
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +58,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val queueManager = QueueManager(application, repository, recommendationManager)
     private val audioProcessor = AudioProcessor(application)
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
+
+    // Track active download jobs for cancellation support
+    private val activeDownloadJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     // PlaybackCollector with cache invalidation callback
     private val playbackCollector = PlaybackCollector(
@@ -410,6 +416,51 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     Log.w("PlayerViewModel", "📥 Metadata fetch failed for playUrl: ${e.message}")
                 }
             }
+            
+            // Fetch YouTube recommendations based on current song (genre, artist, album, year priority)
+            if (url.contains("youtube.com") || url.contains("youtu.be")) {
+                _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
+                YoutubeRecommender.getRecommendations(
+                    currentYoutubeUrl = url,
+                    onResult = { recommendations ->
+                        Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations")
+                        // Convert RecommendedSong to Song objects for UI
+                        val recommendedSongs = recommendations.map { rec ->
+                            Song(
+                                id = "youtube:${rec.videoId}",
+                                title = rec.title,
+                                artist = rec.artist,
+                                album = null,
+                                duration = 0L, // Duration unknown from search API
+                                filePath = rec.watchUrl,
+                                genre = null,
+                                releaseYear = null,
+                                albumArtUri = rec.thumbnail
+                            )
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            upNextRecommendations = recommendedSongs,
+                            isLoadingRecommendations = false
+                        )
+                    },
+                    onError = { error ->
+                        Log.e("PlayerViewModel", "❌ YouTube recommendations failed: $error")
+                        _uiState.value = _uiState.value.copy(
+                            upNextRecommendations = emptyList(),
+                            isLoadingRecommendations = false
+                        )
+                    }
+                )
+            }
+        }
+    }
+    
+    // Function to play a recommended song from UpNext
+    fun playRecommendedSong(song: Song) {
+        viewModelScope.launch {
+            // Extract video ID from filePath (YouTube URL)
+            val youtubeUrl = song.filePath
+            playUrl(url = youtubeUrl, title = song.title, artist = song.artist, durationMs = song.duration)
         }
     }
 
@@ -1254,7 +1305,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         Log.d("PlayerViewModel", "📥 Format Download: Video ID: $videoId")
         Log.d("PlayerViewModel", "📥 Format Download: URL: $url")
 
-        viewModelScope.launch {
+        // Cancel existing download for this song if any
+        activeDownloadJobs[currentSong.id]?.cancel()
+
+        val downloadJob = viewModelScope.launch {
             try {
                 // Generate PO tokens if needed before downloading
                 Log.d("PlayerViewModel", "📥 Format Download: Ensuring valid PO tokens...")
@@ -1311,7 +1365,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         preferredFormat = null, // Let NewPipe choose best format
                         metadataTitle = metadataTitle,
                         metadataArtist = metadataArtist,
-                        metadataAlbum = metadataAlbum
+                        metadataAlbum = metadataAlbum,
+                        progressCallback = { pct ->
+                            // Dispatch UI updates to Main thread for safety and coalescing
+                            try {
+                                viewModelScope.launch(Dispatchers.Main) {
+                                    _uiState.value = _uiState.value.copy(
+                                        downloadProgress = _uiState.value.downloadProgress + (currentSong.id to (pct / 100.0f))
+                                    )
+                                }
+                            } catch (_: Exception) {}
+                        },
+                        thumbnailProgressCallback = { tPct ->
+                            // Optional: log thumbnail progress (could be used to show a separate UI)
+                            Log.d("PlayerViewModel", "📷 Thumbnail download progress: $tPct% for ${currentSong.id}")
+                        },
+                        progressStep = 2 // reduce update frequency to 2% steps
                     )
                 } catch (e: Exception) {
                     Log.e("PlayerViewModel", "📥 Format Download: NewPipe failed", e)
@@ -1365,26 +1434,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "📥 Format Download: File size: ${downloadedFile.length() / 1024 / 1024}MB"
                         )
 
-                        // Create downloaded song entry
-                        // Priority: yt-dlp metadata > NewPipe metadata > current song data
-                        val finalTitle = metadataTitle.takeIf { it.isNotEmpty() }
-                            ?: newPipeResult.title.takeIf { it.isNotEmpty() }
-                            ?: currentSong.title
+                        // Create downloaded song entry using the EXACT metadata embedded in the audio file
+                        // This ensures database metadata matches what's physically in the file
+                        val embeddedTitle = newPipeResult.title.takeIf { it.isNotEmpty() } ?: currentSong.title
+                        val embeddedArtist = newPipeResult.artist.takeIf { it.isNotEmpty() } ?: currentSong.artist
+                        val embeddedAlbum = newPipeResult.album.takeIf { it.isNotEmpty() } ?: "YouTube Audio"
                         
-                        val finalArtist = metadataArtist.takeIf { it.isNotEmpty() }
-                            ?: newPipeResult.artist.takeIf { it.isNotEmpty() }
-                            ?: currentSong.artist
-                        
-                        val finalAlbum = metadataAlbum.takeIf { it.isNotEmpty() }
-                            ?: currentSong.album
-                        
-                        Log.d("PlayerViewModel", "📥 Format Download: Final metadata - Title: $finalTitle, Artist: $finalArtist, Album: $finalAlbum")
+                        Log.d("PlayerViewModel", "📥 Format Download: Using embedded metadata from file - Title: $embeddedTitle, Artist: $embeddedArtist, Album: $embeddedAlbum")
                         
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
-                            title = finalTitle,
-                            artist = finalArtist,
-                            album = finalAlbum,
+                            title = embeddedTitle,
+                            artist = embeddedArtist,
+                            album = embeddedAlbum,
                             duration = currentSong.duration, // Use original duration, will be updated on playback
                             filePath = downloadedFile.absolutePath,
                             genre = currentSong.genre,
@@ -1434,15 +1496,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
             } catch (e: Exception) {
-                Log.e("PlayerViewModel", "📥 Format Download: ❌ Error: ${e.message}", e)
-                Log.e("PlayerViewModel", "📥 Format Download: Stack trace:", e)
-                _uiState.value = _uiState.value.copy(
-                    downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
-                    downloadProgress = _uiState.value.downloadProgress - currentSong.id,
-                    downloadMessage = "Download failed: ${e.message}"
-                )
+                if (e is kotlinx.coroutines.CancellationException) {
+                    Log.w("PlayerViewModel", "📥 Format Download: Download cancelled by user")
+                    _uiState.value = _uiState.value.copy(
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
+                        downloadProgress = _uiState.value.downloadProgress - currentSong.id,
+                        downloadMessage = "Download cancelled"
+                    )
+                } else {
+                    Log.e("PlayerViewModel", "📥 Format Download: ❌ Error: ${e.message}", e)
+                    Log.e("PlayerViewModel", "📥 Format Download: Stack trace:", e)
+                    _uiState.value = _uiState.value.copy(
+                        downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,
+                        downloadProgress = _uiState.value.downloadProgress - currentSong.id,
+                        downloadMessage = "Download failed: ${e.message}"
+                    )
+                }
+            } finally {
+                // Clean up job reference
+                activeDownloadJobs.remove(currentSong.id)
             }
         }
+        
+        // Store the job for potential cancellation
+        activeDownloadJobs[currentSong.id] = downloadJob
+    }
+
+    /**
+     * Cancel an active download for a specific song
+     */
+    fun cancelDownload(songId: String) {
+        activeDownloadJobs[songId]?.let { job ->
+            Log.d("PlayerViewModel", "🛑 Cancelling download for song: $songId")
+            job.cancel()
+            activeDownloadJobs.remove(songId)
+            
+            // Update UI state
+            _uiState.value = _uiState.value.copy(
+                downloadingSongs = _uiState.value.downloadingSongs - songId,
+                downloadProgress = _uiState.value.downloadProgress - songId,
+                downloadMessage = "Download cancelled"
+            )
+        }
+    }
+
+    /**
+     * Check if a song is currently being downloaded
+     */
+    fun isDownloading(songId: String): Boolean {
+        return _uiState.value.downloadingSongs.contains(songId)
     }
 
     fun selectFormat(format: Format) {
@@ -1556,5 +1658,7 @@ data class PlayerUiState(
     val isLoadingFormats: Boolean = false, // Loading indicator for format selection
     val selectedFormat: Format? = null,  // Currently selected format for download
     val poTokenData: String = "", // PO Token data (JSON) for YouTube
-    val showPoTokenDialog: Boolean = false // Dialog to enter PO Token
+    val showPoTokenDialog: Boolean = false, // Dialog to enter PO Token
+    val upNextRecommendations: List<Song> = emptyList(), // YouTube-recommended songs for online player
+    val isLoadingRecommendations: Boolean = false // Loading indicator for recommendations
 )

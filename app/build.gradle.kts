@@ -34,6 +34,8 @@ android {
         // Add API keys to BuildConfig (default to empty strings if not found)
         buildConfigField("String", "MUSIC_API_KEY", "\"${properties.getProperty("MUSIC_API_KEY") ?: ""}\"")
         buildConfigField("String", "PLAYER_API_KEY", "\"${properties.getProperty("PLAYER_API_KEY") ?: ""}\"")
+        buildConfigField("String", "YOUTUBE_API_KEY", "\"${properties.getProperty("YOUTUBE_API_KEY") ?: ""}\"")
+        buildConfigField("String", "YOUTUBE_CLIENT_ID", "\"${properties.getProperty("YOUTUBE_CLIENT_ID") ?: ""}\"")
 
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -72,7 +74,7 @@ chaquopy {
 //        buildPython("C:\Users\theya\AppData\Local\Programs\Python\Python312\python.exe")
 //        buildPython("C:\Users\theya\AppData\Local\Microsoft\WindowsApps\python.exe")
         pip {
-            install("yt-dlp==2024.11.18") // Specify latest version
+            install("yt-dlp")
             install("mutagen")
             install("requests") // Add requests library
             install("urllib3")
@@ -164,7 +166,6 @@ dependencies {
 
     // FFmpeg for audio processing
     // implementation("com.github.arthenica:ffmpeg-kit:v6.0-2")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
-    // Commented out due to jitpack.io 401 error - app handles FFmpeg absence gracefully
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")    // Commented out due to jitpack.io 401 error - app handles FFmpeg absence gracefully
     // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
 }
