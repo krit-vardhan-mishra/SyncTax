@@ -30,14 +30,10 @@ import com.just_for_fun.synctax.core.utils.AudioProcessor
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
 import com.just_for_fun.synctax.potoken.PoTokenHelper
 import com.just_for_fun.synctax.service.MusicService
-<<<<<<< HEAD
-import com.just_for_fun.synctax.util.FormatUtil
 import com.just_for_fun.synctax.util.YoutubeRecommender
 import com.just_for_fun.synctax.util.RecommendedSong
-import kotlinx.coroutines.Dispatchers
-=======
 import com.just_for_fun.synctax.utils.FormatUtil
->>>>>>> 82345c57d1908bd520574ec613b639ffa202a238
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -428,30 +424,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     currentYoutubeUrl = url,
                     onResult = { recommendations ->
                         Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations")
-                        // Convert RecommendedSong to Song objects for UI
-                        val recommendedSongs = recommendations.map { rec ->
-                            Song(
-                                id = "youtube:${rec.videoId}",
-                                title = rec.title,
-                                artist = rec.artist,
-                                album = null,
-                                duration = 0L, // Duration unknown from search API
-                                filePath = rec.watchUrl,
-                                genre = null,
-                                releaseYear = null,
-                                albumArtUri = rec.thumbnail
+                        if (recommendations.isEmpty()) {
+                            // No recommendations available - enable repeat mode to loop the current song
+                            Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
+                            _uiState.value = _uiState.value.copy(
+                                repeatEnabled = true,
+                                upNextRecommendations = emptyList(),
+                                isLoadingRecommendations = false
+                            )
+                        } else {
+                            // Convert RecommendedSong to Song objects for UI
+                            val recommendedSongs = recommendations.map { rec ->
+                                Song(
+                                    id = "youtube:${rec.videoId}",
+                                    title = rec.title,
+                                    artist = rec.artist,
+                                    album = null,
+                                    duration = 0L, // Duration unknown from search API
+                                    filePath = rec.watchUrl,
+                                    genre = null,
+                                    releaseYear = null,
+                                    albumArtUri = rec.thumbnail
+                                )
+                            }
+                            _uiState.value = _uiState.value.copy(
+                                upNextRecommendations = recommendedSongs,
+                                isLoadingRecommendations = false,
+                                repeatEnabled = false  // Disable repeat when recommendations are available
                             )
                         }
-                        _uiState.value = _uiState.value.copy(
-                            upNextRecommendations = recommendedSongs,
-                            isLoadingRecommendations = false
-                        )
                     },
                     onError = { error ->
                         Log.e("PlayerViewModel", "❌ YouTube recommendations failed: $error")
+                        // On error, also enable repeat mode to loop the current song
+                        Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
                         _uiState.value = _uiState.value.copy(
                             upNextRecommendations = emptyList(),
-                            isLoadingRecommendations = false
+                            isLoadingRecommendations = false,
+                            repeatEnabled = true
                         )
                     }
                 )
@@ -614,6 +624,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     Log.w("PlayerViewModel", "📥 Metadata fetch failed for stream: ${e.message}")
                 }
             }
+            
+            // Fetch YouTube recommendations after stream extraction completes
+            Log.d("PlayerViewModel", "🎵 Stream extraction complete, fetching YouTube recommendations for videoId=$videoId")
+            _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
+            YoutubeRecommender.getRecommendations(
+                currentYoutubeUrl = "https://www.youtube.com/watch?v=$videoId",
+                onResult = { recommendations ->
+                    Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations for chunked stream")
+                    if (recommendations.isEmpty()) {
+                        // No recommendations available - enable repeat mode to loop the current song
+                        Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
+                        _uiState.value = _uiState.value.copy(
+                            repeatEnabled = true,
+                            upNextRecommendations = emptyList(),
+                            isLoadingRecommendations = false
+                        )
+                    } else {
+                        // Convert RecommendedSong to Song objects for UI
+                        val recommendedSongs = recommendations.map { rec ->
+                            Song(
+                                id = "youtube:${rec.videoId}",
+                                title = rec.title,
+                                artist = rec.artist,
+                                album = null,
+                                duration = 0L, // Duration unknown from search API
+                                filePath = rec.watchUrl,
+                                genre = null,
+                                releaseYear = null,
+                                albumArtUri = rec.thumbnail
+                            )
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            upNextRecommendations = recommendedSongs,
+                            isLoadingRecommendations = false,
+                            repeatEnabled = false  // Disable repeat when recommendations are available
+                        )
+                    }
+                },
+                onError = { error ->
+                    Log.e("PlayerViewModel", "❌ YouTube recommendations failed for chunked stream: $error")
+                    // On error, also enable repeat mode to loop the current song
+                    Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
+                    _uiState.value = _uiState.value.copy(
+                        upNextRecommendations = emptyList(),
+                        isLoadingRecommendations = false,
+                        repeatEnabled = true
+                    )
+                }
+            )
         }
     }
 
@@ -1110,14 +1169,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         "PlayerViewModel",
                         "📥 Download: Sorted ${audioFormats.size} audio formats"
                     )
-
-                    // Log top 5 formats for debugging
-                    audioFormats.take(5).forEachIndexed { index, format ->
-                        Log.d(
-                            "PlayerViewModel",
-                            "📥 Download: Format $index: ${format.format_id} - ${format.acodec} • ${format.tbr}kbps • ${format.container}"
-                        )
-                    }
 
                     if (audioFormats.isNotEmpty()) {
                         // Show format selection dialog with Format objects

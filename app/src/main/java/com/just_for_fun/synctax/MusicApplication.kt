@@ -1,7 +1,6 @@
 package com.just_for_fun.synctax
 
 import android.app.Application
-import android.net.Uri
 import android.util.Log
 import android.webkit.WebView
 import coil.ImageLoader
@@ -29,10 +28,6 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import java.io.File
-import com.yausername.aria2c.Aria2c
-import com.yausername.ffmpeg.FFmpeg
-import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLException
 
 class MusicApplication : Application(), ImageLoaderFactory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -67,13 +62,6 @@ class MusicApplication : Application(), ImageLoaderFactory {
         }
 
         Log.d(TAG, "Music Application initialized")
-    }
-
-    @Throws(YoutubeDLException::class)
-    private fun initLibraries() {
-        YoutubeDL.getInstance().init(this)
-        FFmpeg.getInstance().init(this)
-        Aria2c.getInstance().init(this)
     }
 
     override fun newImageLoader(): ImageLoader {

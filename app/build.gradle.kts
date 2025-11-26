@@ -72,14 +72,10 @@ chaquopy {
     defaultConfig {
         version = "3.10"
         pip {
-<<<<<<< HEAD
-            install("yt-dlp")
-=======
             install("yt-dlp==2025.11.12")
             install("ffmpeg")
             install("ffprobe")
             install("pillow")
->>>>>>> 82345c57d1908bd520574ec613b639ffa202a238
             install("mutagen")
             install("requests") // Add requests library
             install("urllib3")
@@ -163,14 +159,7 @@ dependencies {
 
     // FFmpeg for audio processing
     // implementation("com.github.arthenica:ffmpeg-kit:v6.0-2")
-<<<<<<< HEAD
-=======
-    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
-//implementation "io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1"
-    implementation("io.github.junkfood02.youtubedl-android:aria2c:0.18.1")
-//    implementation "io.github.junkfood02.youtubedl-android:library:0.17.4"
->>>>>>> 82345c57d1908bd520574ec613b639ffa202a238
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")    // Commented out due to jitpack.io 401 error - app handles FFmpeg absence gracefully
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")    // provide ffmpeg helper library
     // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
 
     implementation("com.afollestad.material-dialogs:core:3.3.0")
