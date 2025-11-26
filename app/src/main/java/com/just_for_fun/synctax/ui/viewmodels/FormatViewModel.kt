@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.data.model.Format
 import com.just_for_fun.synctax.core.data.model.FormatRecyclerView
 import com.just_for_fun.synctax.core.utils.AudioProcessor
-import com.just_for_fun.synctax.util.FormatUtil
+import com.just_for_fun.synctax.utils.FormatUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
