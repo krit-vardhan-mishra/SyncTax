@@ -6,5 +6,8 @@ data class OnlineSearchResult(
     val author: String?,
     val duration: Long?,
     val thumbnailUrl: String?,
-    var streamUrl: String? // direct playable audio url (fetched on-demand)
+    var streamUrl: String?, // direct playable audio url (fetched on-demand)
+    val type: OnlineResultType = OnlineResultType.SONG, // Type of result (song/album/video)
+    val year: String? = null, // Album year (for albums)
+    val browseId: String? = null // Browse ID for albums to fetch album details
 )

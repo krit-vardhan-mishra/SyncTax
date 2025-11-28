@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Manages Quick Access section - random 9 songs
+ * Manages Quick Access section - random songs for quick discovery
+ * This shows randomly selected songs from the user's library (previously in Speed Dial)
  */
 class QuickAccessManager(
     private val repository: MusicRepository

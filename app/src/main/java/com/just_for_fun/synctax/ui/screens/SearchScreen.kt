@@ -7,30 +7,32 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.just_for_fun.synctax.ui.components.card.SongCard
-import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.focus.onFocusChanged
 import com.just_for_fun.synctax.ui.components.app.EmptySearchState
 import com.just_for_fun.synctax.ui.components.card.OnlineResultCard
-import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
+import com.just_for_fun.synctax.ui.components.card.SongCard
+import com.just_for_fun.synctax.ui.components.chips.SearchFilterChips
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
+import com.just_for_fun.synctax.ui.model.SearchFilterType
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
-import kotlinx.coroutines.delay
+import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
+    onNavigateToAlbum: (String, String, List<com.just_for_fun.synctax.core.data.local.entities.Song>) -> Unit = { _, _, _ -> },
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel()
@@ -39,6 +41,7 @@ fun SearchScreen(
     val playerState by playerViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf(SearchFilterType.ALL) }
 
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
@@ -61,7 +64,7 @@ fun SearchScreen(
             if (!hasLocal) {
                 searchJob = launch {
                     delay(800) // Wait 800ms after user stops typing
-                    homeViewModel.searchOnline(searchQuery)
+                    homeViewModel.searchOnline(searchQuery, selectedFilter)
                 }
             }
         }
@@ -71,16 +74,26 @@ fun SearchScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
-    // Filter songs based on search query
-    val filteredSongs = remember(searchQuery, uiState.allSongs) {
+    // Filter songs based on search query and filter type
+    val filteredSongs = remember(searchQuery, selectedFilter, uiState.allSongs) {
         if (searchQuery.isEmpty()) {
             uiState.allSongs
         } else {
-            uiState.allSongs.filter { song ->
+            val matchedSongs = uiState.allSongs.filter { song ->
                 song.title.contains(searchQuery, ignoreCase = true) ||
                         song.artist.contains(searchQuery, ignoreCase = true) ||
                         song.album?.contains(searchQuery, ignoreCase = true) == true ||
                         song.genre?.contains(searchQuery, ignoreCase = true) == true
+            }
+            
+            // Apply filter type (for local songs, we only have songs, not albums)
+            // Albums filter shows no local results since we don't have album objects
+            when (selectedFilter) {
+                SearchFilterType.ALL -> matchedSongs
+                SearchFilterType.SONGS -> matchedSongs
+                SearchFilterType.ALBUMS -> emptyList() // No local album objects
+                SearchFilterType.ARTISTS -> emptyList() // No artist objects in local storage
+                SearchFilterType.VIDEOS -> emptyList() // No videos in local storage
             }
         }
     }
@@ -135,6 +148,21 @@ fun SearchScreen(
                     singleLine = true,
                     shape = MaterialTheme.shapes.large
                 )
+                
+                // Filter chips - shown when search query is not empty
+                if (searchQuery.isNotEmpty()) {
+                    SearchFilterChips(
+                        selectedFilter = selectedFilter,
+                        onFilterSelected = { filter ->
+                            selectedFilter = filter
+                            // Trigger new online search with filter if no local results
+                            if (filteredSongs.isEmpty()) {
+                                homeViewModel.searchOnline(searchQuery, selectedFilter)
+                            }
+                        },
+                        showVideos = false // Only show Songs/Albums filters
+                    )
+                }
 
                 // Show Listen Again (recently played / most played merged) when search field focused and empty
                 if (searchQuery.isEmpty() && isFocused && uiState.listenAgain.isNotEmpty()) {
@@ -200,16 +228,21 @@ fun SearchScreen(
                                     Spacer(modifier = Modifier.height(16.dp))
 
                                     Text(
-                                        text = "No Local Results",
-                                        style = MaterialTheme.typography.titleLarge,
+                                        text = "No Local",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Results",
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
 
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
 
                                     Text(
                                         text = "No songs found on your device for \"$searchQuery\"",
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
@@ -265,37 +298,124 @@ fun SearchScreen(
                                     items(uiState.onlineSearchResults) { result ->
                                         val coroutineScope = rememberCoroutineScope()
                                         OnlineResultCard(result) { res ->
-                                            // Play online song using chunked progressive streaming
-                                            val url = res.streamUrl
-                                            if (!url.isNullOrEmpty()) {
-                                                playerViewModel.playChunkedStream(
-                                                    res.id,
-                                                    url,
-                                                    res.title,
-                                                    res.author ?: "Unknown",
-                                                    res.duration ?: 0L,
-                                                    res.thumbnailUrl
-                                                )
-                                            } else {
-                                                // Try to fetch stream URL then play
-                                                coroutineScope.launch {
-                                                    val fetched =
-                                                        homeViewModel.fetchStreamUrl(res.id)
-                                                    if (!fetched.isNullOrEmpty()) {
-                                                        playerViewModel.playChunkedStream(
-                                                            res.id,
-                                                            fetched,
-                                                            res.title,
-                                                            res.author ?: "Unknown",
-                                                            res.duration ?: 0L,
-                                                            res.thumbnailUrl
-                                                        )
-                                                    } else {
-                                                        android.util.Log.w(
-                                                            "SearchScreen",
-                                                            "No stream url available for ${res.title}"
+                                            // Check result type and navigate accordingly
+                                            when (res.type) {
+                                                com.just_for_fun.synctax.core.network.OnlineResultType.ALBUM -> {
+                                                    // Fetch album details and show detail screen
+                                                    coroutineScope.launch {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "Loading album: ${res.title}",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        
+                                                        homeViewModel.fetchAlbumDetails(
+                                                            browseId = res.browseId ?: res.id,
+                                                            onResult = {albumDetails ->
+                                                                if (albumDetails != null && albumDetails.songs.isNotEmpty()) {
+                                                                    // Convert online songs to Song objects for playback
+                                                                    val songs = albumDetails.songs.map { track ->
+                                                                        com.just_for_fun.synctax.core.data.local.entities.Song(
+                                                                            id = "youtube:${track.videoId}",
+                                                                            title = track.title,
+                                                                            artist = track.artist,
+                                                                            album = albumDetails.title,
+                                                                            duration = 0L,
+                                                                            filePath = track.watchUrl,
+                                                                            genre = null,
+                                                                            releaseYear = albumDetails.year.toIntOrNull(),
+                                                                            albumArtUri = track.thumbnail
+                                                                        )
+                                                                    }
+                                                                    // Navigate to AlbumDetailScreen with online songs
+                                                                    android.util.Log.d("SearchScreen", "Album loaded: ${albumDetails.title} with ${songs.size} songs")
+                                                                    homeViewModel.setSelectedAlbum(
+                                                                        album = albumDetails.title,
+                                                                        artist = songs.firstOrNull()?.artist ?: "Unknown Artist",
+                                                                        songs = songs
+                                                                    )
+                                                                    onNavigateToAlbum(albumDetails.title, songs.firstOrNull()?.artist ?: "Unknown Artist", songs)
+                                                                } else {
+                                                                    android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "Album has no songs available",
+                                                                        android.widget.Toast.LENGTH_SHORT
+                                                                    ).show()
+                                                                }
+                                                            },
+                                                            onError = { error ->
+                                                                android.widget.Toast.makeText(
+                                                                    context,
+                                                                    "Failed to load album: $error",
+                                                                    android.widget.Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
                                                         )
                                                     }
+                                                }
+                                                com.just_for_fun.synctax.core.network.OnlineResultType.ARTIST -> {
+                                                    // Fetch artist details and show detail screen
+                                                    coroutineScope.launch {
+                                                        android.widget.Toast.makeText(
+                                                            context,
+                                                            "Loading artist: ${res.title}",
+                                                            android.widget.Toast.LENGTH_SHORT
+                                                        ).show()
+                                                        
+                                                        homeViewModel.fetchArtistDetails(
+                                                            browseId = res.browseId ?: res.id,
+                                                            onResult = { artistDetails ->
+                                                                if (artistDetails != null && artistDetails.songs.isNotEmpty()) {
+                                                                    // Convert online songs to Song objects for playback
+                                                                    val songs = artistDetails.songs.map { track ->
+                                                                        com.just_for_fun.synctax.core.data.local.entities.Song(
+                                                                            id = "youtube:${track.videoId}",
+                                                                            title = track.title,
+                                                                            artist = track.artist,
+                                                                            album = null,
+                                                                            duration = 0L,
+                                                                            filePath = track.watchUrl,
+                                                                            genre = null,
+                                                                            releaseYear = null,
+                                                                            albumArtUri = track.thumbnail
+                                                                        )
+                                                                    }
+                                                                    // TODO: Navigate to ArtistDetailScreen with songs
+                                                                    // For now, play the first song
+                                                                    android.util.Log.d("SearchScreen", "Artist loaded: ${artistDetails.name} with ${songs.size} songs")
+                                                                    playerViewModel.playUrl(
+                                                                        url = songs.first().filePath,
+                                                                        title = songs.first().title,
+                                                                        artist = songs.first().artist,
+                                                                        durationMs = 0L
+                                                                    )
+                                                                } else {
+                                                                    android.widget.Toast.makeText(
+                                                                        context,
+                                                                        "Artist has no songs available",
+                                                                        android.widget.Toast.LENGTH_SHORT
+                                                                    ).show()
+                                                                }
+                                                            },
+                                                            onError = { error ->
+                                                                android.widget.Toast.makeText(
+                                                                    context,
+                                                                    "Failed to load artist: $error",
+                                                                    android.widget.Toast.LENGTH_SHORT
+                                                                ).show()
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                                else -> {
+                                                    // Play online song - construct YouTube URL from videoId
+                                                    val youtubeUrl = "https://www.youtube.com/watch?v=${res.id}"
+                                                    playerViewModel.playUrl(
+                                                        url = youtubeUrl,
+                                                        title = res.title,
+                                                        artist = res.author ?: "Unknown",
+                                                        durationMs = res.duration ?: 0L
+                                                    )
                                                 }
                                             }
                                         }
@@ -342,7 +462,8 @@ fun SearchScreen(
                                             Spacer(modifier = Modifier.height(16.dp))
                                             Button(onClick = {
                                                 homeViewModel.searchOnline(
-                                                    searchQuery
+                                                    searchQuery,
+                                                    selectedFilter
                                                 )
                                             }) {
                                                 Icon(

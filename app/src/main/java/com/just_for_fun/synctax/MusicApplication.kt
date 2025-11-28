@@ -90,6 +90,10 @@ class MusicApplication : Application(), ImageLoaderFactory {
             if (!Python.isStarted()) {
                 Python.start(AndroidPlatform(this))
                 Log.d(TAG, "Python runtime initialized")
+                
+                // Initialize YTMusicRecommender for song-only recommendations
+                com.just_for_fun.synctax.util.YTMusicRecommender.initialize()
+                Log.d(TAG, "YTMusicRecommender initialized")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize Python runtime", e)

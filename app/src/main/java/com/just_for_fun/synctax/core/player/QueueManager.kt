@@ -423,6 +423,19 @@ class QueueManager(
         val upcomingCount = getUpcomingQueue().size
         return upcomingCount < threshold
     }
+
+    /**
+     * Peek at the next song in queue without moving to it
+     * @return The next song, or null if no next song exists
+     */
+    fun peekNext(): Song? {
+        val state = _queueState.value
+        return if (state.currentIndex < state.currentPlaylist.size - 1) {
+            state.currentPlaylist[state.currentIndex + 1]
+        } else {
+            null
+        }
+    }
 }
 
 /**

@@ -42,12 +42,19 @@ fun SpeedDialSection(
                 useGradient = true
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = "Speed dial",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            Column {
+                Text(
+                    text = "Speed dial",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Personalized for you",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         LazyRow(

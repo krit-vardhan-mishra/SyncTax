@@ -36,6 +36,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -89,6 +91,8 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     
     // Storage permission launcher for Android 11+
     val storagePermissionLauncher = rememberLauncherForActivityResult(
@@ -132,6 +136,7 @@ fun LibraryScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             SimpleDynamicMusicTopAppBar(
                 title = "Library",
@@ -149,6 +154,10 @@ fun LibraryScreen(
                     }
                     if (songsToShuffle.isNotEmpty()) {
                         playerViewModel.shufflePlay(songsToShuffle)
+                    } else {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("No songs available on your device, listen songs online")
+                        }
                     }
                 },
                 onRefreshClick = { homeViewModel.scanMusic() },

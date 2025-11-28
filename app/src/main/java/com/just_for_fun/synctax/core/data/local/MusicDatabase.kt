@@ -8,14 +8,15 @@ import com.just_for_fun.synctax.core.data.local.dao.*
 import com.just_for_fun.synctax.core.data.local.entities.*
 
 @Database(
-    entities = [Song::class, ListeningHistory::class, UserPreference::class],
-    version = 2,  // Incremented due to removing foreign key constraint from ListeningHistory
+    entities = [Song::class, ListeningHistory::class, UserPreference::class, OnlineListeningHistory::class],
+    version = 3,  // Incremented due to adding OnlineListeningHistory entity
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
     abstract fun listeningHistoryDao(): ListeningHistoryDao
     abstract fun userPreferenceDao(): UserPreferenceDao
+    abstract fun onlineListeningHistoryDao(): OnlineListeningHistoryDao
 
     companion object {
         @Volatile

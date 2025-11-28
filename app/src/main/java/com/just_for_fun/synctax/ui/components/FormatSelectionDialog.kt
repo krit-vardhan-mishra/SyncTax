@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.core.data.model.Format
-import com.just_for_fun.synctax.utils.FormatUtil
+import com.just_for_fun.synctax.util.FormatUtil
 
 /**
  * Bottom sheet dialog for selecting audio format/quality

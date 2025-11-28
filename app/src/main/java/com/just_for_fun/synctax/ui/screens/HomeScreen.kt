@@ -216,26 +216,31 @@ fun HomeScreen(
                                     FilterChipsRow()
                                 }
 
-                                // Quick Picks Section
+                                // Quick Picks Section - Now shows online listening history
                                 item {
-                                    QuickPicksSection(
-                                        songs = uiState.quickPicks,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.quickPicks)
+                                    com.just_for_fun.synctax.ui.components.section.OnlineHistorySection(
+                                        history = uiState.onlineHistory,
+                                        onHistoryClick = { history ->
+                                            playerViewModel.playUrl(
+                                                url = history.watchUrl,
+                                                title = history.title,
+                                                artist = history.artist,
+                                                durationMs = 0L
+                                            )
                                         },
-                                        onRefreshClick = { homeViewModel.generateQuickPicks() },
-                                        onViewAllClick = { /* Navigate to Quick Picks */ },
-                                        isGenerating = uiState.isGeneratingRecommendations,
                                         onPlayAll = {
-                                            uiState.quickPicks.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playSong(
-                                                    firstSong,
-                                                    uiState.quickPicks
+                                            uiState.onlineHistory.firstOrNull()?.let { firstHistory ->
+                                                playerViewModel.playUrl(
+                                                    url = firstHistory.watchUrl,
+                                                    title = firstHistory.title,
+                                                    artist = firstHistory.artist,
+                                                    durationMs = 0L
                                                 )
                                             }
                                         },
-                                        currentSong = playerState.currentSong,
-                                        trainingDataSize = uiState.trainingDataSize
+                                        currentVideoId = if (playerState.currentSong?.id?.startsWith("online:") == true)
+                                            playerState.currentSong?.id?.removePrefix("online:")
+                                        else null
                                     )
                                 }
 

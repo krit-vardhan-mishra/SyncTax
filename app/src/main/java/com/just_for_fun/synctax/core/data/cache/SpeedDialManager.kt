@@ -8,11 +8,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Manages Speed Dial section - random 9 songs
+ * Manages Speed Dial section - ML-recommended songs based on listening behavior
+ * This now shows personalized recommendations (previously shown in Quick Picks)
  */
 class SpeedDialManager(
     private val repository: MusicRepository
@@ -21,19 +21,18 @@ class SpeedDialManager(
 
     private val _speedDialSongs = MutableStateFlow<List<Song>>(emptyList())
     val speedDialSongs: StateFlow<List<Song>> = _speedDialSongs.asStateFlow()
+    
+    private val _isGenerating = MutableStateFlow(false)
+    val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
 
-    fun refresh() {
-        scope.launch {
-            try {
-                val allSongs = repository.getAllSongs().first()
-                
-                // Get random 9 songs
-                val randomSongs = allSongs.shuffled().take(9)
-                
-                _speedDialSongs.value = randomSongs
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+    /**
+     * Update with ML-recommended songs (passed from HomeViewModel)
+     */
+    fun updateRecommendations(songs: List<Song>) {
+        _speedDialSongs.value = songs.take(9) // Take first 9 recommendations
+    }
+    
+    fun setGenerating(generating: Boolean) {
+        _isGenerating.value = generating
     }
 }

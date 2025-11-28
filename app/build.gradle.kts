@@ -79,6 +79,7 @@ chaquopy {
             install("mutagen")
             install("requests") // Add requests library
             install("urllib3")
+            install("ytmusicapi")
         }
     }
 }

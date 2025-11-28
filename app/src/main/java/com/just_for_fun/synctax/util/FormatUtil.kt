@@ -1,9 +1,8 @@
-package com.just_for_fun.synctax.utils
+package com.just_for_fun.synctax.util
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
-import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.data.model.Format
 
 /**

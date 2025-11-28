@@ -37,7 +37,8 @@ import com.just_for_fun.synctax.core.data.local.entities.Song
 import kotlinx.coroutines.launch
 
 /**
- * Speed Dial Component - 3x3 Grid of song thumbnails
+ * Quick Access Component - 3x3 Grid of random song thumbnails
+ * Shows randomly selected songs for quick discovery
  * Redesigned with Material 3 Immersive Cards
  */
 @Composable

@@ -10,6 +10,8 @@ import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.util.AlbumDetails
+import com.just_for_fun.synctax.util.ArtistDetails
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +47,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         scanMusic()
         observeListeningHistoryForTraining()
         observeListenAgain()
+        loadOnlineHistory()
         // Start periodic refresh for deleted songs check
         startPeriodicRefresh()
         // Refresh album art for songs without embedded art
@@ -138,12 +141,106 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun searchOnline(query: String) {
+    fun searchOnline(query: String, filterType: com.just_for_fun.synctax.ui.model.SearchFilterType = com.just_for_fun.synctax.ui.model.SearchFilterType.ALL) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSearchingOnline = true)
             try {
-                val apiKey = UserPreferences(getApplication()).getYouTubeApiKey()
-                val results = onlineManager.search(query, apiKey = apiKey)
+                val results = mutableListOf<com.just_for_fun.synctax.core.network.OnlineSearchResult>()
+                
+                // Search for songs if filter is ALL or SONGS
+                if (filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.ALL || 
+                    filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.SONGS) {
+                    
+                    com.just_for_fun.synctax.util.YTMusicRecommender.searchSongs(
+                        query = query,
+                        limit = 15,
+                        onResult = { songs ->
+                            val songResults = songs.map { song ->
+                                com.just_for_fun.synctax.core.network.OnlineSearchResult(
+                                    id = song.videoId,
+                                    title = song.title,
+                                    author = song.artist,
+                                    duration = 0L, // Duration from ytmusicapi is string, would need parsing
+                                    thumbnailUrl = song.thumbnail,
+                                    streamUrl = null,
+                                    type = com.just_for_fun.synctax.core.network.OnlineResultType.SONG
+                                )
+                            }
+                            results.addAll(songResults)
+                        },
+                        onError = { error ->
+                            android.util.Log.e("HomeViewModel", "Song search failed: $error")
+                        }
+                    )
+                    
+                    // Wait a bit for async results
+                    kotlinx.coroutines.delay(500)
+                }
+                
+                // Search for albums if filter is ALL or ALBUMS
+                if (filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.ALL || 
+                    filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.ALBUMS) {
+                    
+                    com.just_for_fun.synctax.util.YTMusicRecommender.searchAlbums(
+                        query = query,
+                        limit = 10,
+                        onResult = { albums ->
+                            val albumResults = albums.map { album ->
+                                com.just_for_fun.synctax.core.network.OnlineSearchResult(
+                                    id = album.browseId,
+                                    title = album.title,
+                                    author = album.artist,
+                                    duration = null,
+                                    thumbnailUrl = album.thumbnail,
+                                    streamUrl = null,
+                                    type = com.just_for_fun.synctax.core.network.OnlineResultType.ALBUM,
+                                    year = album.year,
+                                    browseId = album.browseId
+                                )
+                            }
+                            results.addAll(albumResults)
+                        },
+                        onError = { error ->
+                            android.util.Log.e("HomeViewModel", "Album search failed: $error")
+                        }
+                    )
+                    
+                    // Wait a bit for async results
+                    kotlinx.coroutines.delay(500)
+                }
+                
+                // Search for artists if filter is ALL or ARTISTS
+                if (filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.ALL || 
+                    filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.ARTISTS) {
+                    
+                    com.just_for_fun.synctax.util.YTMusicRecommender.searchArtists(
+                        query = query,
+                        limit = 10,
+                        onResult = { artists ->
+                            val artistResults = artists.map { artist ->
+                                com.just_for_fun.synctax.core.network.OnlineSearchResult(
+                                    id = artist.browseId,
+                                    title = artist.name,
+                                    author = artist.subscribers,
+                                    duration = null,
+                                    thumbnailUrl = artist.thumbnail,
+                                    streamUrl = null,
+                                    type = com.just_for_fun.synctax.core.network.OnlineResultType.ARTIST,
+                                    year = null,
+                                    browseId = artist.browseId
+                                )
+                            }
+                            results.addAll(artistResults)
+                        },
+                        onError = { error ->
+                            android.util.Log.e("HomeViewModel", "Artist search failed: $error")
+                        }
+                    )
+                    
+                    // Wait a bit for async results
+                    kotlinx.coroutines.delay(500)
+                }
+                
                 _uiState.value = _uiState.value.copy(
                     isSearchingOnline = false,
                     onlineSearchResults = results
@@ -154,6 +251,40 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     error = e.message
                 )
             }
+        }
+    }
+    
+    /**
+     * Fetch album details with songs list
+     */
+    fun fetchAlbumDetails(
+        browseId: String,
+        onResult: (AlbumDetails?) -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            com.just_for_fun.synctax.util.YTMusicRecommender.getAlbumDetails(
+                browseId = browseId,
+                onResult = onResult,
+                onError = onError
+            )
+        }
+    }
+    
+    /**
+     * Fetch artist details with top songs list
+     */
+    fun fetchArtistDetails(
+        browseId: String,
+        onResult: (ArtistDetails?) -> Unit,
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            com.just_for_fun.synctax.util.YTMusicRecommender.getArtistDetails(
+                browseId = browseId,
+                onResult = onResult,
+                onError = onError
+            )
         }
     }
 
@@ -169,6 +300,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun generateQuickPicks() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isGeneratingRecommendations = true)
+            speedDialManager.setGenerating(true)
 
             try {
                 val result = recommendationManager.generateQuickPicks(20)
@@ -183,11 +315,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     recommendationScores = result.recommendations,
                     isGeneratingRecommendations = false
                 )
+                
+                // Update Speed Dial with top 9 recommendations
+                speedDialManager.updateRecommendations(recommendedSongs)
+                speedDialManager.setGenerating(false)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isGeneratingRecommendations = false,
                     error = e.message
                 )
+                speedDialManager.setGenerating(false)
             }
         }
     }
@@ -441,8 +578,56 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun refreshSections() {
         listenAgainManager.refresh()
-        speedDialManager.refresh()
+        // Speed Dial now uses ML recommendations - updated separately
         quickAccessManager.refresh()
+    }
+    
+    /**
+     * Update Speed Dial with ML recommendations
+     */
+    fun updateSpeedDialRecommendations(songs: List<Song>) {
+        speedDialManager.updateRecommendations(songs)
+    }
+    
+    /**
+     * Add an online song to the listening history
+     */
+    fun addOnlineListeningHistory(videoId: String, title: String, artist: String, thumbnailUrl: String?, watchUrl: String) {
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                val onlineHistory = com.just_for_fun.synctax.core.data.local.entities.OnlineListeningHistory(
+                    videoId = videoId,
+                    title = title,
+                    artist = artist,
+                    thumbnailUrl = thumbnailUrl,
+                    watchUrl = watchUrl
+                )
+                database.onlineListeningHistoryDao().insertOnlineListening(onlineHistory)
+                database.onlineListeningHistoryDao().trimOldRecords()
+                
+                // Refresh the online history in UI state
+                loadOnlineHistory()
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error adding online listening history", e)
+            }
+        }
+    }
+    
+    /**
+     * Load online listening history from database
+     */
+    private fun loadOnlineHistory() {
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                database.onlineListeningHistoryDao().getRecentOnlineHistory().collect { history ->
+                    _uiState.value = _uiState.value.copy(onlineHistory = history)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error loading online listening history", e)
+            }
+        }
     }
     
     /**
@@ -500,8 +685,9 @@ data class HomeUiState(
     val onlineSearchResults: List<com.just_for_fun.synctax.core.network.OnlineSearchResult> = emptyList(),
     // Section-specific song lists
     val listenAgain: List<Song> = emptyList(),
-    val speedDialSongs: List<Song> = emptyList(),
-    val quickAccessSongs: List<Song> = emptyList(),
+    val speedDialSongs: List<Song> = emptyList(), // Now shows ML recommendations
+    val quickAccessSongs: List<Song> = emptyList(), // Now shows random songs
+    val onlineHistory: List<com.just_for_fun.synctax.core.data.local.entities.OnlineListeningHistory> = emptyList(), // Last 10 online songs
     // Pagination state for all songs
     val isLoadingMore: Boolean = false,
     val hasMoreSongs: Boolean = true

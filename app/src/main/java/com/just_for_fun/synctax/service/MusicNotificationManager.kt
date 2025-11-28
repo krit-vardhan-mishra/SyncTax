@@ -114,7 +114,7 @@ class MusicNotificationManager(
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(song?.title ?: "YouTube Music")
+            .setContentTitle(song?.title ?: "SyncTax")
             .setContentText(song?.artist ?: "No song playing")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(contentIntent)

@@ -10,41 +10,37 @@ import android.content.ServiceConnection
 import android.media.AudioManager
 import android.os.Environment
 import android.os.IBinder
-import androidx.lifecycle.AndroidViewModel
 import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.Format
 import com.just_for_fun.synctax.core.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
+import com.just_for_fun.synctax.core.network.OnlineSearchManager
 import com.just_for_fun.synctax.core.player.ChunkedStreamManager
 import com.just_for_fun.synctax.core.player.MusicPlayer
 import com.just_for_fun.synctax.core.player.PlaybackCollector
 import com.just_for_fun.synctax.core.player.PlaybackEvent
 import com.just_for_fun.synctax.core.player.PlaybackEventBus
 import com.just_for_fun.synctax.core.player.QueueManager
-import com.just_for_fun.synctax.core.utils.AudioFormat
 import com.just_for_fun.synctax.core.utils.AudioProcessor
-import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
 import com.just_for_fun.synctax.potoken.PoTokenHelper
 import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.util.YoutubeRecommender
-import com.just_for_fun.synctax.util.RecommendedSong
-import com.just_for_fun.synctax.utils.FormatUtil
+import com.just_for_fun.synctax.util.FormatUtil
+import com.just_for_fun.synctax.util.YTMusicRecommender
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.net.URL
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -58,6 +54,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val queueManager = QueueManager(application, repository, recommendationManager)
     private val audioProcessor = AudioProcessor(application)
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
+    private val onlineManager = OnlineSearchManager()
 
     // Track active download jobs for cancellation support
     private val activeDownloadJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
@@ -75,6 +72,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Track if we're currently handling song end to prevent multiple triggers
     private var isHandlingSongEnd = false
     private var currentLyrics: String? = null
+    
+    // Prefetching state
+    private var prefetchedSongId: String? = null
+    private var isPrefetching = false
+    private var prefetchJob: Job? = null
+    
+    // Stable recommendations - keep original list and only refetch when empty
+    private var originalRecommendationVideoId: String? = null
+    
+    // Track played recommendations for previous navigation
+    private val playedRecommendationsHistory = mutableListOf<Song>()
 
     private fun logSongDetails(song: Song) {
         // Simplified playback log; detailed metadata is logged when fetched via yt-dlp
@@ -220,6 +228,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         )
                     }
                 }
+
+                // Prefetch next song when reaching 75% progress
+                val duration = _uiState.value.duration
+                if (duration > 0 && position >= (duration * 0.75)) {
+                    prefetchNextSongIfNeeded()
+                }
             }
         }
 
@@ -357,8 +371,64 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun playUrl(url: String, title: String, artist: String? = null, durationMs: Long = 0L) {
+    fun playUrl(url: String, title: String, artist: String? = null, durationMs: Long = 0L, thumbnailUrl: String? = null, skipRecommendationFetch: Boolean = false) {
         viewModelScope.launch {
+            // Extract video ID from YouTube URL
+            val videoId = url.substringAfter("v=").substringBefore("&").substringAfter("youtu.be/").substringBefore("?")
+            
+            // Record online listening history for YouTube songs
+            if (url.contains("youtube.com") || url.contains("youtu.be")) {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                val finalThumbnailUrl = thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
+                val onlineHistory = com.just_for_fun.synctax.core.data.local.entities.OnlineListeningHistory(
+                    videoId = videoId,
+                    title = title,
+                    artist = artist ?: "Unknown Artist",
+                    thumbnailUrl = finalThumbnailUrl,
+                    watchUrl = url
+                )
+                database.onlineListeningHistoryDao().insertOnlineListening(onlineHistory)
+                database.onlineListeningHistoryDao().trimOldRecords()
+            }
+            
+            // Check if this is a YouTube URL that needs stream extraction
+            if (url.contains("youtube.com") || url.contains("youtu.be")) {
+                Log.d("PlayerViewModel", "🔄 Extracting stream URL for YouTube video: $videoId")
+                // Set loading state for online songs
+                _uiState.value = _uiState.value.copy(isLoadingSong = true)
+                
+                // Fetch the actual stream URL
+                val streamUrl = onlineManager.getStreamUrl(videoId)
+                
+                if (streamUrl != null) {
+                    Log.d("PlayerViewModel", "✅ Stream URL extracted, using chunked playback")
+                    // Clear loading state when stream is ready
+                    _uiState.value = _uiState.value.copy(isLoadingSong = false)
+                    // Generate thumbnail URL from video ID if not provided
+                    val finalThumbnailUrl = thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
+                    // Use chunked stream playback with the extracted URL
+                    playChunkedStream(
+                        videoId = videoId,
+                        streamUrl = streamUrl,
+                        title = title,
+                        artist = artist,
+                        durationMs = durationMs,
+                        thumbnailUrl = finalThumbnailUrl
+                    )
+                } else {
+                    Log.e("PlayerViewModel", "❌ Failed to extract stream URL for: $videoId")
+                    // Clear loading state on error
+                    _uiState.value = _uiState.value.copy(isLoadingSong = false)
+                    android.widget.Toast.makeText(
+                        getApplication(),
+                        "Failed to play song: Could not extract stream",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                return@launch
+            }
+            
+            // For non-YouTube URLs, play directly
             chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
             // Create a temporary Song object for playback UI
             val onlineSong = Song(
@@ -417,54 +487,76 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             
-            // Fetch YouTube recommendations based on current song (genre, artist, album, year priority)
-            if (url.contains("youtube.com") || url.contains("youtu.be")) {
-                _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
-                YoutubeRecommender.getRecommendations(
-                    currentYoutubeUrl = url,
-                    onResult = { recommendations ->
-                        Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations")
-                        if (recommendations.isEmpty()) {
-                            // No recommendations available - enable repeat mode to loop the current song
-                            Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
-                            _uiState.value = _uiState.value.copy(
-                                repeatEnabled = true,
-                                upNextRecommendations = emptyList(),
-                                isLoadingRecommendations = false
-                            )
-                        } else {
-                            // Convert RecommendedSong to Song objects for UI
-                            val recommendedSongs = recommendations.map { rec ->
-                                Song(
-                                    id = "youtube:${rec.videoId}",
-                                    title = rec.title,
-                                    artist = rec.artist,
-                                    album = null,
-                                    duration = 0L, // Duration unknown from search API
-                                    filePath = rec.watchUrl,
-                                    genre = null,
-                                    releaseYear = null,
-                                    albumArtUri = rec.thumbnail
+            // Fetch YouTube Music recommendations based on current song (songs only, no videos/playlists)
+            // Skip if explicitly requested (e.g., playing from existing recommendation list)
+            if (!skipRecommendationFetch && (url.contains("youtube.com") || url.contains("youtu.be"))) {
+                // Extract video ID from URL
+                val videoId = url.substringAfter("v=").substringBefore("&").substringAfter("youtu.be/").substringBefore("?")
+                
+                // Only fetch if recommendations list is empty (all songs played) AND played history is also empty (fresh start)
+                // This ensures recommendations stay stable during continuous playback
+                val shouldFetchRecommendations = _uiState.value.upNextRecommendations.isEmpty() && 
+                                                playedRecommendationsHistory.isEmpty() &&
+                                                originalRecommendationVideoId != videoId
+                
+                if (shouldFetchRecommendations) {
+                    // Clear history when fetching fresh recommendations (new search)
+                    playedRecommendationsHistory.clear()
+                    _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
+                    originalRecommendationVideoId = videoId
+                    
+                    YTMusicRecommender.getRecommendations(
+                        videoId = videoId,
+                        limit = 50,
+                        onResult = { recommendations ->
+                            Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations")
+                            if (recommendations.isEmpty()) {
+                                // No recommendations available - enable repeat mode to loop the current song
+                                Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
+                                _uiState.value = _uiState.value.copy(
+                                    repeatEnabled = true,
+                                    upNextRecommendations = emptyList(),
+                                    isLoadingRecommendations = false
+                                )
+                            } else {
+                                // Convert RecommendedSong to Song objects for UI
+                                val recommendedSongs = recommendations
+                                    .filter { rec -> rec.videoId != videoId } // Filter out current song to avoid loop
+                                    .map { rec ->
+                                        Song(
+                                            id = "youtube:${rec.videoId}",
+                                            title = rec.title,
+                                            artist = rec.artist,
+                                            album = null,
+                                            duration = 0L, // Duration unknown from search API
+                                            filePath = rec.watchUrl,
+                                            genre = null,
+                                            releaseYear = null,
+                                            albumArtUri = rec.thumbnail
+                                        )
+                                    }
+                                Log.d("PlayerViewModel", "🎵 Filtered recommendations: ${recommendedSongs.size} songs (excluded current)")
+                                _uiState.value = _uiState.value.copy(
+                                    upNextRecommendations = recommendedSongs,
+                                    isLoadingRecommendations = false,
+                                    repeatEnabled = false  // Disable repeat when recommendations are available
                                 )
                             }
+                        },
+                        onError = { error ->
+                            Log.e("PlayerViewModel", "❌ YouTube recommendations failed: $error")
+                            // On error, also enable repeat mode to loop the current song
+                            Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
                             _uiState.value = _uiState.value.copy(
-                                upNextRecommendations = recommendedSongs,
+                                upNextRecommendations = emptyList(),
                                 isLoadingRecommendations = false,
-                                repeatEnabled = false  // Disable repeat when recommendations are available
+                                repeatEnabled = true
                             )
                         }
-                    },
-                    onError = { error ->
-                        Log.e("PlayerViewModel", "❌ YouTube recommendations failed: $error")
-                        // On error, also enable repeat mode to loop the current song
-                        Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
-                        _uiState.value = _uiState.value.copy(
-                            upNextRecommendations = emptyList(),
-                            isLoadingRecommendations = false,
-                            repeatEnabled = true
-                        )
-                    }
-                )
+                    )
+                } else {
+                    Log.d("PlayerViewModel", "🎵 Using existing recommendations, not refetching")
+                }
             }
         }
     }
@@ -472,9 +564,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Function to play a recommended song from UpNext
     fun playRecommendedSong(song: Song) {
         viewModelScope.launch {
+            // Add current song to history before playing next
+            _uiState.value.currentSong?.let { current ->
+                if (current.id.startsWith("online:") || current.id.startsWith("youtube:")) {
+                    playedRecommendationsHistory.add(current)
+                    // Keep history size limited to 50 songs
+                    if (playedRecommendationsHistory.size > 50) {
+                        playedRecommendationsHistory.removeAt(0)
+                    }
+                }
+            }
+            
             // Extract video ID from filePath (YouTube URL)
             val youtubeUrl = song.filePath
-            playUrl(url = youtubeUrl, title = song.title, artist = song.artist, durationMs = song.duration)
+            // Skip recommendation fetch since we're playing from the existing recommendation list
+            playUrl(url = youtubeUrl, title = song.title, artist = song.artist, durationMs = song.duration, 
+                   thumbnailUrl = song.albumArtUri, skipRecommendationFetch = true)
         }
     }
 
@@ -550,6 +655,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             player.play()
 
             playbackCollector.startCollecting(onlineSong.id)
+            
+            // Start background loading of next song if recommendations are available
+            if (_uiState.value.upNextRecommendations.isNotEmpty()) {
+                viewModelScope.launch {
+                    delay(2000) // Wait 2 seconds after current song starts
+                    val nextSong = _uiState.value.upNextRecommendations.firstOrNull()
+                    if (nextSong != null) {
+                        Log.d("PlayerViewModel", "🔄 Background loading next song: ${nextSong.title}")
+                        val nextVideoId = nextSong.id.removePrefix("youtube:")
+                        // Pre-fetch stream URL for next song
+                        onlineManager.getStreamUrl(nextVideoId)
+                        Log.d("PlayerViewModel", "✅ Next song pre-loaded: ${nextSong.title}")
+                    }
+                }
+            }
 
             // Log song details
             logSongDetails(onlineSong)
@@ -625,54 +745,71 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             
-            // Fetch YouTube recommendations after stream extraction completes
-            Log.d("PlayerViewModel", "🎵 Stream extraction complete, fetching YouTube recommendations for videoId=$videoId")
-            _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
-            YoutubeRecommender.getRecommendations(
-                currentYoutubeUrl = "https://www.youtube.com/watch?v=$videoId",
-                onResult = { recommendations ->
-                    Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations for chunked stream")
-                    if (recommendations.isEmpty()) {
-                        // No recommendations available - enable repeat mode to loop the current song
-                        Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
-                        _uiState.value = _uiState.value.copy(
-                            repeatEnabled = true,
-                            upNextRecommendations = emptyList(),
-                            isLoadingRecommendations = false
-                        )
-                    } else {
-                        // Convert RecommendedSong to Song objects for UI
-                        val recommendedSongs = recommendations.map { rec ->
-                            Song(
-                                id = "youtube:${rec.videoId}",
-                                title = rec.title,
-                                artist = rec.artist,
-                                album = null,
-                                duration = 0L, // Duration unknown from search API
-                                filePath = rec.watchUrl,
-                                genre = null,
-                                releaseYear = null,
-                                albumArtUri = rec.thumbnail
+            // Fetch YouTube Music recommendations after stream extraction completes (songs only)
+            // Only fetch if recommendations list is completely empty (all songs played) and history is empty
+            val shouldFetchRecommendations = _uiState.value.upNextRecommendations.isEmpty() && 
+                                            playedRecommendationsHistory.isEmpty() &&
+                                            originalRecommendationVideoId != videoId
+            
+            if (shouldFetchRecommendations) {
+                // Clear history when fetching fresh recommendations (new search)
+                playedRecommendationsHistory.clear()
+                Log.d("PlayerViewModel", "🎵 Stream extraction complete, fetching YouTube Music recommendations for videoId=$videoId")
+                _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
+                originalRecommendationVideoId = videoId
+                
+                YTMusicRecommender.getRecommendations(
+                    videoId = videoId,
+                    limit = 50,
+                    onResult = { recommendations ->
+                        Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations for chunked stream")
+                        if (recommendations.isEmpty()) {
+                            // No recommendations available - enable repeat mode to loop the current song
+                            Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
+                            _uiState.value = _uiState.value.copy(
+                                repeatEnabled = true,
+                                upNextRecommendations = emptyList(),
+                                isLoadingRecommendations = false
+                            )
+                        } else {
+                            // Convert RecommendedSong to Song objects for UI
+                            val recommendedSongs = recommendations
+                                .filter { rec -> rec.videoId != videoId } // Filter out current song to avoid loop
+                                .map { rec ->
+                                    Song(
+                                        id = "youtube:${rec.videoId}",
+                                        title = rec.title,
+                                        artist = rec.artist,
+                                        album = null,
+                                        duration = 0L, // Duration unknown from search API
+                                        filePath = rec.watchUrl,
+                                        genre = null,
+                                        releaseYear = null,
+                                        albumArtUri = rec.thumbnail
+                                    )
+                                }
+                            Log.d("PlayerViewModel", "🎵 Filtered chunked stream recommendations: ${recommendedSongs.size} songs (excluded current)")
+                            _uiState.value = _uiState.value.copy(
+                                upNextRecommendations = recommendedSongs,
+                                isLoadingRecommendations = false,
+                                repeatEnabled = false  // Disable repeat when recommendations are available
                             )
                         }
+                    },
+                    onError = { error ->
+                        Log.e("PlayerViewModel", "❌ YouTube recommendations failed for chunked stream: $error")
+                        // On error, also enable repeat mode to loop the current song
+                        Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
                         _uiState.value = _uiState.value.copy(
-                            upNextRecommendations = recommendedSongs,
+                            upNextRecommendations = emptyList(),
                             isLoadingRecommendations = false,
-                            repeatEnabled = false  // Disable repeat when recommendations are available
+                            repeatEnabled = true
                         )
                     }
-                },
-                onError = { error ->
-                    Log.e("PlayerViewModel", "❌ YouTube recommendations failed for chunked stream: $error")
-                    // On error, also enable repeat mode to loop the current song
-                    Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
-                    _uiState.value = _uiState.value.copy(
-                        upNextRecommendations = emptyList(),
-                        isLoadingRecommendations = false,
-                        repeatEnabled = true
-                    )
-                }
-            )
+                )
+            } else {
+                Log.d("PlayerViewModel", "🎵 Using existing recommendations, not refetching")
+            }
         }
     }
 
@@ -724,11 +861,85 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         updateNotification()
     }
 
+    /**
+     * Prefetch next song in queue when reaching 75% of current song
+     * This prepares the stream URL and potentially starts downloading the first chunks
+     */
+    private fun prefetchNextSongIfNeeded() {
+        val currentSong = _uiState.value.currentSong ?: return
+        val nextSong = queueManager.peekNext() ?: return
+        
+        // Only prefetch if this is a different song and we're not already prefetching
+        if (nextSong.id == prefetchedSongId || isPrefetching) {
+            return
+        }
+        
+        // Only prefetch online songs that need stream URL extraction
+        if (!nextSong.id.startsWith("online:") && !nextSong.id.startsWith("youtube:")) {
+            return
+        }
+        
+        isPrefetching = true
+        prefetchJob?.cancel()
+        
+        prefetchJob = viewModelScope.launch {
+            try {
+                Log.d("PlayerViewModel", "🔄 Prefetching next song: ${nextSong.title}")
+                
+                val videoId = nextSong.id.removePrefix("online:").removePrefix("youtube:")
+                
+                // Fetch stream URL for next song
+                val streamUrl = onlineManager.getStreamUrl(videoId)
+                
+                if (streamUrl != null) {
+                    Log.d("PlayerViewModel", "✅ Prefetched stream URL for: ${nextSong.title}")
+                    prefetchedSongId = nextSong.id
+                    
+                    // Optionally: Start downloading first chunk in background
+                    // This would require a separate ChunkedStreamManager instance
+                    // or modifications to support multiple concurrent downloads
+                    
+                } else {
+                    Log.w("PlayerViewModel", "⚠️ Failed to prefetch stream URL for: ${nextSong.title}")
+                }
+            } catch (e: Exception) {
+                Log.e("PlayerViewModel", "❌ Error prefetching next song: ${e.message}")
+            } finally {
+                isPrefetching = false
+            }
+        }
+    }
+
     fun next() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
 
-            // Use queue manager to move to next song (with auto-refill)
+            // Reset prefetch state when moving to next song
+            prefetchedSongId = null
+            prefetchJob?.cancel()
+
+            val currentSong = _uiState.value.currentSong
+            
+            // For online songs with recommendations, play from recommendation list
+            if (currentSong != null && 
+                (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) && 
+                _uiState.value.upNextRecommendations.isNotEmpty()) {
+                
+                val nextRecommendation = _uiState.value.upNextRecommendations.first()
+                Log.d("PlayerViewModel", "⏭️ Playing next recommendation: ${nextRecommendation.title}")
+                
+                // Remove the played recommendation from the list
+                val remainingRecommendations = _uiState.value.upNextRecommendations.drop(1)
+                _uiState.value = _uiState.value.copy(
+                    upNextRecommendations = remainingRecommendations
+                )
+                
+                // Play the recommended song
+                playRecommendedSong(nextRecommendation)
+                return@launch
+            }
+
+            // Use queue manager to move to next song (with auto-refill) for offline songs
             val nextSong = queueManager.moveToNext(autoRefill = true)
 
             if (nextSong != null) {
@@ -757,7 +968,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
 
-            // Use queue manager to move to previous song
+            val currentSong = _uiState.value.currentSong
+            
+            // For online songs with played history, go back to previous recommendation
+            if (currentSong != null && 
+                (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) && 
+                playedRecommendationsHistory.isNotEmpty()) {
+                
+                val previousRecommendation = playedRecommendationsHistory.last()
+                Log.d("PlayerViewModel", "⏮️ Playing previous recommendation: ${previousRecommendation.title}")
+                
+                // Remove from history
+                playedRecommendationsHistory.removeAt(playedRecommendationsHistory.size - 1)
+                
+                // Add current song back to the front of recommendations list
+                val updatedRecommendations = listOf(currentSong) + _uiState.value.upNextRecommendations
+                _uiState.value = _uiState.value.copy(
+                    upNextRecommendations = updatedRecommendations
+                )
+                
+                // Play the previous song (skip recommendation fetch)
+                val youtubeUrl = previousRecommendation.filePath
+                playUrl(url = youtubeUrl, title = previousRecommendation.title, 
+                       artist = previousRecommendation.artist, durationMs = previousRecommendation.duration, 
+                       thumbnailUrl = previousRecommendation.albumArtUri, skipRecommendationFetch = true)
+                return@launch
+            }
+
+            // Use queue manager to move to previous song for offline songs
             val previousSong = queueManager.moveToPrevious()
 
             if (previousSong != null) {
@@ -812,26 +1050,41 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         playbackCollector.startCollecting(currentSong.id)
                     }
                 } else {
-                    // Auto-play next song with queue refill enabled
-                    val nextSong = queueManager.moveToNext(autoRefill = true)
-
-                    if (nextSong != null) {
-                        player.prepare(nextSong.filePath, nextSong.id)
-                        player.play()
-                        playbackCollector.startCollecting(nextSong.id)
-
+                    // For online songs with recommendations, auto-play the first recommendation
+                    if (currentSong.id.startsWith("online:") && _uiState.value.upNextRecommendations.isNotEmpty()) {
+                        val nextRecommendation = _uiState.value.upNextRecommendations.first()
+                        Log.d("PlayerViewModel", "🎵 Auto-playing next recommendation: ${nextRecommendation.title}")
+                        
+                        // Remove the played recommendation from the list
+                        val remainingRecommendations = _uiState.value.upNextRecommendations.drop(1)
                         _uiState.value = _uiState.value.copy(
-                            currentSong = nextSong,
-                            isPlaying = true
+                            upNextRecommendations = remainingRecommendations
                         )
-
-                        // Log song details
-                        logSongDetails(nextSong)
-
-                        updateNotification()
-                        savePlaylistState()
+                        
+                        // Play the recommended song
+                        playRecommendedSong(nextRecommendation)
                     } else {
-                        _uiState.value = _uiState.value.copy(isPlaying = false)
+                        // Auto-play next song from queue with queue refill enabled
+                        val nextSong = queueManager.moveToNext(autoRefill = true)
+
+                        if (nextSong != null) {
+                            player.prepare(nextSong.filePath, nextSong.id)
+                            player.play()
+                            playbackCollector.startCollecting(nextSong.id)
+
+                            _uiState.value = _uiState.value.copy(
+                                currentSong = nextSong,
+                                isPlaying = true
+                            )
+
+                            // Log song details
+                            logSongDetails(nextSong)
+
+                            updateNotification()
+                            savePlaylistState()
+                        } else {
+                            _uiState.value = _uiState.value.copy(isPlaying = false)
+                        }
                     }
                 }
             } finally {
@@ -1698,6 +1951,7 @@ data class PlayerUiState(
     val currentSong: Song? = null,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
+    val isLoadingSong: Boolean = false,
     val position: Long = 0L,
     val duration: Long = 0L,
     val shuffleEnabled: Boolean = false,

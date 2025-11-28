@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -29,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.network.OnlineSearchResult
+import com.just_for_fun.synctax.core.network.OnlineResultType
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -67,7 +70,11 @@ fun OnlineResultCard(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         Icon(
-                            imageVector = Icons.Default.MusicNote,
+                            imageVector = when (result.type) {
+                                OnlineResultType.ALBUM -> Icons.Default.Album
+                                OnlineResultType.ARTIST -> Icons.Default.Person
+                                else -> Icons.Default.MusicNote
+                            },
                             contentDescription = null,
                             modifier = Modifier.size(28.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -85,13 +92,36 @@ fun OnlineResultCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = result.author ?: "Unknown Artist",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = result.author ?: "Unknown Artist",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    
+                    // Show type badge for albums and artists
+                    if (result.type == OnlineResultType.ALBUM || result.type == OnlineResultType.ARTIST) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = when (result.type) {
+                                    OnlineResultType.ALBUM -> "Album${if (!result.year.isNullOrEmpty()) " • ${result.year}" else ""}"
+                                    OnlineResultType.ARTIST -> "Artist"
+                                    else -> ""
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             IconButton(onClick = { onPlayClick(result) }) {

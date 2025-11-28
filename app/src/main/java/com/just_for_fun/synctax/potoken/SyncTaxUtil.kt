@@ -25,7 +25,7 @@
 //import com.just_for_fun.synctax.core.data.local.entities.ChapterItem
 //import com.just_for_fun.synctax.core.data.local.entities.Format
 //import com.just_for_fun.synctax.core.data.local.entities.ResultItem
-//import com.just_for_fun.synctax.utils.FormatUtil
+//import com.just_for_fun.synctax.util.FormatUtil
 //import com.yausername.youtubedl_android.YoutubeDL
 //import com.yausername.youtubedl_android.YoutubeDLRequest
 //import kotlinx.coroutines.Dispatchers
