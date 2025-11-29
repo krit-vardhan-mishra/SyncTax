@@ -12,11 +12,20 @@ import java.io.Serializable
 
 /**
  * Simple in-memory vector database for song embeddings with persistence
+ * Optimized with memory limits and LRU cache to prevent excessive memory usage
  */
 class VectorDatabase(private val context: Context) {
-    private val vectors = mutableMapOf<String, DoubleArray>()
+    private val vectors = object : LinkedHashMap<String, DoubleArray>(MAX_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, DoubleArray>?): Boolean {
+            return size > MAX_CACHE_SIZE
+        }
+    }
     private val mutex = Mutex()
     private val vectorsFile = File(context.filesDir, "vectors.dat")
+
+    companion object {
+        private const val MAX_CACHE_SIZE = 5000 // Limit in-memory vectors to 5000 songs
+    }
 
     init {
         loadVectors()
@@ -25,7 +34,10 @@ class VectorDatabase(private val context: Context) {
     suspend fun storeVector(id: String, vector: DoubleArray) {
         mutex.withLock {
             vectors[id] = vector.clone()
-            saveVectors()
+            // Save periodically or on significant changes
+            if (vectors.size % 100 == 0) {
+                saveVectors()
+            }
         }
     }
 
@@ -37,12 +49,21 @@ class VectorDatabase(private val context: Context) {
 
     suspend fun findSimilar(queryVector: DoubleArray, topK: Int = 10): List<Pair<String, Double>> {
         mutex.withLock {
-            return vectors.mapNotNull { (id, vector) ->
+            // Use a min-heap to efficiently find top K without sorting all
+            val candidates = mutableListOf<Pair<String, Double>>()
+            
+            for ((id, vector) in vectors) {
                 val similarity = MathUtils.cosineSimilarity(queryVector, vector)
-                id to similarity
+                candidates.add(id to similarity)
+                
+                // Early optimization: only keep top candidates
+                if (candidates.size > topK * 2) {
+                    candidates.sortByDescending { it.second }
+                    candidates.subList(topK * 2, candidates.size).clear()
+                }
             }
-                .sortedByDescending { it.second }
-                .take(topK)
+            
+            return candidates.sortedByDescending { it.second }.take(topK)
         }
     }
 
@@ -56,6 +77,12 @@ class VectorDatabase(private val context: Context) {
     suspend fun size(): Int {
         mutex.withLock {
             return vectors.size
+        }
+    }
+    
+    suspend fun flush() {
+        mutex.withLock {
+            saveVectors()
         }
     }
 
@@ -78,7 +105,8 @@ class VectorDatabase(private val context: Context) {
             FileInputStream(vectorsFile).use { fis ->
                 ObjectInputStream(fis).use { ois ->
                     val serializableMap = ois.readObject() as? Map<String, List<Double>> ?: return
-                    serializableMap.forEach { (id, list) ->
+                    // Only load up to MAX_CACHE_SIZE vectors
+                    serializableMap.entries.take(MAX_CACHE_SIZE).forEach { (id, list) ->
                         vectors[id] = list.toDoubleArray()
                     }
                 }

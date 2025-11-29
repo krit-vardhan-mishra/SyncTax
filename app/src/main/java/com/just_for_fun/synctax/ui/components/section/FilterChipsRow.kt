@@ -23,7 +23,7 @@ import com.just_for_fun.synctax.ui.theme.ChipUnselected
 
 @Composable
 fun FilterChipsRow() {
-    val chips = listOf("All", "Podcasts", "Romance", "Feel good", "Relax", "Energy")
+    val chips = listOf("All", "Quick Picks", "Listen Again", "Speed Dial", "Quick Access")
     var selectedChip by remember { mutableStateOf(chips[0]) }
 
     LazyRow(

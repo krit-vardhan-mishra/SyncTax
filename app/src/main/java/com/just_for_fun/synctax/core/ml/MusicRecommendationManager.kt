@@ -46,6 +46,7 @@ class MusicRecommendationManager(private val context: Context) {
     /**
      * Generate quick picks for the home screen
      * Results are cached for 5 minutes to improve performance
+     * Uses chunked processing to avoid loading all songs in memory
      */
     suspend fun generateQuickPicks(count: Int = 20): QuickPicksResult {
         // Return cached result if still valid
@@ -55,35 +56,44 @@ class MusicRecommendationManager(private val context: Context) {
             }
         }
         return withContext(Dispatchers.Default) {
-            // Get all songs
-            val allSongs = database.songDao().getAllSongs().first()
-            if (allSongs.isEmpty()) {
-                return@withContext QuickPicksResult(emptyList(), "1.0.0")
-            }
-
-            // Get user's listening history
+            // Get user's listening history first
             val recentHistory = database.listeningHistoryDao().getRecentHistory(100).first()
             val userPreferences = database.userPreferenceDao().getTopPreferences(50).first()
 
-            // If user has no songs, do not generate recommendations
-            if (allSongs.isEmpty()) {
+            if (userPreferences.isEmpty()) {
                 return@withContext QuickPicksResult(emptyList(), "1.0.0")
             }
 
-            // Extract features for each song
-            val songFeaturesList = allSongs.map { song ->
-                extractSongFeatures(song.id, recentHistory, userPreferences)
+            // Process songs in chunks to avoid memory issues
+            val allResults = mutableListOf<RecommendationResult>()
+            val chunkSize = 500
+            var offset = 0
+            
+            while (true) {
+                val songChunk = database.songDao().getSongsPaginated(chunkSize, offset)
+                if (songChunk.isEmpty()) break
+                
+                // Extract features for chunk
+                val chunkFeatures = songChunk.map { song ->
+                    extractSongFeatures(song.id, recentHistory, userPreferences)
+                }
+                
+                // Process chunk with all agents (in parallel)
+                val chunkResults = chunkFeatures.map { songFeatures ->
+                    async {
+                        processWithAgents(songFeatures, chunkFeatures)
+                    }
+                }.awaitAll()
+                
+                allResults.addAll(chunkResults)
+                offset += chunkSize
+                
+                // Early exit if we have enough candidates
+                if (allResults.size >= count * 10) break
             }
 
-            // Process in parallel with all agents
-            val results = songFeaturesList.map { songFeatures ->
-                async {
-                    processWithAgents(songFeatures, songFeaturesList)
-                }
-            }.awaitAll()
-
             // Generate final recommendations
-            val quickPicks = recommendationAgent.generateQuickPicks(results, count)
+            val quickPicks = recommendationAgent.generateQuickPicks(allResults, count)
             
             // Cache the result
             cachedQuickPicks = quickPicks
@@ -405,24 +415,33 @@ class MusicRecommendationManager(private val context: Context) {
     /**
      * Check for deleted songs and remove them from database and ML models.
      * Should be called periodically.
+     * Uses chunked processing to avoid memory issues.
      */
     suspend fun cleanupDeletedSongs() {
         withContext(Dispatchers.IO) {
             try {
-                val allSongs = database.songDao().getAllSongs().first()
                 val deletedSongs = mutableListOf<String>()
+                val chunkSize = 500
+                var offset = 0
 
-                allSongs.forEach { song ->
-                    // Check if file exists
-                    // Note: This assumes song.filePath is an absolute path or accessible URI
-                    try {
-                        val file = java.io.File(song.filePath)
-                        if (!file.exists() && !song.id.startsWith("online:")) {
-                            deletedSongs.add(song.id)
+                // Process songs in chunks
+                while (true) {
+                    val songChunk = database.songDao().getSongsPaginated(chunkSize, offset)
+                    if (songChunk.isEmpty()) break
+                    
+                    songChunk.forEach { song ->
+                        // Check if file exists
+                        try {
+                            val file = java.io.File(song.filePath)
+                            if (!file.exists() && !song.id.startsWith("online:")) {
+                                deletedSongs.add(song.id)
+                            }
+                        } catch (e: Exception) {
+                            // If filePath is invalid or not a file path, skip
                         }
-                    } catch (e: Exception) {
-                        // If filePath is invalid or not a file path, skip
                     }
+                    
+                    offset += chunkSize
                 }
 
                 if (deletedSongs.isNotEmpty()) {

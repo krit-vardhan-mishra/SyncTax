@@ -52,24 +52,32 @@ class MusicService : Service() {
     
     private val widgetPreferences by lazy { WidgetPreferences(this) }
     
+    // Track if we were playing before losing focus
+    private var wasPlayingBeforeFocusLoss = false
+    
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
                 // Permanent loss of audio focus - pause playback
+                wasPlayingBeforeFocusLoss = false
                 onPause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                // Temporary loss of audio focus - pause playback
+                // Temporary loss of audio focus - remember state and pause
+                wasPlayingBeforeFocusLoss = isPlaying
                 onPause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                // Temporary loss with ducking allowed - lower volume (handled by system)
-                // We'll just pause to avoid conflict
+                // Temporary loss with ducking allowed - remember state and pause
+                wasPlayingBeforeFocusLoss = isPlaying
                 onPause()
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
-                // Regained audio focus - optionally resume playback
-                // We won't auto-resume, user needs to press play
+                // Regained audio focus - resume if we were playing before
+                if (wasPlayingBeforeFocusLoss) {
+                    onPlay()
+                    wasPlayingBeforeFocusLoss = false
+                }
             }
         }
     }

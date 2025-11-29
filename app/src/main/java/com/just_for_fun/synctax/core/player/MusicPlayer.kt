@@ -54,12 +54,20 @@ class MusicPlayer(context: Context) {
 
     private var positionUpdateRunnable: Runnable? = null
 
+    private var lastEmittedPosition = 0L
+    private val positionUpdateThreshold = 1000L // Only update if position changed by 1 second
+    
     private fun startPositionUpdates() {
         stopPositionUpdates()
         positionUpdateRunnable = object : Runnable {
             override fun run() {
-                _currentPosition.value = exoPlayer.currentPosition
-                mainHandler.postDelayed(this, 100) // Update every 100ms
+                val currentPos = exoPlayer.currentPosition
+                // Only emit if position changed significantly to reduce recompositions
+                if (kotlin.math.abs(currentPos - lastEmittedPosition) >= positionUpdateThreshold) {
+                    _currentPosition.value = currentPos
+                    lastEmittedPosition = currentPos
+                }
+                mainHandler.postDelayed(this, 500) // Update every 500ms (reduced frequency)
             }
         }
         mainHandler.post(positionUpdateRunnable!!)

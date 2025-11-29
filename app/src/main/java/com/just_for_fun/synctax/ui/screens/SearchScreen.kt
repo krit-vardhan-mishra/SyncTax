@@ -303,17 +303,12 @@ fun SearchScreen(
                                                 com.just_for_fun.synctax.core.network.OnlineResultType.ALBUM -> {
                                                     // Fetch album details and show detail screen
                                                     coroutineScope.launch {
-                                                        android.widget.Toast.makeText(
-                                                            context,
-                                                            "Loading album: ${res.title}",
-                                                            android.widget.Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        
                                                         homeViewModel.fetchAlbumDetails(
                                                             browseId = res.browseId ?: res.id,
                                                             onResult = {albumDetails ->
                                                                 if (albumDetails != null && albumDetails.songs.isNotEmpty()) {
                                                                     // Convert online songs to Song objects for playback
+                                                                    // Use album's thumbnail for all songs to ensure consistent album art display
                                                                     val songs = albumDetails.songs.map { track ->
                                                                         com.just_for_fun.synctax.core.data.local.entities.Song(
                                                                             id = "youtube:${track.videoId}",
@@ -324,7 +319,7 @@ fun SearchScreen(
                                                                             filePath = track.watchUrl,
                                                                             genre = null,
                                                                             releaseYear = albumDetails.year.toIntOrNull(),
-                                                                            albumArtUri = track.thumbnail
+                                                                            albumArtUri = albumDetails.thumbnail
                                                                         )
                                                                     }
                                                                     // Navigate to AlbumDetailScreen with online songs
@@ -367,6 +362,7 @@ fun SearchScreen(
                                                             onResult = { artistDetails ->
                                                                 if (artistDetails != null && artistDetails.songs.isNotEmpty()) {
                                                                     // Convert online songs to Song objects for playback
+                                                                    // Use artist's thumbnail for all songs for consistent display
                                                                     val songs = artistDetails.songs.map { track ->
                                                                         com.just_for_fun.synctax.core.data.local.entities.Song(
                                                                             id = "youtube:${track.videoId}",
@@ -377,7 +373,7 @@ fun SearchScreen(
                                                                             filePath = track.watchUrl,
                                                                             genre = null,
                                                                             releaseYear = null,
-                                                                            albumArtUri = track.thumbnail
+                                                                            albumArtUri = artistDetails.thumbnail
                                                                         )
                                                                     }
                                                                     // TODO: Navigate to ArtistDetailScreen with songs
@@ -387,7 +383,8 @@ fun SearchScreen(
                                                                         url = songs.first().filePath,
                                                                         title = songs.first().title,
                                                                         artist = songs.first().artist,
-                                                                        durationMs = 0L
+                                                                        durationMs = 0L,
+                                                                        thumbnailUrl = artistDetails.thumbnail
                                                                     )
                                                                 } else {
                                                                     android.widget.Toast.makeText(
@@ -414,7 +411,8 @@ fun SearchScreen(
                                                         url = youtubeUrl,
                                                         title = res.title,
                                                         artist = res.author ?: "Unknown",
-                                                        durationMs = res.duration ?: 0L
+                                                        durationMs = res.duration ?: 0L,
+                                                        thumbnailUrl = res.thumbnailUrl
                                                     )
                                                 }
                                             }

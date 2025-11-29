@@ -1,7 +1,7 @@
 # SyncTax
 
 <p align="left">
-  <img src="assets/app_icon.png" alt="App icon" height="96" />
+  <img src="assets/app_icon.jpg" alt="App icon" height="200" />
 </p>
 
 SyncTax is an offline-first Android music player and recommender app that demonstrates privacy-preserving, on-device personalization and compact ML models. It combines a modern Android UI with background playback, local-first data storage, and a lightweight hybrid recommendation engine that uses Kotlin-based agents and an optional Python model via Chaquopy.

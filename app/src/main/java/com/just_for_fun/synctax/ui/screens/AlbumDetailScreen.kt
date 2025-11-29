@@ -54,19 +54,34 @@ fun AlbumDetailScreen(
         if (albumArtUri.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
-                    context.contentResolver.openInputStream(albumArtUri.toUri())?.use { inputStream ->
-                        val bitmap = BitmapFactory.decodeStream(inputStream)
-                        bitmap?.let { bmp ->
-                            Palette.from(bmp).generate { palette ->
-                                val dominant = palette?.dominantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF121212)
-                                val vibrant = palette?.vibrantSwatch?.rgb?.let { Color(it) }
-                                    ?: palette?.darkVibrantSwatch?.rgb?.let { Color(it) }
-                                    ?: palette?.mutedSwatch?.rgb?.let { Color(it) }
-                                    ?: dominant
-
-                                dominantColor = dominant
-                                vibrantColor = vibrant
+                    val bitmap = when {
+                        albumArtUri.startsWith("http://") || albumArtUri.startsWith("https://") -> {
+                            // Load from URL
+                            val url = java.net.URL(albumArtUri)
+                            val connection = url.openConnection() as java.net.HttpURLConnection
+                            connection.doInput = true
+                            connection.connect()
+                            val inputStream = connection.inputStream
+                            BitmapFactory.decodeStream(inputStream)
+                        }
+                        else -> {
+                            // Load from local URI
+                            context.contentResolver.openInputStream(albumArtUri.toUri())?.use { inputStream ->
+                                BitmapFactory.decodeStream(inputStream)
                             }
+                        }
+                    }
+                    
+                    bitmap?.let { bmp ->
+                        Palette.from(bmp).generate { palette ->
+                            val dominant = palette?.dominantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF121212)
+                            val vibrant = palette?.vibrantSwatch?.rgb?.let { Color(it) }
+                                ?: palette?.darkVibrantSwatch?.rgb?.let { Color(it) }
+                                ?: palette?.mutedSwatch?.rgb?.let { Color(it) }
+                                ?: dominant
+
+                            dominantColor = dominant
+                            vibrantColor = vibrant
                         }
                     }
                 } catch (e: Exception) {
@@ -160,7 +175,11 @@ fun AlbumDetailScreen(
                                 }
                             } else {
                                 AsyncImage(
-                                    model = albumArtUri,
+                                    model = coil.request.ImageRequest.Builder(context)
+                                        .data(albumArtUri)
+                                        .crossfade(true)
+                                        .error(android.R.drawable.ic_menu_gallery)
+                                        .build(),
                                     contentDescription = albumName,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier

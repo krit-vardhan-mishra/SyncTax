@@ -63,6 +63,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val playbackCollector = PlaybackCollector(
         repository = repository,
         player = player,
+        scope = viewModelScope, // Use viewModelScope for lifecycle management
         onPlaybackRecorded = {
             // Invalidate Quick Picks cache when new playback is recorded
             recommendationManager.invalidateQuickPicksCache()

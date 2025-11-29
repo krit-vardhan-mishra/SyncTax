@@ -270,7 +270,7 @@ private fun EmptyStateCard() {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Add songs to your favorites to see them here instantly.",
+                text = "Start listening to music and we'll analyze your patterns to suggest personalized songs here.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

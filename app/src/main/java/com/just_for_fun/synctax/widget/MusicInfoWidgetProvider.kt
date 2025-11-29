@@ -123,24 +123,49 @@ class MusicInfoWidgetProvider : AppWidgetProvider() {
     private suspend fun loadAlbumArt(context: Context, albumArtUri: String): Bitmap? {
         return withContext(Dispatchers.IO) {
             try {
+                val targetSize = 300
                 if (albumArtUri.startsWith("http")) {
                     val url = URL(albumArtUri)
                     val connection = url.openConnection() as HttpURLConnection
                     connection.connectTimeout = 5000
                     connection.readTimeout = 5000
                     connection.inputStream.use { inputStream ->
-                        BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                            Bitmap.createScaledBitmap(bitmap, 300, 300, true)
+                        // Use inSampleSize for memory-efficient decoding
+                        val options = BitmapFactory.Options().apply {
+                            inJustDecodeBounds = true
+                        }
+                        BitmapFactory.decodeStream(inputStream, null, options)
+                        options.inSampleSize = calculateInSampleSize(options, targetSize, targetSize)
+                        options.inJustDecodeBounds = false
+                        
+                        connection.inputStream.use { secondStream ->
+                            BitmapFactory.decodeStream(secondStream, null, options)?.let { bitmap ->
+                                if (bitmap.width > targetSize || bitmap.height > targetSize) {
+                                    Bitmap.createScaledBitmap(bitmap, targetSize, targetSize, true).also {
+                                        if (it != bitmap) bitmap.recycle()
+                                    }
+                                } else bitmap
+                            }
                         }
                     }
                 } else if (albumArtUri.startsWith("/") || albumArtUri.contains(":\\")) {
                     // Handle absolute file paths (from downloaded songs)
                     val file = File(albumArtUri)
                     if (file.exists()) {
-                        file.inputStream().use { inputStream ->
-                            BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                                Bitmap.createScaledBitmap(bitmap, 300, 300, true)
-                            }
+                        // Use BitmapFactory.Options for memory-efficient decoding
+                        val options = BitmapFactory.Options().apply {
+                            inJustDecodeBounds = true
+                        }
+                        BitmapFactory.decodeFile(file.absolutePath, options)
+                        options.inSampleSize = calculateInSampleSize(options, targetSize, targetSize)
+                        options.inJustDecodeBounds = false
+                        
+                        BitmapFactory.decodeFile(file.absolutePath, options)?.let { bitmap ->
+                            if (bitmap.width > targetSize || bitmap.height > targetSize) {
+                                Bitmap.createScaledBitmap(bitmap, targetSize, targetSize, true).also {
+                                    if (it != bitmap) bitmap.recycle()
+                                }
+                            } else bitmap
                         }
                     } else {
                         null
@@ -158,5 +183,20 @@ class MusicInfoWidgetProvider : AppWidgetProvider() {
                 null
             }
         }
+    }
+    
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 }

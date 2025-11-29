@@ -50,7 +50,7 @@ fun SpeedDialSection(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Personalized for you",
+                    text = "AI-powered suggestions based on your listening patterns",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

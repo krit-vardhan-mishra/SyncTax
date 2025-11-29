@@ -12,6 +12,12 @@ interface SongDao {
     @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC LIMIT :limit OFFSET :offset")
     suspend fun getSongsPaginated(limit: Int, offset: Int): List<Song>
 
+    @Query("SELECT * FROM songs WHERE addedTimestamp < :lastTimestamp ORDER BY addedTimestamp DESC LIMIT :limit")
+    suspend fun getSongsKeysetPaginated(lastTimestamp: Long, limit: Int): List<Song>
+
+    @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC LIMIT :limit")
+    suspend fun getSongsChunk(limit: Int): List<Song>
+
     @Query("SELECT COUNT(*) FROM songs")
     suspend fun getSongCount(): Int
 

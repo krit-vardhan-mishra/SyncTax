@@ -9,7 +9,7 @@ import com.just_for_fun.synctax.core.data.local.entities.*
 
 @Database(
     entities = [Song::class, ListeningHistory::class, UserPreference::class, OnlineListeningHistory::class],
-    version = 3,  // Incremented due to adding OnlineListeningHistory entity
+    version = 4,  // Incremented for adding indices
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {

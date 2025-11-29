@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.collect
 class PlaybackCollector(
     private val repository: MusicRepository,
     private val player: MusicPlayer,
+    private val scope: CoroutineScope, // Accept scope from caller (ViewModel)
     private val onPlaybackRecorded: (() -> Unit)? = null
 ) {
 
@@ -26,8 +27,8 @@ class PlaybackCollector(
         playStartTime = System.currentTimeMillis()
 
         collectJob?.cancel()
-        // Use Main dispatcher to safely observe player state
-        collectJob = CoroutineScope(Dispatchers.Main).launch {
+        // Use provided scope for lifecycle management
+        collectJob = scope.launch {
             player.playerState.collect { state ->
                 // Observe player state changes safely
                 if (!state.isPlaying) {
