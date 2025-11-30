@@ -2,6 +2,7 @@ package com.just_for_fun.synctax.core.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.util.Calendar
 import androidx.core.net.toUri
 
@@ -130,20 +132,36 @@ class MusicRepository(private val context: Context) {
                                     val id =
                                         cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
                                             .toString()
-                                    val title =
+                                    var title =
                                         cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE))
                                             ?: file.nameWithoutExtension
-                                    val artist =
+                                    var artist =
                                         cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST))
                                             ?: "Unknown Artist"
-                                    val album =
+                                    var album =
                                         cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM))
                                     val albumId =
                                         cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID))
-                                    val duration =
+                                    var duration =
                                         cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION))
-                                    val year =
+                                    var year =
                                         cursor.getInt(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR))
+
+                                    // If MediaStore returns "Unknown Artist" or generic values, 
+                                    // try to read embedded metadata directly from the file
+                                    if (artist == "Unknown Artist" || artist == "<unknown>" || 
+                                        album == null || album == "Unknown Album" || album == "<unknown>") {
+                                        val embedded = extractEmbeddedMetadata(file)
+                                        
+                                        // Override with embedded values if available
+                                        (embedded["title"] as? String)?.let { if (it.isNotBlank()) title = it }
+                                        (embedded["artist"] as? String)?.let { if (it.isNotBlank()) artist = it }
+                                        (embedded["album"] as? String)?.let { if (it.isNotBlank()) album = it }
+                                        (embedded["duration"] as? Long)?.let { if (it > 0 && duration == 0L) duration = it }
+                                        (embedded["year"] as? Int)?.let { if (it > 0 && year == 0) year = it }
+                                        
+                                        Log.d("MusicRepository", "Enhanced metadata from embedded tags for: ${file.name}")
+                                    }
 
                                     // Get album art URI - check for local image file first
                                     var albumArtUri = ContentUris.withAppendedId(
@@ -180,25 +198,37 @@ class MusicRepository(private val context: Context) {
                                 }
                             }
 
-                            // If not found in MediaStore, add basic info
+                            // If not found in MediaStore, try embedded metadata first, then fallback to basic info
                             if (!songAdded) {
-                                // Remove file extension properly using nameWithoutExtension
-                                val title = file.nameWithoutExtension
+                                val embedded = extractEmbeddedMetadata(file)
+                                
+                                val title = (embedded["title"] as? String)?.takeIf { it.isNotBlank() } 
+                                    ?: file.nameWithoutExtension
+                                val artist = (embedded["artist"] as? String)?.takeIf { it.isNotBlank() } 
+                                    ?: "Unknown Artist"
+                                val album = (embedded["album"] as? String)?.takeIf { it.isNotBlank() }
+                                val duration = (embedded["duration"] as? Long) ?: 0L
+                                val year = embedded["year"] as? Int
+                                
+                                // Check for album art - either extracted or existing local file
+                                val albumArtUri = (embedded["albumArtUri"] as? String) 
+                                    ?: checkForLocalAlbumArt(file)
+                                
                                 val song = Song(
                                     id = file.absolutePath,
                                     title = title,
-                                    artist = "Unknown Artist",
-                                    album = null,
-                                    duration = 0L,
+                                    artist = artist,
+                                    album = album,
+                                    duration = duration,
                                     filePath = file.absolutePath,
-                                    genre = detectGenre(file.absolutePath, "", title),
-                                    releaseYear = null,
-                                    albumArtUri = checkForLocalAlbumArt(file) // Check for local album art
+                                    genre = detectGenre(file.absolutePath, artist, title),
+                                    releaseYear = year,
+                                    albumArtUri = albumArtUri
                                 )
                                 songs.add(song)
                                 Log.d(
                                     "Directory Location",
-                                    "Added song from direct scan (no MediaStore): ${file.absolutePath}"
+                                    "Added song from direct scan with embedded metadata: ${file.absolutePath}"
                                 )
                             }
                         } catch (e: Exception) {
@@ -380,6 +410,69 @@ class MusicRepository(private val context: Context) {
             // Silently ignore errors when checking for album art
         }
         return null
+    }
+
+    /**
+     * Extract embedded metadata directly from audio file using MediaMetadataRetriever.
+     * This is used as fallback when MediaStore doesn't have proper metadata.
+     * Also extracts embedded album art and saves it as a separate file.
+     * 
+     * @return Map with keys: title, artist, album, duration, albumArtUri
+     */
+    private fun extractEmbeddedMetadata(audioFile: File): Map<String, Any?> {
+        val result = mutableMapOf<String, Any?>()
+        val retriever = MediaMetadataRetriever()
+        
+        try {
+            retriever.setDataSource(audioFile.absolutePath)
+            
+            // Extract text metadata
+            result["title"] = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+            result["artist"] = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+            result["album"] = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            
+            val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            result["duration"] = durationStr?.toLongOrNull() ?: 0L
+            
+            val yearStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_YEAR)
+            result["year"] = yearStr?.toIntOrNull()
+            
+            // Extract embedded album art
+            val embeddedArt = retriever.embeddedPicture
+            if (embeddedArt != null && embeddedArt.isNotEmpty()) {
+                // Save embedded art as a separate file
+                val directory = audioFile.parentFile
+                val baseName = audioFile.nameWithoutExtension
+                val albumArtFile = File(directory, "$baseName.jpg")
+                
+                // Only write if doesn't exist already
+                if (!albumArtFile.exists()) {
+                    try {
+                        FileOutputStream(albumArtFile).use { fos ->
+                            fos.write(embeddedArt)
+                        }
+                        Log.d("MusicRepository", "Extracted embedded album art to: ${albumArtFile.absolutePath}")
+                    } catch (e: Exception) {
+                        Log.w("MusicRepository", "Failed to save embedded album art: ${e.message}")
+                    }
+                }
+                
+                result["albumArtUri"] = albumArtFile.absolutePath
+            }
+            
+            Log.d("MusicRepository", "Extracted embedded metadata - Title: ${result["title"]}, Artist: ${result["artist"]}, Album: ${result["album"]}")
+            
+        } catch (e: Exception) {
+            Log.w("MusicRepository", "Failed to extract embedded metadata from ${audioFile.name}: ${e.message}")
+        } finally {
+            try {
+                retriever.release()
+            } catch (e: Exception) {
+                // Ignore release errors
+            }
+        }
+        
+        return result
     }
 
     private fun scanFromMediaStore(songs: MutableList<Song>, allowedPath: String) {
