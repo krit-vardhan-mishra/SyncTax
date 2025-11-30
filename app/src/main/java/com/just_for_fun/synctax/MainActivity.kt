@@ -129,16 +129,9 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Request READ_MEDIA_IMAGES permission for Android 13+ (for album art)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_MEDIA_IMAGES
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
-            }
-        }
+        // Note: READ_MEDIA_IMAGES is no longer requested
+        // Downloaded songs have thumbnails embedded directly in the audio file
+        // Local library songs will use MediaStore album art if permission is granted via system settings
 
         // Request notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

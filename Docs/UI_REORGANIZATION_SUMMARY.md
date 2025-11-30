@@ -1,9 +1,9 @@
 # UI Reorganization and Online Features Implementation Summary
 
-## Date: November 28, 2025
+## Date: November 30, 2025 (Updated)
 
 ## Overview
-This document summarizes the major changes made to reorganize the home screen sections and add online listening history features.
+This document summarizes the major changes made to reorganize the home screen sections, add online listening history features, and implement history management capabilities.
 
 ---
 
@@ -26,13 +26,15 @@ This document summarizes the major changes made to reorganize the home screen se
   - `OnlineListeningHistoryDao.kt` - DAO for accessing online history
   - `OnlineHistoryCard.kt` - UI component for displaying online history items
   - `OnlineHistorySection.kt` - Section component for home screen
-- **Database:** Updated `MusicDatabase.kt` to version 3 with new entity
+- **Database:** Updated `MusicDatabase.kt` to version 4 with new entity
 - **Storage:** Maintains up to 15 records, shows most recent 10
 - **Features:**
   - Displays title, artist, thumbnail for each online song
   - Play all button to replay songs in order
   - Click to replay individual songs
   - Shows "Recently played online" subtitle
+  - **NEW:** Long-press to show bottom sheet options
+  - **NEW:** "Remove from Quick Picks" option with confirmation dialog
 
 ### Quick Access Section (Previously: Non-existent)
 **New Behavior:** Random songs for quick discovery
@@ -57,6 +59,7 @@ This document summarizes the major changes made to reorganize the home screen se
 - **DAO Methods:**
   - `getRecentOnlineHistory()` - Returns Flow of last 10 records
   - `insertOnlineListening()` - Adds new record
+  - `deleteByVideoId()` - Removes specific record by videoId
   - `trimOldRecords()` - Keeps only 15 most recent records
   - `clearAll()` - Clears history
 
@@ -70,11 +73,27 @@ This document summarizes the major changes made to reorganize the home screen se
 
 ### HomeViewModel Integration
 - **File:** `HomeViewModel.kt`
-- **New Methods:**
-  - `addOnlineListeningHistory()` - Manually add history (not used currently)
+- **Methods:**
+  - `addOnlineListeningHistory()` - Manually add history
   - `loadOnlineHistory()` - Load history from database into UI state
+  - `deleteOnlineHistory(videoId)` - **NEW:** Remove song from online history
 - **UI State:** Added `onlineHistory` field to `HomeUiState`
 - **Initialization:** Calls `loadOnlineHistory()` in init block
+
+### Online History Card Updates
+- **File:** `OnlineHistoryCard.kt`
+- **Features:**
+  - Combined clickable for tap and long-press
+  - Haptic feedback on long-press
+  - ModalBottomSheet with song details
+  - "Remove from Quick Picks" option (styled in error color)
+  - AlertDialog for delete confirmation
+  - Proper state management with remember and coroutines
+
+### Online History Section Updates
+- **File:** `OnlineHistorySection.kt`
+- **New Parameter:** `onRemoveFromHistory: (OnlineListeningHistory) -> Unit`
+- **Behavior:** Passes callback to each OnlineHistoryCard
 
 ---
 
@@ -243,10 +262,14 @@ This document summarizes the major changes made to reorganize the home screen se
 
 ## 10. Future Enhancements
 
+### Completed ✅
+1. **Online History:**
+   - ✅ Add ability to clear individual history items (long-press → Remove)
+   - ✅ Confirmation dialog before deletion
+
 ### Potential Improvements
 1. **Online History:**
-   - Add ability to clear history
-   - Add "Remove from history" option per song
+   - Add "Clear All" button to clear entire history
    - Show play count for each song
 
 2. **Online Albums:**
@@ -263,3 +286,7 @@ This document summarizes the major changes made to reorganize the home screen se
    - Add filter by genre/mood
    - Smart random (avoid recently played)
    - Customizable grid size (6, 9, 12 songs)
+
+---
+
+*Last Updated: November 30, 2025*

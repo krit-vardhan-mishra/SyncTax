@@ -513,6 +513,20 @@ object NewPipeAudioDownloader {
                 }
             }
             
+            // Clean up any leftover thumbnail files
+            val baseName = "${sanitizedArtist} - ${sanitizedTitle}"
+            listOf(".jpg", ".webp", ".png", ".jpeg", ".jpg.webp").forEach { ext ->
+                val thumbFile = File(outputDir, baseName + ext)
+                if (thumbFile.exists()) {
+                    try {
+                        thumbFile.delete()
+                        Log.d(TAG, "🧹 Cleaned up thumbnail: ${thumbFile.name}")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to cleanup thumbnail: ${thumbFile.name}")
+                    }
+                }
+            }
+            
             if (finalFile != null && finalFile.exists() && finalFile.length() > 1024) {
                 Log.d(TAG, "✅ yt-dlp download successful: ${finalFile.absolutePath}")
                 DownloadResult(

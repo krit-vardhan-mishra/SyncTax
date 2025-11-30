@@ -1,14 +1,16 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.utils
 
-import android.app.Activity
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.button.MaterialButton
 import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.data.model.Format
 import com.just_for_fun.synctax.ui.adapter.FormatAdapter
@@ -42,7 +44,7 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
 
         // Load formats if URL is provided
         if (url.isNotBlank()) {
-            view.findViewById<android.widget.TextView>(R.id.url).text = url
+            view.findViewById<TextView>(R.id.url).text = url
             viewModel.loadFormats(url)
         }
     }
@@ -51,29 +53,29 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
         adapter = FormatAdapter(object : FormatAdapter.OnItemClickListener {
             override fun onItemSelect(item: Format) {
                 viewModel.selectFormat(item)
-                view.findViewById<com.google.android.material.button.MaterialButton>(R.id.download_button).isEnabled = true
+                view.findViewById<MaterialButton>(R.id.download_button).isEnabled = true
             }
         }, requireActivity())
 
-        view.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.recyclerView).apply {
+        view.findViewById<RecyclerView>(R.id.recyclerView).apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = this@FormatSelectionBottomSheetDialog.adapter
         }
     }
 
     private fun setupClickListeners(view: View) {
-        view.findViewById<com.google.android.material.button.MaterialButton>(R.id.filter_button).setOnClickListener {
+        view.findViewById<MaterialButton>(R.id.filter_button).setOnClickListener {
             viewModel.cycleCategory()
             updateFilterButtonText(view)
         }
 
-        view.findViewById<com.google.android.material.button.MaterialButton>(R.id.refresh).setOnClickListener {
+        view.findViewById<MaterialButton>(R.id.refresh).setOnClickListener {
             if (url.isNotBlank()) {
                 viewModel.refreshFormats(url)
             }
         }
 
-        view.findViewById<com.google.android.material.button.MaterialButton>(R.id.download_button).setOnClickListener {
+        view.findViewById<MaterialButton>(R.id.download_button).setOnClickListener {
             viewModel.uiState.value.selectedFormat?.let { format ->
                 onFormatSelected?.invoke(format)
                 dismiss()
@@ -83,7 +85,7 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
 
     private fun updateFilterButtonText(view: View) {
         val categoryName = viewModel.getCategoryName()
-        view.findViewById<android.widget.TextView>(R.id.title).text = "Select Format ($categoryName)"
+        view.findViewById<TextView>(R.id.title).text = "Select Format ($categoryName)"
     }
 
     private fun observeViewModel() {
@@ -92,7 +94,7 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
                 val view = requireView()
 
                 // Update loading state
-                view.findViewById<com.google.android.material.button.MaterialButton>(R.id.refresh).isEnabled = !state.isLoading
+                view.findViewById<MaterialButton>(R.id.refresh).isEnabled = !state.isLoading
 
                 // Update adapter data
                 adapter.submitList(state.recyclerViewItems.toMutableList())
@@ -101,7 +103,7 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
                 adapter.selectedFormat = state.selectedFormat
 
                 // Update download button
-                view.findViewById<com.google.android.material.button.MaterialButton>(R.id.download_button).isEnabled = state.selectedFormat != null
+                view.findViewById<MaterialButton>(R.id.download_button).isEnabled = state.selectedFormat != null
 
                 // Update filter category in title
                 updateFilterButtonText(view)
@@ -109,7 +111,7 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
                 // Handle errors
                 state.error?.let { error ->
                     // Show error (could use Snackbar)
-                    view.findViewById<android.widget.TextView>(R.id.title).text = "Error: $error"
+                    view.findViewById<TextView>(R.id.title).text = "Error: $error"
                 }
             }
         }
@@ -118,7 +120,7 @@ class FormatSelectionBottomSheetDialog : BottomSheetDialogFragment() {
     fun setUrl(url: String) {
         this.url = url
         if (isAdded) {
-            requireView().findViewById<android.widget.TextView>(R.id.url).text = url
+            requireView().findViewById<TextView>(R.id.url).text = url
             viewModel.loadFormats(url)
         }
     }

@@ -15,19 +15,13 @@ import coil.memory.MemoryCache
 import coil.request.Options
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
-import com.just_for_fun.synctax.potoken.NewPipeDownloaderImpl
-import com.just_for_fun.synctax.potoken.NewPipePoTokenGenerator
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
 import okio.buffer
 import okio.source
-import org.schabi.newpipe.extractor.NewPipe
-import org.schabi.newpipe.extractor.localization.Localization
-import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
@@ -49,24 +43,12 @@ class MusicApplication : Application(), ImageLoaderFactory {
             Log.e(TAG, "❌ Failed to initialize WebView", e)
         }
 
-        // Initialize NewPipe extractor with PO token support
-        try {
-            NewPipe.init(
-                NewPipeDownloaderImpl(OkHttpClient.Builder()),
-                Localization("en", "US")
-            )
-            YoutubeStreamExtractor.setPoTokenProvider(NewPipePoTokenGenerator())
-            Log.d(TAG, "✅ NewPipe initialized with PO token support")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to initialize NewPipe", e)
-        }
-
         // Initialize Python runtime on background thread to avoid blocking main thread
         applicationScope.launch {
             initializePython()
         }
         
-        // Initialize YoutubeDL and FFmpeg on background thread
+        // Initialize YoutubeDL on background thread
         applicationScope.launch {
             initializeYoutubeDLAndFFmpeg()
         }

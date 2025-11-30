@@ -48,7 +48,7 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.card.SongCard
 import com.just_for_fun.synctax.ui.components.onboarding.DirectorySelectionDialog
 import com.just_for_fun.synctax.ui.components.section.EmptyMusicState
-import com.just_for_fun.synctax.ui.components.section.FilterChipsRow
+import com.just_for_fun.synctax.ui.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.ui.components.section.OnlineHistorySection
 import com.just_for_fun.synctax.ui.components.section.SectionHeader
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
@@ -279,7 +279,10 @@ fun HomeScreen(
                                                 ) == true
                                             )
                                                 playerState.currentSong?.id?.removePrefix("online:")
-                                            else null
+                                            else null,
+                                            onRemoveFromHistory = { history ->
+                                                homeViewModel.deleteOnlineHistory(history.videoId)
+                                            }
                                         )
                                     }
                                 }

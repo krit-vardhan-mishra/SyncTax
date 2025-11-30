@@ -284,6 +284,17 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                     except Exception as e:
                         print(f"🎵 Python: Mutagen metadata embedding failed: {e}", file=sys.stderr)
                 
+                # Clean up any leftover thumbnail files regardless of success
+                thumb_base = os.path.splitext(filename)[0]
+                for ext in ['.jpg', '.webp', '.png', '.jpeg', '.jpg.webp']:
+                    potential_thumb = thumb_base + ext
+                    if os.path.exists(potential_thumb):
+                        try:
+                            os.remove(potential_thumb)
+                            print(f"🧹 Python: Cleaned up thumbnail: {potential_thumb}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"🧹 Python: Failed to cleanup thumbnail {potential_thumb}: {e}", file=sys.stderr)
+                
                 result = {
                     "success": True,
                     "message": f"Download completed successfully using {client} client" + 

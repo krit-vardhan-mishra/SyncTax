@@ -461,3 +461,8 @@ YTDLNIS provides a comprehensive audio download solution with:
 5. **Advanced Features**: Thumbnail embedding, chapter splitting, SponsorBlock
 
 The key innovation is the **FormatUtil** class that intelligently sorts formats based on multiple criteria, and the **FormatViewModel** that manages format display with various filter/sort options for the user.
+
+---
+
+**Last Updated**: November 30, 2025  
+**Reference Status**: ✅ Implemented in SyncTax

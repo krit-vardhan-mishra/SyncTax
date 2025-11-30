@@ -27,7 +27,6 @@ import com.just_for_fun.synctax.core.player.PlaybackEvent
 import com.just_for_fun.synctax.core.player.PlaybackEventBus
 import com.just_for_fun.synctax.core.player.QueueManager
 import com.just_for_fun.synctax.core.utils.AudioProcessor
-import com.just_for_fun.synctax.potoken.PoTokenHelper
 import com.just_for_fun.synctax.service.MusicService
 import com.just_for_fun.synctax.util.FormatUtil
 import com.just_for_fun.synctax.util.YTMusicRecommender
@@ -40,7 +39,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -474,7 +472,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val videoId = title.substringAfter("online:", "") // best-effort; if not available, fallback
                     val resolvedUrl = if (url.startsWith("http")) url else "https://www.youtube.com/watch?v=$videoId"
                     val info = try {
-                        chaquopyDownloader.getVideoInfo(resolvedUrl, _uiState.value.poTokenData.ifEmpty { null })
+                        chaquopyDownloader.getVideoInfo(resolvedUrl, null)
                     } catch (e: Exception) { null }
 
                     if (info != null) {
@@ -771,7 +769,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 try {
                     val url = "https://www.youtube.com/watch?v=$videoId"
                     val info = try {
-                        chaquopyDownloader.getVideoInfo(url, _uiState.value.poTokenData.ifEmpty { null })
+                        chaquopyDownloader.getVideoInfo(url, null)
                     } catch (e: Exception) { null }
 
                     if (info != null) {
@@ -973,7 +971,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                     
                                     val buffer = ByteArray(8192)
                                     var bytesRead: Int
-                                    var totalBytes = 0L
+                                    var totalBytes = 0
                                     
                                     // Limit to 1MB max
                                     while (inputStream.read(buffer).also { bytesRead = it } != -1 && totalBytes < 1048576) {
@@ -1487,16 +1485,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Show loading indicator
                 _uiState.value = _uiState.value.copy(isLoadingFormats = true)
 
-                // Generate PO tokens if needed
-                Log.d("PlayerViewModel", "📥 Download: Ensuring valid PO tokens...")
-                ensureValidPoTokens(videoId)
-                Log.d("PlayerViewModel", "📥 Download: PO tokens ready")
-
                 // Get available formats using ChaquopyAudioDownloader (includes client fallback)
-                val videoInfo = chaquopyDownloader.getVideoInfo(
-                    url,
-                    _uiState.value.poTokenData.ifEmpty { null }
-                )
+                val videoInfo = chaquopyDownloader.getVideoInfo(url, null)
 
                 Log.d(
                     "PlayerViewModel",
@@ -1569,12 +1559,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 Log.d("PlayerViewModel", "📥 Direct Download: Starting for '${song.title}'")
 
-                // Generate PO tokens before download
-                val videoId = song.id.substringAfter("online:")
-                Log.d("PlayerViewModel", "📥 Direct Download: Ensuring valid PO tokens...")
-                ensureValidPoTokens(videoId)
-                Log.d("PlayerViewModel", "📥 Direct Download: PO tokens ready")
-
                 // Mark as downloading
                 _uiState.value = _uiState.value.copy(
                     downloadingSongs = _uiState.value.downloadingSongs + song.id,
@@ -1601,7 +1585,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     url,
                     downloadDir.absolutePath,
                     null,
-                    _uiState.value.poTokenData.ifEmpty { null }
+                    null
                 )
 
                 Log.d(
@@ -1718,15 +1702,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         val downloadJob = viewModelScope.launch {
             try {
-                // Generate PO tokens if needed before downloading
-                Log.d("PlayerViewModel", "📥 Format Download: Ensuring valid PO tokens...")
-                ensureValidPoTokens(videoId)
-                Log.d("PlayerViewModel", "📥 Format Download: PO tokens ready")
-
                 // Fetch detailed metadata from yt-dlp first
                 Log.d("PlayerViewModel", "📥 Format Download: Fetching metadata from yt-dlp...")
                 val videoInfo = try {
-                    chaquopyDownloader.getVideoInfo(url, _uiState.value.poTokenData.ifEmpty { null })
+                    chaquopyDownloader.getVideoInfo(url, null)
                 } catch (e: Exception) {
                     Log.w("PlayerViewModel", "📥 Format Download: yt-dlp metadata fetch failed: ${e.message}")
                     null
@@ -1811,7 +1790,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             url,
                             downloadDir.absolutePath,
                             format.format_id,
-                            _uiState.value.poTokenData.ifEmpty { null }
+                            null
                         )
                         
                         if (result.success) {
@@ -1966,58 +1945,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    fun updatePoTokenData(tokenData: String) {
-        _uiState.value = _uiState.value.copy(poTokenData = tokenData)
-    }
-
-    // Helper method to generate and store PO tokens
-    suspend fun generateAndStorePoTokens(videoId: String) {
-        try {
-            val result = PoTokenHelper.generatePoToken(getApplication(), videoId)
-            result.onSuccess { poToken ->
-                // Convert to JSON format expected by Python
-                // PoTokenResult has public final fields: visitorData, playerRequestPoToken, streamingDataPoToken
-                val tokenJson = JSONObject().apply {
-                    put("visitor_data", poToken.visitorData)
-                    put("android", poToken.streamingDataPoToken) // Use streaming token for Android
-                    put("web", poToken.playerRequestPoToken) // Use player token for Web
-                    put("ios", poToken.streamingDataPoToken) // Use streaming token for iOS
-                    put("tv", poToken.streamingDataPoToken) // Use streaming token for TV
-                    put("mweb", poToken.playerRequestPoToken) // Use player token for mobile web
-                }.toString()
-
-                updatePoTokenData(tokenJson)
-                Log.d("PlayerViewModel", "✅ PO tokens generated and stored for video: $videoId")
-                Log.d("PlayerViewModel", "✅ Visitor Data: ${poToken.visitorData}")
-                Log.d("PlayerViewModel", "✅ Token JSON: $tokenJson")
-            }.onFailure { error ->
-                Log.e("PlayerViewModel", "❌ Failed to generate PO tokens", error)
-            }
-        } catch (e: Exception) {
-            Log.e("PlayerViewModel", "❌ Error generating PO tokens", e)
-        }
-    }
-
-    fun isPoTokenExpired(): Boolean {
-        // Check if poTokenData is empty or expired
-        return _uiState.value.poTokenData.isEmpty()
-    }
-
-    // Auto-refresh tokens when needed
-    suspend fun ensureValidPoTokens(videoId: String) {
-        if (isPoTokenExpired()) {
-            generateAndStorePoTokens(videoId)
-        }
-    }
-
-    fun showPoTokenDialog() {
-        _uiState.value = _uiState.value.copy(showPoTokenDialog = true)
-    }
-
-    fun dismissPoTokenDialog() {
-        _uiState.value = _uiState.value.copy(showPoTokenDialog = false)
-    }
-
     private fun updateNotification() {
         musicService?.updatePlaybackState(
             _uiState.value.currentSong,
@@ -2066,8 +1993,6 @@ data class PlayerUiState(
     val availableFormats: List<Format> = emptyList(),  // Changed from AudioFormat to Format
     val isLoadingFormats: Boolean = false, // Loading indicator for format selection
     val selectedFormat: Format? = null,  // Currently selected format for download
-    val poTokenData: String = "", // PO Token data (JSON) for YouTube
-    val showPoTokenDialog: Boolean = false, // Dialog to enter PO Token
     val upNextRecommendations: List<Song> = emptyList(), // YouTube-recommended songs for online player
     val isLoadingRecommendations: Boolean = false // Loading indicator for recommendations
 )

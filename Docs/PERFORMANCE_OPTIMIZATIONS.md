@@ -203,10 +203,20 @@ To test performance optimizations:
 - None - Uses existing Android/Kotlin libraries
 
 ### Database Migrations:
-- None - No schema changes required
+- Database version 4 required for indices
 
 ---
 
-**Version**: 1.2.0  
-**Last Updated**: November 22, 2025  
-**Author**: Performance Optimization Team
+## Updates (November 2025)
+
+### Additional Performance Improvements
+- **APK Size**: Reduced from ~253 MB to ~136 MB (ARM only, FFmpeg removed)
+- **Metadata Embedding**: Mutagen replaces native FFmpeg (Python-based)
+- **Online History**: Limited to 15 records with auto-trim
+- **VectorDatabase**: LRU cache with 5,000 entry limit
+
+---
+
+**Version**: 3.0.0  
+**Last Updated**: November 30, 2025  
+**Author**: SyncTax Development Team

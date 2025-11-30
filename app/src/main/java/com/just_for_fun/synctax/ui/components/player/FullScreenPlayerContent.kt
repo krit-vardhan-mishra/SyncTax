@@ -54,7 +54,6 @@ import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,7 +83,7 @@ import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.components.FormatSelectionDialog
+import com.just_for_fun.synctax.ui.components.utils.FormatSelectionDialog
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
@@ -98,7 +97,6 @@ import com.just_for_fun.synctax.ui.theme.PlayerTextSecondary
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.ui.viewmodels.LyricsViewModel
 import kotlinx.coroutines.delay
-import java.io.File
 import kotlin.math.abs
 import io.github.fletchmckee.liquid.rememberLiquidState
 import io.github.fletchmckee.liquid.liquefiable
@@ -965,10 +963,6 @@ fun FullScreenPlayerContent(
                 },
                 onDismiss = {
                     playerViewModel.dismissFormatDialog()
-                },
-                currentPoToken = uiState.poTokenData,
-                onPoTokenChanged = { token ->
-                    playerViewModel.updatePoTokenData(token)
                 }
             )
         }

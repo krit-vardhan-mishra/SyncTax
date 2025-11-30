@@ -637,6 +637,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
+     * Delete a song from online listening history
+     */
+    fun deleteOnlineHistory(videoId: String) {
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                database.onlineListeningHistoryDao().deleteByVideoId(videoId)
+                android.util.Log.d("HomeViewModel", "Online history deleted: $videoId")
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error deleting online history", e)
+            }
+        }
+    }
+    
+    /**
      * Delete a song from the database and update UI
      */
     fun deleteSong(song: Song) {

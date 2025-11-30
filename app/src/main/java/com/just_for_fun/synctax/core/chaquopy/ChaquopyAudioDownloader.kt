@@ -30,15 +30,12 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
         url: String,
         outputDir: String,
         formatId: String? = null,
-        poTokenData: String? = null
+        poTokenData: String? = null  // Deprecated, kept for API compatibility
     ): DownloadResult {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "🎵 Starting download for URL: $url")
                 Log.d(TAG, "🎵 Output directory: $outputDir")
-                if (poTokenData != null) {
-                    Log.d(TAG, "🎵 PO Token data provided (length: ${poTokenData.length})")
-                }
 
                 val resultJson = if (formatId != null) {
                     pythonModule.callAttr(
@@ -47,7 +44,7 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                         outputDir,
                         false,
                         formatId,
-                        poTokenData
+                        null  // No PO Token
                     )
                 } else {
                     pythonModule.callAttr(
@@ -56,7 +53,7 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
                         outputDir,
                         false,
                         null,
-                        poTokenData
+                        null  // No PO Token
                     )
                 }
 
@@ -108,7 +105,7 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
     suspend fun getVideoInfo(url: String, poTokenData: String? = null): VideoInfo {
         return withContext(Dispatchers.IO) {
             try {
-                val resultJson = pythonModule.callAttr("get_video_info", url, poTokenData)
+                val resultJson = pythonModule.callAttr("get_video_info", url, null)  // No PO Token
                 val result = JSONObject(resultJson.toString())
 
                 val success = result.optBoolean("success", false)

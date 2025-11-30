@@ -1,7 +1,10 @@
 package com.just_for_fun.synctax.ui.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
@@ -31,8 +35,34 @@ fun SettingsScreen(
 ) {
     val themeMode by userPreferences.themeMode.collectAsState(initial = UserPreferences.KEY_THEME_MODE_SYSTEM)
     val scanPaths by userPreferences.scanPaths.collectAsState(initial = emptyList())
+    val scanLocalAlbumArt by userPreferences.scanLocalAlbumArt.collectAsState(initial = false)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    // Permission state for album art
+    var hasImagePermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.READ_MEDIA_IMAGES
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true // Not needed on older versions
+            }
+        )
+    }
+    
+    // Permission launcher for album art
+    val imagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasImagePermission = granted
+        if (granted) {
+            userPreferences.setScanLocalAlbumArt(true)
+            onScanTrigger() // Re-scan to load album art
+        }
+    }
 
     // SAF folder picker
     val dirPickerLauncher = rememberLauncherForActivityResult(
@@ -93,6 +123,50 @@ fun SettingsScreen(
                     onSelect = { userPreferences.setThemeMode(UserPreferences.KEY_THEME_MODE_DARK) }
                 )
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // --- Album Art section ---
+            Text("Album Art", style = MaterialTheme.typography.titleMedium)
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Scan local library for album art")
+                    Text(
+                        text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            "Requires media images permission"
+                        } else {
+                            "Show album art for local songs"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = scanLocalAlbumArt,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            // Check if we need to request permission (Android 13+)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasImagePermission) {
+                                imagePermissionLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+                            } else {
+                                userPreferences.setScanLocalAlbumArt(true)
+                                onScanTrigger()
+                            }
+                        } else {
+                            userPreferences.setScanLocalAlbumArt(false)
+                        }
+                    }
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             // --- Scan directories UI ---
             Text("Scan directories", style = MaterialTheme.typography.titleMedium)

@@ -192,8 +192,33 @@ All optimizations have been successfully implemented and tested. The app now:
 
 ---
 
-**Implementation Complete**: November 22, 2025  
+## Recent Updates (November 2025)
+
+### ✅ Online History Management
+- [x] Long-press on Quick Picks to show options
+- [x] "Remove from Quick Picks" option in bottom sheet
+- [x] Confirmation dialog before deletion
+- [x] HomeViewModel.deleteOnlineHistory() function
+
+### ✅ Permission Optimization
+- [x] READ_MEDIA_IMAGES made optional
+- [x] Settings toggle for album art scanning
+- [x] Permission requested only when user enables feature
+
+### ✅ Download Improvements
+- [x] PO Token infrastructure removed (deprecated)
+- [x] Thumbnail cleanup after metadata embedding
+- [x] Mutagen for metadata embedding (replaces FFmpeg)
+
+### ✅ Code Cleanup
+- [x] Removed potoken/ package (5 files)
+- [x] Removed po_token.html assets
+- [x] Removed .bak backup files
+- [x] Simplified NewPipeUtils.kt
+
+---
+
+**Last Updated**: November 30, 2025  
 **Status**: ✅ Production Ready  
-**Performance**: Excellent  
-**Code Quality**: High  
-**Documentation**: Comprehensive
+**Version**: 3.0.0  
+**APK Size**: ~136 MB

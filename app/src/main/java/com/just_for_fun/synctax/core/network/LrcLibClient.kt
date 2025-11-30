@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 object LrcLibClient {
     
     private const val BASE_URL = "https://lrclib.net/"
-    private const val USER_AGENT = "SyncTax/1.1.0 (Android Music Player)"
+    private const val USER_AGENT = "SyncTax/3.0.0 (Android Music Player)"
     
     /**
      * OkHttp client with logging and custom headers

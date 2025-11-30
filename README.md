@@ -20,13 +20,17 @@ This README gives a quick project overview, usage tips, and developer setup inst
 
 ---
 
-## What's New in v1.1.0
+## What's New in v3.0.0
 
 - **Enhanced Search Performance**: Improved search speed for both local and online music discovery.
-- **Download Feature**: Added download option for online songs directly from search results.
-- **Lyrics Support**: New lyrics section with support for LRC files and online fetching from LRCLIB for select songs.
+- **Download Feature**: Added download option for online songs directly from search results with Mutagen metadata embedding.
+- **Lyrics Support**: New lyrics section with support for LRC files and online fetching from LRCLIB.
+- **Quick Picks Management**: Long-press songs in Quick Picks to remove from listening history.
+- **Optimized Permissions**: READ_MEDIA_IMAGES now optional for better privacy.
+- **Performance Optimizations**: Database indices, chunked ML processing, 5-minute Quick Picks cache.
+- **Smaller APK**: ~136 MB (ARM only, FFmpeg removed, x86 excluded).
 - **UI Enhancements**: Various UI improvements for a better user experience.
-- **Security Improvements**: Restricted directory scanning to only user-selected directories, enhancing privacy and security.
+- **Security Improvements**: Restricted directory scanning to only user-selected directories.
 
 ---
 

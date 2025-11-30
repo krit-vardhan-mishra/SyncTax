@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.card
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*

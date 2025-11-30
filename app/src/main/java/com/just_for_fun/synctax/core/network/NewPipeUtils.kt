@@ -1,8 +1,6 @@
 package com.just_for_fun.synctax.core.network
 
 import android.util.Log
-import com.just_for_fun.synctax.potoken.NewPipeDownloaderImpl
-import com.just_for_fun.synctax.potoken.NewPipePoTokenGenerator
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.schabi.newpipe.extractor.NewPipe
@@ -14,33 +12,64 @@ import org.schabi.newpipe.extractor.downloader.Response as NPResponse
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager
 import org.schabi.newpipe.extractor.stream.AudioStream
 import java.net.URLDecoder
-import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 
 /**
  * Thin wrapper around NewPipe's extractor to decode signature-ciphered stream URLs.
  * Uses NewPipe's internal YoutubeJavaScriptPlayerManager to obtain valid signatures.
- * Optionally uses PoToken generation to bypass bot detection.
  */
 object NewPipeUtils {
 
     @Volatile
     private var initialized = false
 
+    /**
+     * Simple OkHttp-based downloader for NewPipe
+     */
+    private class SimpleDownloader(clientBuilder: OkHttpClient.Builder) : Downloader() {
+        private val client = clientBuilder.build()
+
+        override fun execute(request: NPRequest): NPResponse {
+            val dataToSend = request.dataToSend()
+            val requestBuilder = Request.Builder()
+                .url(request.url())
+                .method(
+                    request.httpMethod(),
+                    if (dataToSend != null) {
+                        okhttp3.RequestBody.create(null, dataToSend)
+                    } else null
+                )
+
+            request.headers().forEach { (key, values) ->
+                values.forEach { value ->
+                    requestBuilder.addHeader(key, value)
+                }
+            }
+
+            val response = client.newCall(requestBuilder.build()).execute()
+            val responseBody = response.body?.string() ?: ""
+            
+            val responseHeaders = mutableMapOf<String, List<String>>()
+            response.headers.names().forEach { name ->
+                responseHeaders[name] = response.headers.values(name)
+            }
+
+            return NPResponse(
+                response.code,
+                response.message,
+                responseHeaders,
+                responseBody,
+                request.url()
+            )
+        }
+    }
+
     init {
-        // Initialize NewPipe with custom downloader
+        // Initialize NewPipe with simple OkHttp downloader
         NewPipe.init(
-            NewPipeDownloaderImpl(OkHttpClient.Builder()),
+            SimpleDownloader(OkHttpClient.Builder()),
             Localization("en", "US")
         )
-        
-        // Set poToken provider for YouTube extractors
-        try {
-            YoutubeStreamExtractor.setPoTokenProvider(NewPipePoTokenGenerator())
-            Log.d("NewPipeUtils", "PoToken provider enabled for YouTube")
-        } catch (e: Exception) {
-            Log.w("NewPipeUtils", "Failed to set PoToken provider (may not be supported in this NewPipe version)", e)
-        }
-        
+        Log.d("NewPipeUtils", "NewPipe initialized")
         initialized = true
     }
 

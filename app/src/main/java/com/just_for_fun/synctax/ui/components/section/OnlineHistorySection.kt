@@ -19,7 +19,8 @@ fun OnlineHistorySection(
     history: List<OnlineListeningHistory>,
     onHistoryClick: (OnlineListeningHistory) -> Unit,
     onPlayAll: () -> Unit = {},
-    currentVideoId: String? = null
+    currentVideoId: String? = null,
+    onRemoveFromHistory: (OnlineListeningHistory) -> Unit = {}
 ) {
     Column(
         modifier = Modifier.padding(vertical = 16.dp),
@@ -86,7 +87,8 @@ fun OnlineHistorySection(
                     OnlineHistoryCard(
                         history = item,
                         onClick = { onHistoryClick(item) },
-                        isPlaying = item.videoId == currentVideoId
+                        isPlaying = item.videoId == currentVideoId,
+                        onRemoveFromHistory = { onRemoveFromHistory(item) }
                     )
                 }
             }

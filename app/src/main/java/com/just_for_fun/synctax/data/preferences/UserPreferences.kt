@@ -22,6 +22,19 @@ class UserPreferences(context: Context) {
     private val _showQuickPicksGuide = MutableStateFlow(isQuickPicksGuideEnabled())
     val showQuickPicksGuide: StateFlow<Boolean> = _showQuickPicksGuide.asStateFlow()
 
+    // --- Album art scanning preference ---
+    private val _scanLocalAlbumArt = MutableStateFlow(isScanLocalAlbumArtEnabled())
+    val scanLocalAlbumArt: StateFlow<Boolean> = _scanLocalAlbumArt.asStateFlow()
+
+    fun isScanLocalAlbumArtEnabled(): Boolean {
+        return prefs.getBoolean(KEY_SCAN_LOCAL_ALBUM_ART, false)
+    }
+
+    fun setScanLocalAlbumArt(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SCAN_LOCAL_ALBUM_ART, enabled).apply()
+        _scanLocalAlbumArt.value = enabled
+    }
+
     // --- new: persisted scan paths (list of tree URIs as strings) ---
     private val _scanPaths = MutableStateFlow(getScanPathsPref())
     val scanPaths: StateFlow<List<String>> = _scanPaths.asStateFlow()
@@ -128,6 +141,9 @@ class UserPreferences(context: Context) {
 
         // new: key for scan paths
         private const val KEY_SCAN_PATHS = "scan_paths"
+        
+        // Album art scanning from local library
+        private const val KEY_SCAN_LOCAL_ALBUM_ART = "scan_local_album_art"
 
         // Guide screen identifiers
         const val GUIDE_HOME = "home"

@@ -405,6 +405,27 @@ All optimizations compiled successfully with only deprecation warnings (unrelate
 
 ---
 
+## Updates (November 2025)
+
+### Additional Optimizations Applied
+
+| Optimization | Description |
+|-------------|-------------|
+| FFmpeg Removal | Native libraries removed (~117 MB savings) |
+| ABI Filtering | x86/x86_64 excluded (ARM only) |
+| Mutagen Integration | Python-based metadata embedding |
+| PO Token Removal | Deprecated code cleaned up |
+| Online History Management | 15 record limit with user deletion |
+
+### Current Performance Metrics
+- APK Size: ~136 MB (release, ARM)
+- Database Version: 4 with full indexing
+- Quick Picks Cache: 5-minute TTL
+- VectorDatabase: 5,000 entry LRU cache
+- ML Batch Size: 500 songs per chunk
+
+---
+
 ## Conclusion
 
 These optimizations fundamentally change how the app handles large data sets:
@@ -412,5 +433,12 @@ These optimizations fundamentally change how the app handles large data sets:
 - **Memory:** From O(n) to O(1) with bounded caches
 - **Speed:** From O(n) to O(log n) with indices and chunking
 - **Responsiveness:** Reduced UI thread work by 80%
+- **APK Size:** Reduced from ~253 MB to ~136 MB
 
 The app now scales to handle libraries of any size without performance degradation.
+
+---
+
+**Date:** November 30, 2025  
+**Status:** ✅ Complete & Production Ready  
+**Version:** 3.0.0

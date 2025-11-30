@@ -1,4 +1,4 @@
-package com.just_for_fun.synctax.ui.components
+package com.just_for_fun.synctax.ui.components.utils
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.core.data.model.Format
+import com.just_for_fun.synctax.ui.components.card.FormatCard
 import com.just_for_fun.synctax.util.FormatUtil
 
 /**
@@ -27,8 +27,6 @@ fun FormatSelectionDialog(
     onFormatSelected: (Format) -> Unit,
     onDismiss: () -> Unit,
     onRefreshFormats: (() -> Unit)? = null,
-    currentPoToken: String = "",
-    onPoTokenChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -37,15 +35,6 @@ fun FormatSelectionDialog(
     var selectedFormat by remember { mutableStateOf<Format?>(null) }
     var showAllFormats by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-    var showPoTokenDialog by remember { mutableStateOf(false) }
-
-    if (showPoTokenDialog) {
-        PoTokenDialog(
-            currentPoToken = currentPoToken,
-            onPoTokenChanged = onPoTokenChanged,
-            onDismiss = { showPoTokenDialog = false }
-        )
-    }
     
     // Get sorted audio formats
     val audioFormats = remember(formats) {
@@ -88,14 +77,6 @@ fun FormatSelectionDialog(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // PO Token button
-                    IconButton(onClick = { showPoTokenDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.VpnKey,
-                            contentDescription = "Enter PO Token"
-                        )
-                    }
-
                     // Refresh button
                     if (onRefreshFormats != null) {
                         IconButton(

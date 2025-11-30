@@ -155,60 +155,88 @@ Download successful: Attention.mp4 (3.54 MB)
    - Better resolution description
    - Client information for debugging
 
+4. **Thumbnail Cleanup (November 2025):**
+   - yt-dlp downloads thumbnail for embedding
+   - Mutagen embeds thumbnail into audio file
+   - Cleanup code removes leftover `.jpg`, `.webp`, `.png` files
+   - Prevents orphaned thumbnail files in download folder
+
 ## 🎯 What Gets Downloaded
 
 ### File Format:
-- **Container:** MP4 (from format 18)
-- **Audio Codec:** AAC (mp4a.40.2)
-- **File Extension:** `.mp4`
-- **Content:** Audio only (video stream discarded/extracted)
+- **Container:** M4A or WebM (depending on format)
+- **Audio Codec:** AAC or Opus
+- **Metadata:** Embedded via Mutagen
+  - Title, Artist, Album
+  - Thumbnail as embedded album art
+  - Duration metadata
 
-### Why MP4?
-- Most reliable format available without PO Token
-- Native AAC audio support
-- Good compatibility with Android MediaPlayer
-- yt-dlp can extract audio without FFmpeg
+### Metadata Embedding Process:
+1. yt-dlp downloads audio stream
+2. yt-dlp downloads thumbnail separately
+3. Mutagen embeds metadata and artwork
+4. Cleanup removes separate thumbnail file
 
-## 🚀 Next Steps
+## 🔧 PO Token Status
 
-### For Better Audio Quality:
-1. **Option 1:** Use format selection UI to let users choose
-   - Show available formats (140, 251, 18, etc.)
-   - Let user pick quality preference
+### Current Status: Deprecated (November 2025)
+- PO Token infrastructure has been removed
+- Downloads work without PO Token using fallback clients
+- The `po_token_data` parameter is kept for API compatibility but unused
 
-2. **Option 2:** Implement PO Token support
-   - Unlocks high-quality audio formats
-   - Requires token generation/management
+### Removed Components:
+- `potoken/` package (5 Kotlin files)
+- `po_token.html` asset files
+- PO Token UI dialog
+- Token generation/validation logic
 
-3. **Option 3:** Bundle FFmpeg
-   - Better audio extraction
-   - Can convert to preferred formats
-   - Requires native library integration
+### Why Removed:
+- Added unnecessary complexity
+- Downloads work reliably without it
+- Client fallback (android → web → tv → ios) handles most cases
+
+## 🚀 Current Download Flow
+
+### Steps:
+1. User clicks download on online song
+2. Format selection dialog shown (optional)
+3. Python `audio_downloader.py` called via Chaquopy
+4. yt-dlp extracts stream with client fallback
+5. Audio downloaded to device storage
+6. Mutagen embeds metadata and artwork
+7. Thumbnail file cleaned up
+8. Media scanner notified
 
 ### Current Status:
 ✅ Downloads work reliably
-✅ Audio extracted from available formats
+✅ Metadata embedded (title, artist, album, artwork)
+✅ Thumbnail cleanup prevents orphaned files
 ✅ Client fallback prevents failures
-✅ Format 18 provides decent quality
-⚠️ Pure audio formats need PO Token
+✅ Format selection UI available
+❌ PO Token removed (not needed)
 
 ## 📱 Testing Recommendations
 
 ### Test with your app:
-1. Search for "attention" in app
-2. Click on "Attention" by Charlie Puth
+1. Search for any song in app
+2. Click on a song result
 3. Click download button
-4. Should download successfully now
+4. Select format (or use default)
+5. Should download successfully with full metadata
 
 ### Expected behavior:
-- Format detection finds format 18
-- Download uses android client
-- File saved as `Attention.mp4`
-- Contains audio only
-- File size: ~3-4 MB
+- Format detection finds available formats
+- Download uses best available client
+- Metadata embedded in file
+- No orphaned thumbnail files
+- File appears in music library
 
 ### If issues persist:
 - Check logcat for Python errors
-- Verify yt-dlp version (should be latest)
+- Verify yt-dlp version (2025.11.12)
 - Ensure storage permissions granted
 - Check network connectivity
+
+---
+
+*Last Updated: November 30, 2025*

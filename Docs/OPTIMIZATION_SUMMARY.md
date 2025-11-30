@@ -197,5 +197,35 @@ The app now handles **1000+ songs** smoothly with:
 
 ---
 
-**Implementation Date**: November 22, 2025  
-**Status**: ✅ Complete & Production Ready
+## Updates (November 2025)
+
+### Additional Optimizations Applied
+
+#### APK Size Optimization
+| Component | Before | After | Savings |
+|-----------|--------|-------|---------|
+| FFmpeg libraries | Included | Removed | ~136 MB |
+| x86/x86_64 ABIs | Included | Removed | ~117 MB |
+| PO Token code | Included | Removed | Cleaner codebase |
+
+#### Current APK Size: ~136 MB
+- ARM architectures only (armeabi-v7a, arm64-v8a)
+- Mutagen for metadata (Python, no native libs)
+- ProGuard enabled for release builds
+
+#### Memory Optimizations
+- VectorDatabase: LRU cache with 5,000 entry limit
+- Chunked ML processing: 500 songs per batch
+- Quick Picks cache: 5-minute TTL
+
+#### Database Optimizations
+- Database version: 4
+- Indices on: timestamp, title, artist, album, genre
+- Keyset pagination for large offsets
+- Online history: 15 record limit with auto-trim
+
+---
+
+**Last Updated**: November 30, 2025  
+**Status**: ✅ Complete & Production Ready  
+**Version**: 3.0.0
