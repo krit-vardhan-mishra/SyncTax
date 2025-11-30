@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.EmptySearchState
 import com.just_for_fun.synctax.ui.components.card.OnlineResultCard
 import com.just_for_fun.synctax.ui.components.card.SongCard
@@ -32,7 +34,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SearchScreen(
     onBackClick: () -> Unit,
-    onNavigateToAlbum: (String, String, List<com.just_for_fun.synctax.core.data.local.entities.Song>) -> Unit = { _, _, _ -> },
+    onNavigateToAlbum: (String, String, List<Song>) -> Unit = { _, _, _ -> },
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel()
@@ -99,8 +101,8 @@ fun SearchScreen(
     }
 
     // Guide Overlay
-    val userPreferences = remember(context) { com.just_for_fun.synctax.data.preferences.UserPreferences(context) }
-    var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(com.just_for_fun.synctax.data.preferences.UserPreferences.GUIDE_SEARCH)) }
+    val userPreferences = remember(context) { UserPreferences(context) }
+    var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(UserPreferences.GUIDE_SEARCH)) }
 
     Scaffold(
         topBar = {

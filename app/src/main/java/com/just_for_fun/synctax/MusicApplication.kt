@@ -17,7 +17,6 @@ import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import com.just_for_fun.synctax.potoken.NewPipeDownloaderImpl
 import com.just_for_fun.synctax.potoken.NewPipePoTokenGenerator
-import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -113,18 +112,16 @@ class MusicApplication : Application(), ImageLoaderFactory {
     
     private fun initializeYoutubeDLAndFFmpeg() {
         try {
-            // Initialize YoutubeDL first
+            // Initialize YoutubeDL
             Log.d(TAG, "🔧 Initializing YoutubeDL...")
             YoutubeDL.getInstance().init(this)
             Log.d(TAG, "✅ YoutubeDL initialized successfully")
             
-            // Then initialize FFmpeg
-            Log.d(TAG, "🔧 Initializing FFmpeg...")
-            FFmpeg.getInstance().init(this)
-            isFFmpegInitialized = true
-            Log.d(TAG, "✅ FFmpeg initialized successfully")
+            // FFmpeg library removed to reduce APK size (~136MB savings)
+            // We use Mutagen (Python) for metadata embedding instead
+            isFFmpegInitialized = false
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to initialize YoutubeDL/FFmpeg: ${e.message}", e)
+            Log.e(TAG, "❌ Failed to initialize YoutubeDL: ${e.message}", e)
             isFFmpegInitialized = false
         }
     }

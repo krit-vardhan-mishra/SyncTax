@@ -56,6 +56,8 @@ import com.just_for_fun.synctax.ui.components.section.SpeedDialSection
 import com.just_for_fun.synctax.ui.components.utils.SortOption
 import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.dynamic.DynamicGreetingSection
+import com.just_for_fun.synctax.ui.guide.GuideContent
+import com.just_for_fun.synctax.ui.guide.GuideOverlay
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
@@ -463,8 +465,8 @@ fun HomeScreen(
                     )
                 }
                 if (showGuide) {
-                    com.just_for_fun.synctax.ui.guide.GuideOverlay(
-                        steps = com.just_for_fun.synctax.ui.guide.GuideContent.homeScreenGuide,
+                    GuideOverlay(
+                        steps = GuideContent.homeScreenGuide,
                         onDismiss = {
                             showGuide = false
                             userPreferences.setGuideShown(UserPreferences.GUIDE_HOME)

@@ -4,12 +4,15 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.data.cache.ListenAgainManager
+import com.just_for_fun.synctax.core.data.cache.QuickAccessManager
+import com.just_for_fun.synctax.core.data.cache.SpeedDialManager
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.model.SearchFilterType
 import com.just_for_fun.synctax.util.AlbumDetails
 import com.just_for_fun.synctax.util.ArtistDetails
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,8 +35,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     
     private val onlineManager = OnlineSearchManager()
     private val listenAgainManager = ListenAgainManager(getApplication())
-    private val speedDialManager = com.just_for_fun.synctax.core.data.cache.SpeedDialManager(repository)
-    private val quickAccessManager = com.just_for_fun.synctax.core.data.cache.QuickAccessManager(repository)
+    private val speedDialManager = SpeedDialManager(repository)
+    private val quickAccessManager = QuickAccessManager(repository)
     
     private var lastQuickPicksRefresh = 0L
     private val quickPicksRefreshInterval = 15 * 60 * 1000L // 15 minutes in milliseconds
@@ -141,15 +144,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun searchOnline(query: String, filterType: com.just_for_fun.synctax.ui.model.SearchFilterType = com.just_for_fun.synctax.ui.model.SearchFilterType.ALL) {
+    fun searchOnline(query: String, filterType: SearchFilterType = SearchFilterType.ALL) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSearchingOnline = true)
             try {
                 val results = mutableListOf<com.just_for_fun.synctax.core.network.OnlineSearchResult>()
                 
                 // Search for songs if filter is ALL or SONGS
-                if (filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.ALL || 
-                    filterType == com.just_for_fun.synctax.ui.model.SearchFilterType.SONGS) {
+                if (filterType == SearchFilterType.ALL ||
+                    filterType == SearchFilterType.SONGS) {
                     
                     com.just_for_fun.synctax.util.YTMusicRecommender.searchSongs(
                         query = query,

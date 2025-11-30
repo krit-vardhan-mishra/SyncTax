@@ -3,14 +3,14 @@ package com.just_for_fun.synctax.ui.components.chips
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.ui.model.SearchFilterType
+import com.just_for_fun.synctax.ui.theme.ChipSelected
+import com.just_for_fun.synctax.ui.theme.ChipUnselected
 
 /**
  * Filter chips for search results
@@ -25,15 +25,16 @@ fun SearchFilterChips(
     showVideos: Boolean = false // Option to show/hide videos filter
 ) {
     LazyRow(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+        contentPadding = PaddingValues(horizontal = 16.dp)
     ) {
         // All filter
         item {
             FilterChipItem(
                 label = "All",
-                icon = Icons.Default.Apps,
                 selected = selectedFilter == SearchFilterType.ALL,
                 onClick = { onFilterSelected(SearchFilterType.ALL) }
             )
@@ -43,7 +44,6 @@ fun SearchFilterChips(
         item {
             FilterChipItem(
                 label = "Songs",
-                icon = Icons.Default.MusicNote,
                 selected = selectedFilter == SearchFilterType.SONGS,
                 onClick = { onFilterSelected(SearchFilterType.SONGS) }
             )
@@ -53,7 +53,6 @@ fun SearchFilterChips(
         item {
             FilterChipItem(
                 label = "Albums",
-                icon = Icons.Default.Album,
                 selected = selectedFilter == SearchFilterType.ALBUMS,
                 onClick = { onFilterSelected(SearchFilterType.ALBUMS) }
             )
@@ -63,7 +62,6 @@ fun SearchFilterChips(
         item {
             FilterChipItem(
                 label = "Artists",
-                icon = Icons.Default.Person,
                 selected = selectedFilter == SearchFilterType.ARTISTS,
                 onClick = { onFilterSelected(SearchFilterType.ARTISTS) }
             )
@@ -74,7 +72,6 @@ fun SearchFilterChips(
             item {
                 FilterChipItem(
                     label = "Videos",
-                    icon = Icons.Default.VideoLibrary,
                     selected = selectedFilter == SearchFilterType.VIDEOS,
                     onClick = { onFilterSelected(SearchFilterType.VIDEOS) }
                 )
@@ -87,7 +84,6 @@ fun SearchFilterChips(
 @Composable
 private fun FilterChipItem(
     label: String,
-    icon: ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -96,13 +92,19 @@ private fun FilterChipItem(
         selected = selected,
         onClick = onClick,
         label = { Text(label) },
-        leadingIcon = {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                modifier = Modifier.size(18.dp)
-            )
-        },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = ChipSelected,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = ChipUnselected,
+            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            selectedBorderColor = Color.White,
+            borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+        ),
+        shape = MaterialTheme.shapes.medium,
         modifier = modifier
     )
 }

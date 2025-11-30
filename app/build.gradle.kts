@@ -38,17 +38,25 @@ android {
         buildConfigField("String", "YOUTUBE_CLIENT_ID", "\"${properties.getProperty("YOUTUBE_CLIENT_ID") ?: ""}\"")
 
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            // Only include ARM architectures - covers 99%+ of Android devices
+            // x86/x86_64 removed: Only needed for emulators, saves ~117 MB
+            // This is required by Chaquopy
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true  // Enable code shrinking
+            isShrinkResources = true  // Enable resource shrinking
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -73,13 +81,11 @@ chaquopy {
         version = "3.10"
         pip {
             install("yt-dlp==2025.11.12")
-            install("ffmpeg")
-            install("ffprobe")
-            install("pillow")
-            install("mutagen")
-            install("requests") // Add requests library
+            install("mutagen")  // For metadata embedding
+            install("requests")
             install("urllib3")
             install("ytmusicapi")
+            // Removed: ffmpeg, ffprobe, pillow (not needed - using Mutagen for metadata)
         }
     }
 }
@@ -158,9 +164,11 @@ dependencies {
     // Worker
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 
-    // FFmpeg for audio processing
+    // FFmpeg for audio processing - DISABLED: ~136MB savings
+    // The youtubedl-android FFmpeg doesn't have a usable execute() method
+    // We now use Mutagen for metadata embedding which works with M4A directly
     // implementation("com.github.arthenica:ffmpeg-kit:v6.0-2")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")    // provide ffmpeg helper library
+    // implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
 
     implementation("com.afollestad.material-dialogs:core:3.3.0")

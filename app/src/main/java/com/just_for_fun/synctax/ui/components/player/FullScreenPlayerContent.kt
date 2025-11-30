@@ -599,7 +599,7 @@ fun FullScreenPlayerContent(
                         ) {
                             val isDownloaded = uiState.downloadedSongs.contains(song.id)
                             val isDownloading = uiState.downloadingSongs.contains(song.id)
-                            val downloadProgress = animatedProgress
+                            val downloadProgress = animatedProgress // Already smoothly animated
 
                             AnimatedDownloadButton(
                                 isDownloading = isDownloading,
@@ -939,7 +939,7 @@ fun FullScreenPlayerContent(
         if (uiState.isLoadingFormats) {
             AlertDialog(
                 onDismissRequest = { },
-                title = { Text("Loading Formats") },
+                title = { Text("Fetching best quality") },
                 text = {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -949,7 +949,7 @@ fun FullScreenPlayerContent(
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Fetching available download formats...")
+                        Text("Starting the download in best available quality...")
                     }
                 },
                 confirmButton = { }
