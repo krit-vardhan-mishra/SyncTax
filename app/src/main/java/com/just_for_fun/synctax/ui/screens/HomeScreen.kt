@@ -86,6 +86,7 @@ fun HomeScreen(
 
     val listState = rememberLazyListState()
     var hasScrolledToBottom by remember { mutableStateOf(false) }
+    var selectedFilter by remember { mutableStateOf("All") }
 
     // Detect scroll to bottom
     LaunchedEffect(listState) {
@@ -241,80 +242,93 @@ fun HomeScreen(
 
                                 // Filter Chips
                                 item {
-                                    FilterChipsRow()
+                                    FilterChipsRow(
+                                        selectedChip = selectedFilter,
+                                        onChipSelected = { chip -> selectedFilter = chip }
+                                    )
                                 }
 
                                 // Quick Picks Section - Now shows online listening history
-                                item {
-                                    OnlineHistorySection(
-                                        history = uiState.onlineHistory,
-                                        onHistoryClick = { history ->
-                                            playerViewModel.playUrl(
-                                                url = history.watchUrl,
-                                                title = history.title,
-                                                artist = history.artist,
-                                                durationMs = 0L
-                                            )
-                                        },
-                                        onPlayAll = {
-                                            uiState.onlineHistory.firstOrNull()?.let { firstHistory ->
+                                if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                                    item {
+                                        OnlineHistorySection(
+                                            history = uiState.onlineHistory,
+                                            onHistoryClick = { history ->
                                                 playerViewModel.playUrl(
-                                                    url = firstHistory.watchUrl,
-                                                    title = firstHistory.title,
-                                                    artist = firstHistory.artist,
+                                                    url = history.watchUrl,
+                                                    title = history.title,
+                                                    artist = history.artist,
                                                     durationMs = 0L
                                                 )
-                                            }
-                                        },
-                                        currentVideoId = if (playerState.currentSong?.id?.startsWith("online:") == true)
-                                            playerState.currentSong?.id?.removePrefix("online:")
-                                        else null
-                                    )
+                                            },
+                                            onPlayAll = {
+                                                uiState.onlineHistory.firstOrNull()
+                                                    ?.let { firstHistory ->
+                                                        playerViewModel.playUrl(
+                                                            url = firstHistory.watchUrl,
+                                                            title = firstHistory.title,
+                                                            artist = firstHistory.artist,
+                                                            durationMs = 0L
+                                                        )
+                                                    }
+                                            },
+                                            currentVideoId = if (playerState.currentSong?.id?.startsWith(
+                                                    "online:"
+                                                ) == true
+                                            )
+                                                playerState.currentSong?.id?.removePrefix("online:")
+                                            else null
+                                        )
+                                    }
                                 }
 
-                                item {
-                                    Spacer(modifier = Modifier.height(15.dp))
+                                if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                                    item {
+                                        Spacer(modifier = Modifier.height(15.dp))
+                                    }
                                 }
 
                                 // Listen Again Section
-                                @OptIn(ExperimentalFoundationApi::class)
-                                item {
-                                    SectionHeader(
-                                        title = "Listen again",
-                                        subtitle = null,
-                                        onViewAllClick = null
-                                    )
+                                if (selectedFilter == "All" || selectedFilter == "Listen Again") {
+                                    @OptIn(ExperimentalFoundationApi::class)
+                                    item {
+                                        SectionHeader(
+                                            title = "Listen again",
+                                            subtitle = null,
+                                            onViewAllClick = null
+                                        )
 
-                                    val songsPerPage = 4
-                                    val shuffledSongs = remember(uiState.allSongs) {
-                                        uiState.allSongs.take(16).shuffled()
-                                    }
-                                    val pages = shuffledSongs.chunked(songsPerPage)
+                                        val songsPerPage = 4
+                                        val shuffledSongs = remember(uiState.allSongs) {
+                                            uiState.allSongs.take(16).shuffled()
+                                        }
+                                        val pages = shuffledSongs.chunked(songsPerPage)
 
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        contentPadding = PaddingValues(horizontal = 16.dp)
-                                    ) {
-                                        items(pages.size) { pageIndex ->
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillParentMaxWidth()
-                                                    .padding(vertical = 8.dp),
-                                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                pages[pageIndex].forEach { song ->
-                                                    SongCard(
-                                                        song = song,
-                                                        onClick = {
-                                                            playerViewModel.playSong(
-                                                                song,
-                                                                uiState.allSongs
-                                                            )
-                                                        },
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .animateItem()
-                                                    )
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            contentPadding = PaddingValues(horizontal = 16.dp)
+                                        ) {
+                                            items(pages.size) { pageIndex ->
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillParentMaxWidth()
+                                                        .padding(vertical = 8.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    pages[pageIndex].forEach { song ->
+                                                        SongCard(
+                                                            song = song,
+                                                            onClick = {
+                                                                playerViewModel.playSong(
+                                                                    song,
+                                                                    uiState.allSongs
+                                                                )
+                                                            },
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .animateItem()
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -322,29 +336,36 @@ fun HomeScreen(
                                 }
 
                                 // Speed Dial Section
-                                item {
-                                    SpeedDialSection(
-                                        songs = uiState.speedDialSongs,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.speedDialSongs)
-                                        },
-                                        userInitial = userInitial,
-                                        currentSong = playerState.currentSong
-                                    )
+                                if (selectedFilter == "All" || selectedFilter == "Speed Dial") {
+                                    item {
+                                        SpeedDialSection(
+                                            songs = uiState.speedDialSongs,
+                                            onSongClick = { song ->
+                                                playerViewModel.playSong(
+                                                    song,
+                                                    uiState.speedDialSongs
+                                                )
+                                            },
+                                            userInitial = userInitial,
+                                            currentSong = playerState.currentSong
+                                        )
+                                    }
                                 }
 
-                                item {
-                                    Spacer(modifier = Modifier.height(15.dp))
-                                }
+                                if (selectedFilter == "All") {
+                                    item {
+                                        Spacer(modifier = Modifier.height(15.dp))
+                                    }
 
-                                item {
-                                    Divider(
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                }
+                                    item {
+                                        Divider(
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        )
+                                    }
 
-                                item {
-                                    Spacer(modifier = Modifier.height(25.dp))
+                                    item {
+                                        Spacer(modifier = Modifier.height(25.dp))
+                                    }
                                 }
 
                                 item {

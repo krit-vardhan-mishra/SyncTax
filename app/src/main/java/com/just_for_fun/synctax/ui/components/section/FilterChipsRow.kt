@@ -22,9 +22,11 @@ import com.just_for_fun.synctax.ui.theme.ChipSelected
 import com.just_for_fun.synctax.ui.theme.ChipUnselected
 
 @Composable
-fun FilterChipsRow() {
+fun FilterChipsRow(
+    selectedChip: String = "All",
+    onChipSelected: (String) -> Unit = {}
+) {
     val chips = listOf("All", "Quick Picks", "Listen Again", "Speed Dial", "Quick Access")
-    var selectedChip by remember { mutableStateOf(chips[0]) }
 
     LazyRow(
         modifier = Modifier
@@ -36,7 +38,7 @@ fun FilterChipsRow() {
         items(chips) { chip ->
             FilterChip(
                 selected = chip == selectedChip,
-                onClick = { selectedChip = chip },
+                onClick = { onChipSelected(chip) },
                 label = { Text(chip) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = ChipSelected,

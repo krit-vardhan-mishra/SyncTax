@@ -603,6 +603,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     thumbnailUrl = thumbnailUrl,
                     watchUrl = watchUrl
                 )
+                // Delete existing entry with same videoId to prevent duplicates
+                database.onlineListeningHistoryDao().deleteByVideoId(videoId)
+                // Insert new entry with updated timestamp
                 database.onlineListeningHistoryDao().insertOnlineListening(onlineHistory)
                 database.onlineListeningHistoryDao().trimOldRecords()
                 

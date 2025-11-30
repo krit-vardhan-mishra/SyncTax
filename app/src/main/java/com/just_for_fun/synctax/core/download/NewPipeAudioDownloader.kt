@@ -2,6 +2,8 @@ package com.just_for_fun.synctax.core.download
 
 import android.content.Context
 import android.util.Log
+import com.chaquo.python.Python
+import com.just_for_fun.synctax.MusicApplication
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.Dispatchers
@@ -68,21 +70,12 @@ object NewPipeAudioDownloader {
         try {
             Log.d(TAG, "🎵 Starting NewPipe download for video: $videoId")
 
-            // Initialize FFmpeg ONLY - NewPipe doesn't need YoutubeDL
-            var ffmpegInitialized = false
-            try {
-                Log.d(TAG, "🔧 Initializing FFmpeg...")
-                FFmpeg.getInstance().init(context.applicationContext)
-                ffmpegInitialized = true
-                Log.d(TAG, "✅ FFmpeg initialized successfully")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to initialize FFmpeg: ${e.message}", e)
-                ffmpegInitialized = false
-            }
+            // FFmpeg from youtubedl-android library doesn't have a usable execute() method
+            // for arbitrary FFmpeg commands. It's designed to work through YoutubeDL only.
+            // We set this to false to force M4A format selection (which supports metadata via Mutagen)
+            val ffmpegInitialized = false
             
-            if (!ffmpegInitialized) {
-                Log.w(TAG, "⚠️ FFmpeg not initialized - will keep WebM format without conversion")
-            }
+            Log.d(TAG, "🎵 FFmpeg execute not available - using M4A format for metadata embedding support")
 
             // Ensure output directory exists
             if (!outputDir.exists()) {
@@ -119,6 +112,9 @@ object NewPipeAudioDownloader {
             Log.d(TAG, "💿 Album (from yt-dlp): $album")
 
             // Get best audio stream
+            // IMPORTANT: Prefer M4A when FFmpeg is not available because:
+            // - M4A (AAC in MP4 container) supports metadata embedding via Mutagen
+            // - WebM/Opus doesn't support metadata embedding without FFmpeg conversion
             val audioStreams = extractor.audioStreams
             if (audioStreams.isNullOrEmpty()) {
                 return@withContext DownloadResult(
@@ -127,25 +123,32 @@ object NewPipeAudioDownloader {
                 )
             }
 
-            // Select best audio stream (prefer Opus/AAC for quality)
-            val selectedStream = selectBestAudioStream(audioStreams, null)
+            // Select best audio stream - prefer M4A when FFmpeg not available
+            val selectedStream = selectBestAudioStream(audioStreams, null, ffmpegInitialized)
             val streamUrl = selectedStream.content
+            val streamExtension = selectedStream.format?.suffix ?: "webm"
 
             Log.d(TAG, "🎧 Selected stream: ${selectedStream.format?.name ?: "unknown"}")
             Log.d(TAG, "🎧 Bitrate: ${selectedStream.averageBitrate} kbps")
+            Log.d(TAG, "🎧 Extension: $streamExtension")
 
-            // Download audio stream as WebM
-            val webmFileName = "${sanitizedArtist} - ${sanitizedTitle}.webm"
-            webmFile = File(outputDir, webmFileName)
+            // Download audio stream with appropriate extension
+            val audioFileName = "${sanitizedArtist} - ${sanitizedTitle}.$streamExtension"
+            webmFile = File(outputDir, audioFileName)
             downloadStream(streamUrl, webmFile, progressCallback, progressStep)
-            Log.d(TAG, "✅ WebM download complete: ${webmFile.length() / 1024 / 1024}MB")
+            Log.d(TAG, "✅ Audio download complete: ${webmFile.length() / 1024 / 1024}MB")
 
             // Download thumbnail (keep for thumbnail URL reference)
             val thumbnailUrl = extractor.thumbnails.maxByOrNull { it.height }?.url
             if (!thumbnailUrl.isNullOrEmpty()) {
                 try {
                     thumbnailFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.jpg")
-                    downloadStream(thumbnailUrl, thumbnailFile, thumbnailProgressCallback, progressStep)
+                    downloadStream(
+                        thumbnailUrl,
+                        thumbnailFile,
+                        thumbnailProgressCallback,
+                        progressStep
+                    )
                     Log.d(TAG, "✅ Thumbnail downloaded: ${thumbnailFile.length() / 1024}KB")
                     // Keep thumbnail file for later use (don't delete)
                 } catch (e: Exception) {
@@ -161,42 +164,36 @@ object NewPipeAudioDownloader {
             Log.d(TAG, "   Title: $title")
             Log.d(TAG, "   Artist: $finalArtist")
             Log.d(TAG, "   Album: $album")
-            
+
             val baseName = "${sanitizedArtist} - ${sanitizedTitle}"
-            val convertedFile = if (ffmpegInitialized) {
-                convertAudioWithMetadata(
-                    context = context,
-                    inputFile = webmFile,
-                    thumbnailFile = thumbnailFile,
-                    title = title,
-                    artist = finalArtist,
-                    album = album,
-                    outDir = outputDir,
-                    baseName = baseName
-                )
+
+            // Embed metadata using Mutagen (Python library)
+            // This works for M4A files which we prefer when FFmpeg is not available
+            Log.d(TAG, "🐍 Embedding metadata with Mutagen...")
+            val mutagenSuccess = embedMetadataWithMutagen(
+                inputFile = webmFile,
+                thumbnailFile = thumbnailFile,
+                title = title,
+                artist = finalArtist,
+                album = album
+            )
+            
+            if (mutagenSuccess) {
+                Log.d(TAG, "✅ Mutagen metadata embedding successful!")
             } else {
-                Log.w(TAG, "⚠️ Skipping conversion - FFmpeg not available")
-                null
+                Log.w(TAG, "⚠️ Mutagen metadata embedding failed - file will not have embedded metadata")
             }
 
-            val finalFile =
-                if (convertedFile != null && convertedFile.exists() && convertedFile.length() > 1024) {
-                    Log.d(
-                        TAG,
-                        "✅ Converted and embedded successfully: ${convertedFile.absolutePath}"
-                    )
-                    // Cleanup temp files
-                    webmFile.delete()
-                    thumbnailFile?.delete()
-                    try { progressCallback?.invoke(100) } catch (_: Exception) {}
-                    convertedFile
-                } else {
-                    Log.w(
-                        TAG,
-                        "⚠️ Conversion/embedding failed, keeping original WebM: ${webmFile.absolutePath}"
-                    )
-                    webmFile
-                }
+            // Use the downloaded file (metadata may or may not be embedded)
+            val finalFile = webmFile
+            
+            // Clean up thumbnail file
+            thumbnailFile?.delete()
+            
+            try {
+                progressCallback?.invoke(100)
+            } catch (_: Exception) {
+            }
 
             if (finalFile.exists() && finalFile.length() > 1024) {
                 Log.d(TAG, "✅ Download successful: ${finalFile.absolutePath}")
@@ -389,9 +386,10 @@ object NewPipeAudioDownloader {
             // The youtubedl-android FFmpeg library uses executeAsync but we need synchronous execution
             val rc = try {
                 // Try to call execute using reflection since the API might vary
-                val executeMethod = FFmpeg.getInstance().javaClass.getMethod("execute", Array<String>::class.java)
+                val executeMethod =
+                    FFmpeg.getInstance().javaClass.getMethod("execute", Array<String>::class.java)
                 val result = executeMethod.invoke(FFmpeg.getInstance(), args)
-                
+
                 when (result) {
                     is Int -> result
                     is Boolean -> if (result) 0 else -1
@@ -408,12 +406,12 @@ object NewPipeAudioDownloader {
                     val commandString = args.joinToString(" ") { arg ->
                         if (arg.contains(" ")) "\"$arg\"" else arg
                     }
-                    
+
                     // Try calling any execute-like method we can find
-                    val methods = FFmpeg.getInstance().javaClass.methods.filter { 
-                        it.name.contains("execute", ignoreCase = true) 
+                    val methods = FFmpeg.getInstance().javaClass.methods.filter {
+                        it.name.contains("execute", ignoreCase = true)
                     }
-                    
+
                     var executed = false
                     for (method in methods) {
                         try {
@@ -421,8 +419,16 @@ object NewPipeAudioDownloader {
                                 1 -> {
                                     val param = method.parameterTypes[0]
                                     val result = when {
-                                        param == String::class.java -> method.invoke(FFmpeg.getInstance(), commandString)
-                                        param == Array<String>::class.java -> method.invoke(FFmpeg.getInstance(), args)
+                                        param == String::class.java -> method.invoke(
+                                            FFmpeg.getInstance(),
+                                            commandString
+                                        )
+
+                                        param == Array<String>::class.java -> method.invoke(
+                                            FFmpeg.getInstance(),
+                                            args
+                                        )
+
                                         else -> continue
                                     }
                                     executed = true
@@ -433,7 +439,7 @@ object NewPipeAudioDownloader {
                             continue
                         }
                     }
-                    
+
                     // Check if file was created
                     if (t.output.exists() && t.output.length() > 1024) 0 else -1
                 } catch (e2: Exception) {
@@ -446,13 +452,16 @@ object NewPipeAudioDownloader {
             }
 
             Log.d(TAG, "🔧 FFmpeg ${t.desc} return code: $rc")
-            
+
             val ok = rc == 0 && t.output.exists() && t.output.length() > 1024
 
             if (ok) {
                 Log.d(TAG, "✅ FFmpeg ${t.desc} succeeded! Output: ${t.output.length() / 1024}KB")
             } else {
-                Log.w(TAG, "⚠️ FFmpeg ${t.desc} failed - RC: $rc, exists: ${t.output.exists()}, size: ${if (t.output.exists()) t.output.length() else 0}")
+                Log.w(
+                    TAG,
+                    "⚠️ FFmpeg ${t.desc} failed - RC: $rc, exists: ${t.output.exists()}, size: ${if (t.output.exists()) t.output.length() else 0}"
+                )
                 // cleanup partial output
                 if (t.output.exists()) {
                     t.output.delete()
@@ -519,12 +528,14 @@ object NewPipeAudioDownloader {
     }
 
     /**
-     * Select the best audio stream based on preferences.
-     * Priority: Opus > AAC (m4a) > WebM > others, with highest bitrate
+     * Select the best audio stream based on preferences and FFmpeg availability.
+     * When FFmpeg is available: Prefer Opus (best quality/size)
+     * When FFmpeg is NOT available: Prefer M4A (supports metadata embedding via Mutagen)
      */
     private fun selectBestAudioStream(
         streams: List<AudioStream>,
-        preferredFormat: String?
+        preferredFormat: String?,
+        ffmpegAvailable: Boolean = true
     ): AudioStream {
         return when {
             // If specific format requested, find it
@@ -537,7 +548,24 @@ object NewPipeAudioDownloader {
                 }
                     ?: streams.maxByOrNull { it.averageBitrate }!!
             }
-            // Prefer Opus for best quality/size ratio
+            // When FFmpeg is NOT available, prefer M4A for metadata embedding support
+            !ffmpegAvailable -> {
+                Log.d(TAG, "🎧 FFmpeg not available, preferring M4A for metadata support")
+                val m4aStreams = streams.filter {
+                    it.format?.suffix?.equals("m4a", ignoreCase = true) == true ||
+                    it.format?.name?.contains("m4a", ignoreCase = true) == true ||
+                    it.format?.name?.contains("aac", ignoreCase = true) == true
+                }
+                if (m4aStreams.isNotEmpty()) {
+                    Log.d(TAG, "🎧 Found ${m4aStreams.size} M4A streams, selecting best bitrate")
+                    m4aStreams.maxByOrNull { it.averageBitrate }!!
+                } else {
+                    // Fall back to best available - metadata won't be embedded
+                    Log.w(TAG, "⚠️ No M4A streams available, using best quality (metadata may not be embedded)")
+                    streams.maxByOrNull { it.averageBitrate }!!
+                }
+            }
+            // When FFmpeg IS available, prefer Opus for best quality/size ratio
             else -> {
                 val opusStreams = streams.filter {
                     it.format?.name?.contains("opus", ignoreCase = true) == true
@@ -561,56 +589,63 @@ object NewPipeAudioDownloader {
         progress: ((Int) -> Unit)? = null,
         progressStep: Int = 1
     ) = withContext(Dispatchers.IO) {
-            val request = Request.Builder()
-                .url(url)
-                .header(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                )
-                .build()
+        val request = Request.Builder()
+            .url(url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            )
+            .build()
 
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw Exception("HTTP ${response.code}: ${response.message}")
-                }
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw Exception("HTTP ${response.code}: ${response.message}")
+            }
 
-                val contentLength = response.body?.contentLength() ?: -1
-                Log.d(TAG, "📦 Content length: ${contentLength / 1024 / 1024}MB")
+            val contentLength = response.body?.contentLength() ?: -1
+            Log.d(TAG, "📦 Content length: ${contentLength / 1024 / 1024}MB")
 
-                response.body?.byteStream()?.use { input ->
-                    FileOutputStream(outputFile).use { output ->
-                        val buffer = ByteArray(8192)
-                        var downloaded = 0L
-                        var read: Int
-                        var lastReportedPercent = -1
+            response.body?.byteStream()?.use { input ->
+                FileOutputStream(outputFile).use { output ->
+                    val buffer = ByteArray(8192)
+                    var downloaded = 0L
+                    var read: Int
+                    var lastReportedPercent = -1
 
-                        while (input.read(buffer).also { read = it } != -1) {
-                            output.write(buffer, 0, read)
-                            downloaded += read
+                    while (input.read(buffer).also { read = it } != -1) {
+                        output.write(buffer, 0, read)
+                        downloaded += read
 
-                            if (contentLength > 0) {
-                                val percent = ((downloaded * 100) / contentLength).toInt().coerceIn(0, 100)
-                                val shouldReport = when {
-                                    percent == 100 -> true
-                                    lastReportedPercent < 0 -> true
-                                    progressStep <= 1 -> percent != lastReportedPercent
-                                    else -> (percent - lastReportedPercent) >= progressStep || percent % progressStep == 0
-                                }
+                        if (contentLength > 0) {
+                            val percent =
+                                ((downloaded * 100) / contentLength).toInt().coerceIn(0, 100)
+                            val shouldReport = when {
+                                percent == 100 -> true
+                                lastReportedPercent < 0 -> true
+                                progressStep <= 1 -> percent != lastReportedPercent
+                                else -> (percent - lastReportedPercent) >= progressStep || percent % progressStep == 0
+                            }
 
-                                if (shouldReport && percent != lastReportedPercent) {
-                                    lastReportedPercent = percent
-                                    val progressBar = getProgressBar(percent)
-                                    Log.d(TAG, "⬇️ Download progress: $percent% $progressBar")
-                                    try { progress?.invoke(percent) } catch (_: Exception) {}
+                            if (shouldReport && percent != lastReportedPercent) {
+                                lastReportedPercent = percent
+                                val progressBar = getProgressBar(percent)
+                                Log.d(TAG, "⬇️ Download progress: $percent% $progressBar")
+                                try {
+                                    progress?.invoke(percent)
+                                } catch (_: Exception) {
                                 }
                             }
                         }
-                        // Final callback in case server didn't provide content-length or to ensure 100%
-                        try { progress?.invoke(100) } catch (_: Exception) {}
+                    }
+                    // Final callback in case server didn't provide content-length or to ensure 100%
+                    try {
+                        progress?.invoke(100)
+                    } catch (_: Exception) {
                     }
                 }
             }
         }
+    }
 
     /**
      * Sanitize filename to remove invalid characters.
@@ -631,5 +666,175 @@ object NewPipeAudioDownloader {
         val greenBlock = "🟩" // Green square
         val grayBlock = "⬜" // Gray square
         return greenBlock.repeat(filled) + grayBlock.repeat(empty)
+    }
+
+    /**
+     * Embed metadata into WebM/OGG audio file using Python's metadata_embedder module.
+     * This is a fallback when FFmpeg is not available.
+     * Uses Mutagen to write Vorbis comments to WebM/OGG files directly.
+     */
+    private fun embedMetadataWithMutagen(
+        inputFile: File,
+        thumbnailFile: File?,
+        title: String,
+        artist: String,
+        album: String
+    ): Boolean {
+        return try {
+            if (!Python.isStarted()) {
+                Log.w(TAG, "⚠️ Python not started, cannot use Mutagen")
+                return false
+            }
+
+            val py = Python.getInstance()
+            
+            Log.d(TAG, "🐍 Using metadata_embedder module for: ${inputFile.absolutePath}")
+            
+            // Load our custom metadata_embedder module
+            val embedderModule = py.getModule("metadata_embedder")
+            
+            // Call the embed_metadata function
+            val result = embedderModule.callAttr(
+                "embed_metadata",
+                inputFile.absolutePath,
+                title,
+                artist,
+                album,
+                thumbnailFile?.absolutePath
+            )
+            
+            // Parse the result dictionary
+            val success = result.callAttr("get", "success")?.toBoolean() ?: false
+            val message = result.callAttr("get", "message")?.toString() ?: "Unknown result"
+            
+            Log.d(TAG, "🐍 Metadata embedder result: success=$success, message=$message")
+            
+            success
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Mutagen metadata embedding failed: ${e.message}", e)
+            false
+        }
+    }
+    
+    /**
+     * Download audio using yt-dlp (Python) with metadata embedding.
+     * This is the most reliable method as yt-dlp handles everything natively.
+     */
+    suspend fun downloadWithYtDlp(
+        context: Context,
+        videoId: String,
+        outputDir: File,
+        title: String,
+        artist: String,
+        album: String,
+        progressCallback: ((Int) -> Unit)? = null
+    ): DownloadResult = withContext(Dispatchers.IO) {
+        try {
+            if (!Python.isStarted()) {
+                return@withContext DownloadResult(
+                    success = false,
+                    message = "Python not initialized"
+                )
+            }
+            
+            val py = Python.getInstance()
+            val sanitizedArtist = sanitizeFilename(artist)
+            val sanitizedTitle = sanitizeFilename(title)
+            val outputTemplate = "${outputDir.absolutePath}/${sanitizedArtist} - ${sanitizedTitle}.%(ext)s"
+            
+            Log.d(TAG, "🐍 Starting yt-dlp download with metadata embedding...")
+            Log.d(TAG, "   Video ID: $videoId")
+            Log.d(TAG, "   Title: $title")
+            Log.d(TAG, "   Artist: $artist")
+            Log.d(TAG, "   Album: $album")
+            
+            // Create yt-dlp options
+            val ytDlpModule = py.getModule("yt_dlp")
+            val url = "https://www.youtube.com/watch?v=$videoId"
+            
+            // Build options dictionary
+            val opts = py.builtins.callAttr("dict")
+            opts.callAttr("__setitem__", "format", "bestaudio/best")
+            opts.callAttr("__setitem__", "outtmpl", outputTemplate)
+            opts.callAttr("__setitem__", "quiet", true)
+            opts.callAttr("__setitem__", "no_warnings", true)
+            opts.callAttr("__setitem__", "writethumbnail", true)
+            opts.callAttr("__setitem__", "embedthumbnail", true)
+            
+            // Add metadata
+            opts.callAttr("__setitem__", "addmetadata", true)
+            
+            // Postprocessor args for metadata
+            val postprocessors = py.builtins.callAttr("list")
+            
+            // Add FFmpeg metadata postprocessor
+            val metadataPP = py.builtins.callAttr("dict")
+            metadataPP.callAttr("__setitem__", "key", "FFmpegMetadata")
+            metadataPP.callAttr("__setitem__", "add_metadata", true)
+            postprocessors.callAttr("append", metadataPP)
+            
+            // Add thumbnail embedder
+            val thumbPP = py.builtins.callAttr("dict")
+            thumbPP.callAttr("__setitem__", "key", "EmbedThumbnail")
+            thumbPP.callAttr("__setitem__", "already_have_thumbnail", false)
+            postprocessors.callAttr("append", thumbPP)
+            
+            // Convert to opus (better for metadata embedding)
+            val extractAudioPP = py.builtins.callAttr("dict")
+            extractAudioPP.callAttr("__setitem__", "key", "FFmpegExtractAudio")
+            extractAudioPP.callAttr("__setitem__", "preferredcodec", "opus")
+            extractAudioPP.callAttr("__setitem__", "preferredquality", "192")
+            postprocessors.callAttr("append", extractAudioPP)
+            
+            opts.callAttr("__setitem__", "postprocessors", postprocessors)
+            
+            // Create YoutubeDL instance and download
+            val ydl = ytDlpModule.callAttr("YoutubeDL", opts)
+            
+            // Download
+            Log.d(TAG, "🐍 Executing yt-dlp download...")
+            ydl.callAttr("download", py.builtins.callAttr("list", arrayOf(url)))
+            
+            // Find the output file
+            val expectedFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.opus")
+            val m4aFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.m4a")
+            val webmFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.webm")
+            
+            val finalFile = when {
+                expectedFile.exists() -> expectedFile
+                m4aFile.exists() -> m4aFile
+                webmFile.exists() -> webmFile
+                else -> {
+                    // Search for any matching file
+                    outputDir.listFiles()?.find { 
+                        it.name.startsWith("${sanitizedArtist} - ${sanitizedTitle}") 
+                    }
+                }
+            }
+            
+            if (finalFile != null && finalFile.exists() && finalFile.length() > 1024) {
+                Log.d(TAG, "✅ yt-dlp download successful: ${finalFile.absolutePath}")
+                DownloadResult(
+                    success = true,
+                    filePath = finalFile.absolutePath,
+                    message = "Downloaded with embedded metadata",
+                    format = finalFile.extension,
+                    title = title,
+                    artist = artist,
+                    album = album
+                )
+            } else {
+                DownloadResult(
+                    success = false,
+                    message = "Output file not found"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ yt-dlp download failed: ${e.message}", e)
+            DownloadResult(
+                success = false,
+                message = "yt-dlp download failed: ${e.message}"
+            )
+        }
     }
 }

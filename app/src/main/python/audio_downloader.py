@@ -163,7 +163,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                 ydl_opts['extractor_args']['youtube']['po_token'] = [f'{client}+{po_token_data}']
                 print(f"🎵 Python: Using fallback PO Token for {client} client", file=sys.stderr)
             
-            # Configure postprocessors based on format
+            # Configure postprocessors based on format and FFmpeg availability
             if ffmpeg_available and prefer_mp3:
                 # Full conversion with embedded thumbnail using FFmpeg
                 ydl_opts['writethumbnail'] = True  # Download thumbnail for embedding
@@ -182,7 +182,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                         'add_metadata': True,
                     },
                 ]
-            else:
+            elif ffmpeg_available:
                 # Download M4A with embedded thumbnail - M4A supports embedded thumbnails better than opus
                 ydl_opts['writethumbnail'] = True  # Download thumbnail for embedding
                 ydl_opts['postprocessors'] = [
@@ -200,6 +200,12 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                         'add_metadata': True,
                     },
                 ]
+            else:
+                # FFmpeg NOT available - download native M4A format and add metadata via Mutagen
+                print(f"🎵 Python: FFmpeg not available, downloading native M4A format", file=sys.stderr)
+                ydl_opts['format'] = 'bestaudio[ext=m4a]/bestaudio'
+                ydl_opts['writethumbnail'] = True  # Download thumbnail separately
+                ydl_opts['postprocessors'] = []  # No FFmpeg postprocessors
             
             # Download the audio
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -207,23 +213,89 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                 
                 # Get the final filename
                 filename = ydl.prepare_filename(info)
+                actual_ext = info.get('ext', 'm4a')
                 
                 # Update extension based on format
                 if ffmpeg_available and prefer_mp3:
                     filename = os.path.splitext(filename)[0] + '.mp3'
-                else:
+                elif ffmpeg_available:
                     filename = os.path.splitext(filename)[0] + '.m4a'
+                else:
+                    # Keep original extension when FFmpeg not available
+                    filename = os.path.splitext(filename)[0] + '.' + actual_ext
+                
+                # If FFmpeg is NOT available, try to embed metadata using Mutagen
+                metadata_embedded = False
+                if not ffmpeg_available:
+                    print(f"🎵 Python: Attempting to embed metadata with Mutagen...", file=sys.stderr)
+                    try:
+                        from mutagen.mp4 import MP4, MP4Cover
+                        
+                        if os.path.exists(filename) and actual_ext in ['m4a', 'mp4']:
+                            audio = MP4(filename)
+                            
+                            # Set metadata tags for M4A
+                            title = info.get('title', 'Unknown')
+                            artist = info.get('artist') or info.get('uploader', 'Unknown')
+                            album = info.get('album', 'YouTube Audio')
+                            
+                            audio['\xa9nam'] = [title]  # Title
+                            audio['\xa9ART'] = [artist]  # Artist
+                            audio['\xa9alb'] = [album]   # Album
+                            
+                            print(f"🎵 Python: M4A tags set - Title: {title}, Artist: {artist}, Album: {album}", file=sys.stderr)
+                            
+                            # Try to embed thumbnail
+                            thumb_base = os.path.splitext(filename)[0]
+                            thumb_extensions = ['.jpg', '.webp', '.png', '.jpeg']
+                            thumb_file = None
+                            for ext in thumb_extensions:
+                                potential_thumb = thumb_base + ext
+                                if os.path.exists(potential_thumb):
+                                    thumb_file = potential_thumb
+                                    break
+                            
+                            if thumb_file:
+                                print(f"🎵 Python: Found thumbnail: {thumb_file}", file=sys.stderr)
+                                try:
+                                    with open(thumb_file, 'rb') as f:
+                                        thumb_data = f.read()
+                                    
+                                    # Determine format
+                                    if thumb_file.endswith('.png'):
+                                        cover_format = MP4Cover.FORMAT_PNG
+                                    else:
+                                        cover_format = MP4Cover.FORMAT_JPEG
+                                    
+                                    audio['covr'] = [MP4Cover(thumb_data, imageformat=cover_format)]
+                                    print(f"🎵 Python: Cover art embedded ({len(thumb_data)} bytes)", file=sys.stderr)
+                                    
+                                    # Clean up thumbnail file
+                                    os.remove(thumb_file)
+                                except Exception as e:
+                                    print(f"🎵 Python: Cover embedding failed: {e}", file=sys.stderr)
+                            
+                            audio.save()
+                            metadata_embedded = True
+                            print(f"✅ Python: M4A metadata saved successfully", file=sys.stderr)
+                            
+                    except ImportError:
+                        print(f"🎵 Python: Mutagen MP4 module not available", file=sys.stderr)
+                    except Exception as e:
+                        print(f"🎵 Python: Mutagen metadata embedding failed: {e}", file=sys.stderr)
                 
                 result = {
                     "success": True,
-                    "message": f"Download completed successfully with embedded album art using {client} client",
+                    "message": f"Download completed successfully using {client} client" + 
+                              (" with embedded metadata" if (ffmpeg_available or metadata_embedded) else " (metadata not embedded)"),
                     "file_path": filename,
                     "title": info.get('title', 'Unknown'),
                     "artist": info.get('artist') or info.get('uploader', 'Unknown'),
                     "duration": info.get('duration', 0),
                     "thumbnail_url": info.get('thumbnail', ''),
-                    "format": 'mp3' if (ffmpeg_available and prefer_mp3) else info.get('ext', 'unknown'),
+                    "format": actual_ext if not ffmpeg_available else ('mp3' if prefer_mp3 else 'm4a'),
                     "ffmpeg_available": ffmpeg_available,
+                    "metadata_embedded": ffmpeg_available or metadata_embedded,
                     "client_used": client,
                 }
                 

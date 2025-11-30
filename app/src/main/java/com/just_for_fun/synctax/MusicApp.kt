@@ -270,34 +270,19 @@ fun MusicApp(userPreferences: UserPreferences) {
                                         }
                                     },
                                     onPlayAll = {
-                                        songs.firstOrNull()?.let { firstSong ->
-                                            if (isOnlineAlbum) {
-                                                // Play online songs in order
-                                                playerViewModel.playUrl(
-                                                    url = firstSong.filePath,
-                                                    title = firstSong.title,
-                                                    artist = firstSong.artist,
-                                                    durationMs = firstSong.duration,
-                                                    thumbnailUrl = firstSong.albumArtUri
-                                                )
-                                            } else {
+                                        if (isOnlineAlbum) {
+                                            // Play all online songs in order with queue
+                                            playerViewModel.playOnlinePlaylist(songs, 0)
+                                        } else {
+                                            songs.firstOrNull()?.let { firstSong ->
                                                 playerViewModel.playSong(firstSong, songs)
                                             }
                                         }
                                     },
                                     onShuffle = {
                                         if (isOnlineAlbum) {
-                                            // Shuffle online songs
-                                            val shuffledSongs = songs.shuffled()
-                                            shuffledSongs.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playUrl(
-                                                    url = firstSong.filePath,
-                                                    title = firstSong.title,
-                                                    artist = firstSong.artist,
-                                                    durationMs = firstSong.duration,
-                                                    thumbnailUrl = firstSong.albumArtUri
-                                                )
-                                            }
+                                            // Shuffle and play all online songs with queue
+                                            playerViewModel.playOnlinePlaylistShuffled(songs)
                                         } else {
                                             playerViewModel.toggleShuffle()
                                             songs.firstOrNull()?.let { firstSong ->

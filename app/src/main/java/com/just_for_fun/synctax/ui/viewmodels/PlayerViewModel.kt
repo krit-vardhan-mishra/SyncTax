@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 
@@ -388,6 +389,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     thumbnailUrl = finalThumbnailUrl,
                     watchUrl = url
                 )
+                // Delete existing entry with same videoId to prevent duplicates
+                database.onlineListeningHistoryDao().deleteByVideoId(videoId)
+                // Insert new entry with updated timestamp
                 database.onlineListeningHistoryDao().insertOnlineListening(onlineHistory)
                 database.onlineListeningHistoryDao().trimOldRecords()
             }
@@ -582,6 +586,45 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             playUrl(url = youtubeUrl, title = song.title, artist = song.artist, durationMs = song.duration, 
                    thumbnailUrl = song.albumArtUri, skipRecommendationFetch = true)
         }
+    }
+
+    /**
+     * Play a list of online songs in order (for album/playlist playback)
+     * Sets the remaining songs as "Up Next" queue
+     */
+    fun playOnlinePlaylist(songs: List<Song>, startIndex: Int = 0) {
+        viewModelScope.launch {
+            if (songs.isEmpty()) return@launch
+            
+            // Clear any existing online recommendations and history
+            playedRecommendationsHistory.clear()
+            
+            // Set the remaining songs as the up next queue (excluding the first song)
+            val upNextSongs = songs.drop(startIndex + 1)
+            _uiState.value = _uiState.value.copy(
+                upNextRecommendations = upNextSongs
+            )
+            
+            // Play the first song
+            val firstSong = songs[startIndex]
+            playUrl(
+                url = firstSong.filePath,
+                title = firstSong.title,
+                artist = firstSong.artist,
+                durationMs = firstSong.duration,
+                thumbnailUrl = firstSong.albumArtUri,
+                skipRecommendationFetch = true // Don't fetch recommendations, use the playlist
+            )
+        }
+    }
+
+    /**
+     * Play a list of online songs in shuffled order
+     * Shuffles the songs and sets them as "Up Next" queue
+     */
+    fun playOnlinePlaylistShuffled(songs: List<Song>) {
+        val shuffledSongs = songs.shuffled()
+        playOnlinePlaylist(shuffledSongs, 0)
     }
 
     /** Play a remote stream using chunked progressive download for 30s segments.
@@ -868,7 +911,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
     private fun prefetchNextSongIfNeeded() {
         val currentSong = _uiState.value.currentSong ?: return
-        val nextSong = queueManager.peekNext() ?: return
+        
+        // For online songs, check recommendations first, then queue
+        var nextSong: Song? = null
+        if ((currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) 
+            && _uiState.value.upNextRecommendations.isNotEmpty()) {
+            // Use first recommendation as next song
+            nextSong = _uiState.value.upNextRecommendations.firstOrNull()
+        } else {
+            // Use queue manager for regular songs
+            nextSong = queueManager.peekNext()
+        }
+        
+        if (nextSong == null) return
         
         // Only prefetch if this is a different song and we're not already prefetching
         if (nextSong.id == prefetchedSongId || isPrefetching) {
@@ -889,17 +944,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 
                 val videoId = nextSong.id.removePrefix("online:").removePrefix("youtube:")
                 
-                // Fetch stream URL for next song
+                // Fetch stream URL for next song (this will cache it in OnlineManager)
                 val streamUrl = onlineManager.getStreamUrl(videoId)
                 
                 if (streamUrl != null) {
-                    Log.d("PlayerViewModel", "✅ Prefetched stream URL for: ${nextSong.title}")
+                    Log.d("PlayerViewModel", "✅ Prefetched and cached stream URL for: ${nextSong.title}")
                     prefetchedSongId = nextSong.id
                     
-                    // Optionally: Start downloading first chunk in background
-                    // This would require a separate ChunkedStreamManager instance
-                    // or modifications to support multiple concurrent downloads
-                    
+                    // Optionally: Pre-download first chunk (1MB) for instant playback
+                    // This improves the user experience by reducing initial buffering
+                    try {
+                        withContext(Dispatchers.IO) {
+                            val cacheDir = getApplication<android.app.Application>().cacheDir
+                            val prefetchFile = File(cacheDir, "prefetch_${videoId}.cache")
+                            
+                            // Only prefetch if file doesn't already exist
+                            if (!prefetchFile.exists()) {
+                                val connection = java.net.URL(streamUrl).openConnection() as java.net.HttpURLConnection
+                                connection.setRequestProperty("Range", "bytes=0-1048575") // First 1MB
+                                connection.connectTimeout = 10000
+                                connection.readTimeout = 10000
+                                connection.connect()
+                                
+                                if (connection.responseCode in 200..299 || connection.responseCode == 206) {
+                                    prefetchFile.parentFile?.mkdirs()
+                                    val inputStream = connection.inputStream
+                                    val outputStream = java.io.FileOutputStream(prefetchFile)
+                                    
+                                    val buffer = ByteArray(8192)
+                                    var bytesRead: Int
+                                    var totalBytes = 0L
+                                    
+                                    // Limit to 1MB max
+                                    while (inputStream.read(buffer).also { bytesRead = it } != -1 && totalBytes < 1048576) {
+                                        outputStream.write(buffer, 0, bytesRead)
+                                        totalBytes += bytesRead
+                                    }
+                                    
+                                    inputStream.close()
+                                    outputStream.close()
+                                    connection.disconnect()
+                                    
+                                    Log.d("PlayerViewModel", "✅ Pre-cached ${totalBytes / 1024}KB for instant playback: ${nextSong.title}")
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w("PlayerViewModel", "⚠️ Failed to pre-cache chunk: ${e.message}")
+                        // Not critical, continue without pre-caching
+                    }
                 } else {
                     Log.w("PlayerViewModel", "⚠️ Failed to prefetch stream URL for: ${nextSong.title}")
                 }
@@ -1425,12 +1518,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
 
                     if (audioFormats.isNotEmpty()) {
-                        // Show format selection dialog with Format objects
-                        _uiState.value = _uiState.value.copy(
-                            showFormatDialog = true,
-                            availableFormats = audioFormats  // Use sorted formats directly
-                        )
-                        Log.d("PlayerViewModel", "📥 Download: Showing format selection dialog")
+                        // AUTO-SELECT BEST FORMAT: Prefer M4A for metadata embedding support
+                        // M4A (AAC) supports metadata embedding via Mutagen without FFmpeg
+                        val bestFormat = audioFormats.find { 
+                            it.container.equals("m4a", ignoreCase = true) ||
+                            it.acodec.contains("aac", ignoreCase = true) ||
+                            it.acodec.contains("mp4a", ignoreCase = true)
+                        } ?: audioFormats.first() // Fall back to best available
+                        
+                        Log.d("PlayerViewModel", "📥 Download: Auto-selected format: ${bestFormat.format_id} (${bestFormat.container})")
+                        
+                        // Download directly with best format (skip format selection dialog)
+                        downloadWithFormat(bestFormat)
                     } else {
                         // No audio formats available - use direct download with ChaquopyAudioDownloader
                         Log.w(

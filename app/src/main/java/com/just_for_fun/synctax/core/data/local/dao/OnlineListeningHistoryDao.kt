@@ -24,6 +24,12 @@ interface OnlineListeningHistoryDao {
     suspend fun insertOnlineListening(history: OnlineListeningHistory)
     
     /**
+     * Delete existing record with the same videoId to prevent duplicates
+     */
+    @Query("DELETE FROM online_listening_history WHERE videoId = :videoId")
+    suspend fun deleteByVideoId(videoId: String)
+    
+    /**
      * Delete oldest records to maintain only 15 records
      */
     @Query("DELETE FROM online_listening_history WHERE id NOT IN (SELECT id FROM online_listening_history ORDER BY timestamp DESC LIMIT 15)")

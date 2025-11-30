@@ -17,6 +17,8 @@ import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import com.just_for_fun.synctax.potoken.NewPipeDownloaderImpl
 import com.just_for_fun.synctax.potoken.NewPipePoTokenGenerator
+import com.yausername.ffmpeg.FFmpeg
+import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +33,10 @@ import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    
+    // FFmpeg initialization status
+    var isFFmpegInitialized = false
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -59,6 +65,11 @@ class MusicApplication : Application(), ImageLoaderFactory {
         // Initialize Python runtime on background thread to avoid blocking main thread
         applicationScope.launch {
             initializePython()
+        }
+        
+        // Initialize YoutubeDL and FFmpeg on background thread
+        applicationScope.launch {
+            initializeYoutubeDLAndFFmpeg()
         }
 
         Log.d(TAG, "Music Application initialized")
@@ -97,6 +108,24 @@ class MusicApplication : Application(), ImageLoaderFactory {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize Python runtime", e)
+        }
+    }
+    
+    private fun initializeYoutubeDLAndFFmpeg() {
+        try {
+            // Initialize YoutubeDL first
+            Log.d(TAG, "🔧 Initializing YoutubeDL...")
+            YoutubeDL.getInstance().init(this)
+            Log.d(TAG, "✅ YoutubeDL initialized successfully")
+            
+            // Then initialize FFmpeg
+            Log.d(TAG, "🔧 Initializing FFmpeg...")
+            FFmpeg.getInstance().init(this)
+            isFFmpegInitialized = true
+            Log.d(TAG, "✅ FFmpeg initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize YoutubeDL/FFmpeg: ${e.message}", e)
+            isFFmpegInitialized = false
         }
     }
 
