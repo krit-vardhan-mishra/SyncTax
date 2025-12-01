@@ -47,6 +47,9 @@ import com.just_for_fun.synctax.ui.screens.TrainingScreen
 import com.just_for_fun.synctax.ui.screens.WelcomeScreen
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.util.ArtistDetails
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,9 +86,11 @@ fun MusicApp(userPreferences: UserPreferences) {
     // --- END HOISTED STATE ---
 
     val playerState by playerViewModel.uiState.collectAsState()
+    val homeState by homeViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var searchResetTrigger by remember { mutableStateOf(0) }
 
     // Update album colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -97,6 +102,30 @@ fun MusicApp(userPreferences: UserPreferences) {
         if (playerState.isLoadingSong) {
             snackbarHostState.showSnackbar(
                 message = "Getting song...",
+                duration = SnackbarDuration.Indefinite
+            )
+        } else {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+    }
+
+    // Show loading snackbar when fetching artist details
+    LaunchedEffect(homeState.isLoadingArtistDetails) {
+        if (homeState.isLoadingArtistDetails) {
+            snackbarHostState.showSnackbar(
+                message = "Loading artist details...",
+                duration = SnackbarDuration.Indefinite
+            )
+        } else {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+    }
+
+    // Show loading snackbar when fetching album details
+    LaunchedEffect(homeState.isLoadingAlbumDetails) {
+        if (homeState.isLoadingAlbumDetails) {
+            snackbarHostState.showSnackbar(
+                message = "Loading album details...",
                 duration = SnackbarDuration.Indefinite
             )
         } else {
@@ -151,7 +180,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                         }
                         composable("search") {
                             SearchScreen(
+                                navController = navController,
                                 onBackClick = { navController.popBackStack() },
+                                resetTrigger = searchResetTrigger,
                                 onNavigateToAlbum = { album, artist, songs ->
                                     homeViewModel.setSelectedAlbum(album, artist, songs)
                                     navController.navigate("album/$album")
@@ -228,6 +259,53 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 )
                             }
                         }
+                        composable("online_artist") {
+                            val uiState by homeViewModel.uiState.collectAsState()
+                            uiState.selectedOnlineArtist?.let { artist ->
+                                ArtistDetailScreen(
+                                    artistName = "", // not used
+                                    songs = emptyList(), // not used
+                                    onBackClick = { 
+                                        navController.popBackStack() 
+                                    },
+                                    onSongClick = {}, // not used
+                                    onPlayAll = {
+                                        artist.songs.firstOrNull()?.let { song ->
+                                            playerViewModel.playUrl(
+                                                url = song.watchUrl,
+                                                title = song.title,
+                                                artist = song.artist,
+                                                durationMs = 0L,
+                                                thumbnailUrl = song.thumbnail
+                                            )
+                                        }
+                                    },
+                                    onShuffle = {
+                                        playerViewModel.toggleShuffle()
+                                        artist.songs.firstOrNull()?.let { song ->
+                                            playerViewModel.playUrl(
+                                                url = song.watchUrl,
+                                                title = song.title,
+                                                artist = song.artist,
+                                                durationMs = 0L,
+                                                thumbnailUrl = song.thumbnail
+                                            )
+                                        }
+                                    },
+                                    isOnline = true,
+                                    artistDetails = artist,
+                                    onOnlineSongClick = { song ->
+                                        playerViewModel.playUrl(
+                                            url = song.watchUrl,
+                                            title = song.title,
+                                            artist = song.artist,
+                                            durationMs = 0L,
+                                            thumbnailUrl = song.thumbnail
+                                        )
+                                    }
+                                )
+                            }
+                        }
                         composable(
                             route = "album/{albumName}",
                             arguments = listOf(navArgument("albumName") {
@@ -241,7 +319,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     albumName = uiState.selectedAlbum ?: "",
                                     artistName = uiState.selectedAlbumArtist ?: "",
                                     songs = songs,
-                                    onBackClick = { navController.popBackStack() },
+                                    onBackClick = { 
+                                        navController.popBackStack() 
+                                    },
                                     onSongClick = { song ->
                                         if (isOnlineAlbum) {
                                             playerViewModel.playUrl(
@@ -275,7 +355,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                                 playerViewModel.playSong(firstSong, songs)
                                             }
                                         }
-                                    }
+                                    },
+                                    isOnline = isOnlineAlbum,
+                                    albumDetails = uiState.selectedOnlineAlbum
                                 )
                             }
                         }

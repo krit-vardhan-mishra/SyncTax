@@ -26,6 +26,14 @@ class UserPreferences(context: Context) {
     private val _scanLocalAlbumArt = MutableStateFlow(isScanLocalAlbumArtEnabled())
     val scanLocalAlbumArt: StateFlow<Boolean> = _scanLocalAlbumArt.asStateFlow()
 
+    // --- Online history count preference ---
+    private val _onlineHistoryCount = MutableStateFlow(getOnlineHistoryCount())
+    val onlineHistoryCount: StateFlow<Int> = _onlineHistoryCount.asStateFlow()
+
+    // --- Recommendations count preference ---
+    private val _recommendationsCount = MutableStateFlow(getRecommendationsCount())
+    val recommendationsCount: StateFlow<Int> = _recommendationsCount.asStateFlow()
+
     fun isScanLocalAlbumArtEnabled(): Boolean {
         return prefs.getBoolean(KEY_SCAN_LOCAL_ALBUM_ART, false)
     }
@@ -33,6 +41,26 @@ class UserPreferences(context: Context) {
     fun setScanLocalAlbumArt(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_SCAN_LOCAL_ALBUM_ART, enabled).apply()
         _scanLocalAlbumArt.value = enabled
+    }
+
+    fun getOnlineHistoryCount(): Int {
+        return prefs.getInt(KEY_ONLINE_HISTORY_COUNT, 10)
+    }
+
+    fun setOnlineHistoryCount(count: Int) {
+        val clamped = count.coerceIn(1, 100)
+        prefs.edit().putInt(KEY_ONLINE_HISTORY_COUNT, clamped).apply()
+        _onlineHistoryCount.value = clamped
+    }
+
+    fun getRecommendationsCount(): Int {
+        return prefs.getInt(KEY_RECOMMENDATIONS_COUNT, 20)
+    }
+
+    fun setRecommendationsCount(count: Int) {
+        val clamped = count.coerceIn(1, 100)
+        prefs.edit().putInt(KEY_RECOMMENDATIONS_COUNT, clamped).apply()
+        _recommendationsCount.value = clamped
     }
 
     // --- new: persisted scan paths (list of tree URIs as strings) ---
@@ -144,6 +172,12 @@ class UserPreferences(context: Context) {
         
         // Album art scanning from local library
         private const val KEY_SCAN_LOCAL_ALBUM_ART = "scan_local_album_art"
+
+        // Online history count
+        private const val KEY_ONLINE_HISTORY_COUNT = "online_history_count"
+
+        // Recommendations count
+        private const val KEY_RECOMMENDATIONS_COUNT = "recommendations_count"
 
         // Guide screen identifiers
         const val GUIDE_HOME = "home"

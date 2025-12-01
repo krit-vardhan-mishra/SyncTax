@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
@@ -28,6 +29,8 @@ import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.ui.components.card.SongCard
+import com.just_for_fun.synctax.util.ArtistDetails
+import com.just_for_fun.synctax.util.RecommendedSong
 import kotlinx.coroutines.Dispatchers
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import kotlinx.coroutines.withContext
@@ -40,29 +43,46 @@ fun ArtistDetailScreen(
     onBackClick: () -> Unit,
     onSongClick: (Song) -> Unit,
     onPlayAll: () -> Unit,
-    onShuffle: () -> Unit
+    onShuffle: () -> Unit,
+    isOnline: Boolean = false,
+    artistDetails: ArtistDetails? = null,
+    onOnlineSongClick: (RecommendedSong) -> Unit = {}
 ) {
+    val displayName = if (isOnline && artistDetails != null) artistDetails.name else artistName
+    val displaySongs = if (isOnline && artistDetails != null) artistDetails.songs else songs
+    val imageUri = if (isOnline && artistDetails != null) artistDetails.thumbnail else songs.firstOrNull()?.albumArtUri.orEmpty()
+    val songCount = if (isOnline && artistDetails != null) artistDetails.songs.size else songs.size
+    val description = if (isOnline && artistDetails != null) artistDetails.description else ""
+    val subscribers = if (isOnline && artistDetails != null) artistDetails.subscribers else ""
+
     val albumArtUri = songs.firstOrNull()?.albumArtUri.orEmpty()
     val context = LocalContext.current
 
     var dominantColor by remember { mutableStateOf(Color(0xFF121212)) }
-    var vibrantColor by remember { mutableStateOf(Color(0xFFE91D63)) } // fallback vibrant red
+    var vibrantColor by remember { mutableStateOf(Color(0xFFD31212)) } // fallback vibrant red
 
-    LaunchedEffect(albumArtUri) {
-        if (albumArtUri.isNotEmpty()) {
+    LaunchedEffect(imageUri) {
+        if (imageUri.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
-                    context.contentResolver.openInputStream(albumArtUri.toUri())?.use { stream ->
-                        val bitmap = BitmapFactory.decodeStream(stream)
-                        bitmap?.let {
-                            Palette.from(it).generate { palette ->
-                                val dominant = palette?.dominantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF121212)
-                                val vibrant = palette?.vibrantSwatch?.rgb?.let { Color(it) }
-                                    ?: palette?.darkVibrantSwatch?.rgb?.let { Color(it) }
-                                    ?: dominant
+                    if (imageUri.startsWith("http")) {
+                        // For online images, skip palette for now, use defaults
+                        dominantColor = Color(0xFF121212)
+                        vibrantColor = Color(0xFFE91D63)
+                    } else {
+                        // Local URI
+                        context.contentResolver.openInputStream(imageUri.toUri())?.use { stream ->
+                            val bitmap = BitmapFactory.decodeStream(stream)
+                            bitmap?.let {
+                                Palette.from(it).generate { palette ->
+                                    val dominant = palette?.dominantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF121212)
+                                    val vibrant = palette?.vibrantSwatch?.rgb?.let { Color(it) }
+                                        ?: palette?.darkVibrantSwatch?.rgb?.let { Color(it) }
+                                        ?: dominant
 
-                                dominantColor = dominant
-                                vibrantColor = vibrant
+                                    dominantColor = dominant
+                                    vibrantColor = vibrant
+                                }
                             }
                         }
                     }
@@ -87,7 +107,7 @@ fun ArtistDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = artistName,
+                        text = displayName,
                         color = Color.White,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -140,7 +160,7 @@ fun ArtistDetailScreen(
                                 .background(Color.White.copy(alpha = 0.1f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (albumArtUri.isEmpty()) {
+                            if (imageUri.isEmpty()) {
                                 Icon(
                                     Icons.Default.Person,
                                     contentDescription = null,
@@ -149,8 +169,8 @@ fun ArtistDetailScreen(
                                 )
                             } else {
                                 AsyncImage(
-                                    model = albumArtUri,
-                                    contentDescription = artistName,
+                                    model = imageUri,
+                                    contentDescription = displayName,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -162,7 +182,7 @@ fun ArtistDetailScreen(
                         Spacer(modifier = Modifier.height(28.dp))
 
                         Text(
-                            text = artistName,
+                            text = displayName,
                             style = MaterialTheme.typography.headlineLarge.copy(
                                 fontSize = 38.sp,
                                 fontWeight = FontWeight.ExtraBold
@@ -174,11 +194,23 @@ fun ArtistDetailScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "${songs.size} songs",
+                            text = "${songCount} songs" + if (subscribers.isNotEmpty()) " • $subscribers subscribers" else "",
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White.copy(alpha = 0.8f),
                             modifier = Modifier.padding(horizontal = 32.dp)
                         )
+
+                        if (description.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.7f),
+                                maxLines = 3,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(32.dp))
 
@@ -222,11 +254,60 @@ fun ArtistDetailScreen(
                     }
                 }
 
-                items(songs) { song ->
-                    SongCard(
-                        song = song,
-                        onClick = { onSongClick(song) }
-                    )
+                if (isOnline && artistDetails != null) {
+                    items(artistDetails.songs) { song ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = song.thumbnail,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(50.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = song.title,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = song.artist,
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                IconButton(onClick = { onOnlineSongClick(song) }) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(songs) { song ->
+                        SongCard(
+                            song = song,
+                            onClick = { onSongClick(song) }
+                        )
+                    }
                 }
             }
         }

@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.Flow
 interface OnlineListeningHistoryDao {
     
     /**
-     * Get the last 10 online listened songs ordered by timestamp (newest first)
+     * Get the last N online listened songs ordered by timestamp (newest first)
      */
-    @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC LIMIT 10")
-    fun getRecentOnlineHistory(): Flow<List<OnlineListeningHistory>>
+    @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC LIMIT :limit")
+    fun getRecentOnlineHistory(limit: Int = 10): Flow<List<OnlineListeningHistory>>
     
     /**
      * Insert a new online listening record

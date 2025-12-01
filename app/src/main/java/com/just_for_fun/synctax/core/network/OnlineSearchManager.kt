@@ -1,6 +1,7 @@
 package com.just_for_fun.synctax.core.network
 
 import android.util.Log
+import com.just_for_fun.synctax.core.player.StreamUrlCache
 
 /**
  * Online search manager using YouTube InnerTube API.
@@ -19,7 +20,22 @@ class OnlineSearchManager {
     }
 
     suspend fun getStreamUrl(videoId: String): String? {
-        return innerTubeClient.getStreamUrl(videoId)
+        // Check cache first for faster access
+        StreamUrlCache.get(videoId)?.let {
+            Log.d(TAG, "Stream URL cache hit for: $videoId")
+            return it
+        }
+        
+        // Fetch from network
+        val url = innerTubeClient.getStreamUrl(videoId)
+        
+        // Cache the result if successful
+        if (url != null) {
+            StreamUrlCache.put(videoId, url)
+            Log.d(TAG, "Cached stream URL for: $videoId")
+        }
+        
+        return url
     }
 
     companion object {

@@ -455,6 +455,7 @@ object YTMusicRecommender {
                 thumbnail = jsonObject.optString("thumbnail", ""),
                 trackCount = jsonObject.optInt("trackCount", songs.size),
                 duration = jsonObject.optString("duration", ""),
+                description = jsonObject.optString("description", ""),
                 songs = songs
             )
         } catch (e: Exception) {
@@ -531,6 +532,7 @@ data class AlbumDetails(
     val thumbnail: String,
     val trackCount: Int,
     val duration: String,
+    val description: String,
     val songs: List<RecommendedSong>
 )
 

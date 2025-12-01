@@ -51,6 +51,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         observeListeningHistoryForTraining()
         observeListenAgain()
         loadOnlineHistory()
+        observeRecommendationsCount()
         // Start periodic refresh for deleted songs check
         startPeriodicRefresh()
         // Refresh album art for songs without embedded art
@@ -71,6 +72,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             quickAccessManager.quickAccessSongs.collect { list ->
                 _uiState.value = _uiState.value.copy(quickAccessSongs = list)
+            }
+        }
+    }
+
+    private fun observeRecommendationsCount() {
+        viewModelScope.launch {
+            val userPreferences = com.just_for_fun.synctax.data.preferences.UserPreferences(getApplication())
+            var isFirst = true
+            userPreferences.recommendationsCount.collect { count ->
+                if (isFirst) {
+                    isFirst = false
+                    return@collect
+                }
+                // Only regenerate if we have songs and not currently generating
+                if (_uiState.value.allSongs.isNotEmpty() && !_uiState.value.isGeneratingRecommendations) {
+                    generateQuickPicks()
+                }
             }
         }
     }
@@ -266,10 +284,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingAlbumDetails = true)
             com.just_for_fun.synctax.util.YTMusicRecommender.getAlbumDetails(
                 browseId = browseId,
-                onResult = onResult,
-                onError = onError
+                onResult = { albumDetails ->
+                    _uiState.value = _uiState.value.copy(isLoadingAlbumDetails = false)
+                    onResult(albumDetails)
+                },
+                onError = { error ->
+                    _uiState.value = _uiState.value.copy(isLoadingAlbumDetails = false)
+                    onError(error)
+                }
             )
         }
     }
@@ -283,10 +308,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingArtistDetails = true)
             com.just_for_fun.synctax.util.YTMusicRecommender.getArtistDetails(
                 browseId = browseId,
-                onResult = onResult,
-                onError = onError
+                onResult = { artistDetails ->
+                    _uiState.value = _uiState.value.copy(isLoadingArtistDetails = false)
+                    onResult(artistDetails)
+                },
+                onError = { error ->
+                    _uiState.value = _uiState.value.copy(isLoadingArtistDetails = false)
+                    onError(error)
+                }
             )
         }
     }
@@ -306,7 +338,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             speedDialManager.setGenerating(true)
 
             try {
-                val result = recommendationManager.generateQuickPicks(20)
+                val userPreferences = com.just_for_fun.synctax.data.preferences.UserPreferences(getApplication())
+                val count = userPreferences.getRecommendationsCount()
+                val result = recommendationManager.generateQuickPicks(count)
 
                 // Map recommendations to songs
                 val recommendedSongs = result.recommendations.mapNotNull { rec ->
@@ -435,11 +469,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun setSelectedOnlineArtist(artistDetails: ArtistDetails) {
+        _uiState.value = _uiState.value.copy(
+            selectedOnlineArtist = artistDetails
+        )
+    }
+
     fun setSelectedAlbum(album: String, artist: String, songs: List<Song>) {
         _uiState.value = _uiState.value.copy(
             selectedAlbum = album,
             selectedAlbumArtist = artist,
             selectedAlbumSongs = songs
+        )
+    }
+
+    fun setSelectedOnlineAlbum(albumDetails: AlbumDetails) {
+        _uiState.value = _uiState.value.copy(
+            selectedOnlineAlbum = albumDetails,
+            selectedAlbum = albumDetails.title,
+            selectedAlbumArtist = albumDetails.artist,
+            selectedAlbumSongs = albumDetails.songs.map { song ->
+                // Convert RecommendedSong to Song for compatibility
+                Song(
+                    id = song.videoId,
+                    title = song.title,
+                    artist = song.artist,
+                    album = albumDetails.title,
+                    duration = 0L, // Will be parsed from duration string if needed
+                    filePath = song.watchUrl ?: "",
+                    albumArtUri = song.thumbnail,
+                    genre = null,
+                    releaseYear = albumDetails.year.toIntOrNull()
+                )
+            }
         )
     }
 
@@ -627,8 +689,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
-                database.onlineListeningHistoryDao().getRecentOnlineHistory().collect { history ->
-                    _uiState.value = _uiState.value.copy(onlineHistory = history)
+                val userPreferences = com.just_for_fun.synctax.data.preferences.UserPreferences(getApplication())
+                var isFirst = true
+                userPreferences.onlineHistoryCount.collect { limit ->
+                    if (isFirst) {
+                        isFirst = false
+                    }
+                    database.onlineListeningHistoryDao().getRecentOnlineHistory(limit).collect { history ->
+                        _uiState.value = _uiState.value.copy(onlineHistory = history)
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("HomeViewModel", "Error loading online listening history", e)
@@ -698,12 +767,16 @@ data class HomeUiState(
     val error: String? = null,
     val selectedArtist: String? = null,
     val selectedArtistSongs: List<Song>? = null,
+    val selectedOnlineArtist: ArtistDetails? = null,
+    val selectedOnlineAlbum: AlbumDetails? = null,
     val selectedAlbum: String? = null,
     val selectedAlbumArtist: String? = null,
     val selectedAlbumSongs: List<Song>? = null,
     // Online search state (for SearchScreen)
     val isSearchingOnline: Boolean = false,
     val onlineSearchResults: List<com.just_for_fun.synctax.core.network.OnlineSearchResult> = emptyList(),
+    val isLoadingArtistDetails: Boolean = false,
+    val isLoadingAlbumDetails: Boolean = false,
     // Section-specific song lists
     val listenAgain: List<Song> = emptyList(),
     val speedDialSongs: List<Song> = emptyList(), // Now shows ML recommendations

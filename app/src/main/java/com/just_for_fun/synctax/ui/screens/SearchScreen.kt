@@ -29,11 +29,14 @@ import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.navigation.NavController
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
+    navController: NavController,
     onBackClick: () -> Unit,
+    resetTrigger: Int = 0,
     onNavigateToAlbum: (String, String, List<Song>) -> Unit = { _, _, _ -> },
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
@@ -48,6 +51,9 @@ fun SearchScreen(
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
+
+    // Note: We no longer reset search on back navigation to preserve results
+    // The resetTrigger is kept for potential explicit reset scenarios but not triggered on navigation
 
     // Debounced online search - only search after user stops typing for 800ms
     LaunchedEffect(searchQuery) {
@@ -87,7 +93,7 @@ fun SearchScreen(
                         song.album?.contains(searchQuery, ignoreCase = true) == true ||
                         song.genre?.contains(searchQuery, ignoreCase = true) == true
             }
-            
+
             // Apply filter type (for local songs, we only have songs, not albums)
             // Albums filter shows no local results since we don't have album objects
             when (selectedFilter) {
@@ -150,7 +156,7 @@ fun SearchScreen(
                     singleLine = true,
                     shape = MaterialTheme.shapes.large
                 )
-                
+
                 // Filter chips - shown when search query is not empty
                 if (searchQuery.isNotEmpty()) {
                     SearchFilterChips(
@@ -307,31 +313,35 @@ fun SearchScreen(
                                                     coroutineScope.launch {
                                                         homeViewModel.fetchAlbumDetails(
                                                             browseId = res.browseId ?: res.id,
-                                                            onResult = {albumDetails ->
+                                                            onResult = { albumDetails ->
                                                                 if (albumDetails != null && albumDetails.songs.isNotEmpty()) {
                                                                     // Convert online songs to Song objects for playback
                                                                     // Use album's thumbnail for all songs to ensure consistent album art display
-                                                                    val songs = albumDetails.songs.map { track ->
-                                                                        com.just_for_fun.synctax.core.data.local.entities.Song(
-                                                                            id = "youtube:${track.videoId}",
-                                                                            title = track.title,
-                                                                            artist = track.artist,
-                                                                            album = albumDetails.title,
-                                                                            duration = 0L,
-                                                                            filePath = track.watchUrl,
-                                                                            genre = null,
-                                                                            releaseYear = albumDetails.year.toIntOrNull(),
-                                                                            albumArtUri = albumDetails.thumbnail
-                                                                        )
-                                                                    }
+                                                                    val songs =
+                                                                        albumDetails.songs.map { track ->
+                                                                            com.just_for_fun.synctax.core.data.local.entities.Song(
+                                                                                id = "youtube:${track.videoId}",
+                                                                                title = track.title,
+                                                                                artist = track.artist,
+                                                                                album = albumDetails.title,
+                                                                                duration = 0L,
+                                                                                filePath = track.watchUrl,
+                                                                                genre = null,
+                                                                                releaseYear = albumDetails.year.toIntOrNull(),
+                                                                                albumArtUri = albumDetails.thumbnail
+                                                                            )
+                                                                        }
                                                                     // Navigate to AlbumDetailScreen with online songs
-                                                                    android.util.Log.d("SearchScreen", "Album loaded: ${albumDetails.title} with ${songs.size} songs")
-                                                                    homeViewModel.setSelectedAlbum(
-                                                                        album = albumDetails.title,
-                                                                        artist = songs.firstOrNull()?.artist ?: "Unknown Artist",
-                                                                        songs = songs
+                                                                    android.util.Log.d(
+                                                                        "SearchScreen",
+                                                                        "Album loaded: ${albumDetails.title} with ${songs.size} songs"
                                                                     )
-                                                                    onNavigateToAlbum(albumDetails.title, songs.firstOrNull()?.artist ?: "Unknown Artist", songs)
+                                                                    homeViewModel.setSelectedOnlineAlbum(albumDetails)
+                                                                    onNavigateToAlbum(
+                                                                        albumDetails.title,
+                                                                        albumDetails.artist,
+                                                                        songs
+                                                                    )
                                                                 } else {
                                                                     android.widget.Toast.makeText(
                                                                         context,
@@ -350,44 +360,19 @@ fun SearchScreen(
                                                         )
                                                     }
                                                 }
+
                                                 com.just_for_fun.synctax.core.network.OnlineResultType.ARTIST -> {
                                                     // Fetch artist details and show detail screen
                                                     coroutineScope.launch {
-                                                        android.widget.Toast.makeText(
-                                                            context,
-                                                            "Loading artist: ${res.title}",
-                                                            android.widget.Toast.LENGTH_SHORT
-                                                        ).show()
-                                                        
+
                                                         homeViewModel.fetchArtistDetails(
                                                             browseId = res.browseId ?: res.id,
                                                             onResult = { artistDetails ->
                                                                 if (artistDetails != null && artistDetails.songs.isNotEmpty()) {
-                                                                    // Convert online songs to Song objects for playback
-                                                                    // Use artist's thumbnail for all songs for consistent display
-                                                                    val songs = artistDetails.songs.map { track ->
-                                                                        com.just_for_fun.synctax.core.data.local.entities.Song(
-                                                                            id = "youtube:${track.videoId}",
-                                                                            title = track.title,
-                                                                            artist = track.artist,
-                                                                            album = null,
-                                                                            duration = 0L,
-                                                                            filePath = track.watchUrl,
-                                                                            genre = null,
-                                                                            releaseYear = null,
-                                                                            albumArtUri = artistDetails.thumbnail
-                                                                        )
-                                                                    }
-                                                                    // TODO: Navigate to ArtistDetailScreen with songs
-                                                                    // For now, play the first song
-                                                                    android.util.Log.d("SearchScreen", "Artist loaded: ${artistDetails.name} with ${songs.size} songs")
-                                                                    playerViewModel.playUrl(
-                                                                        url = songs.first().filePath,
-                                                                        title = songs.first().title,
-                                                                        artist = songs.first().artist,
-                                                                        durationMs = 0L,
-                                                                        thumbnailUrl = artistDetails.thumbnail
+                                                                    homeViewModel.setSelectedOnlineArtist(
+                                                                        artistDetails
                                                                     )
+                                                                    navController.navigate("online_artist")
                                                                 } else {
                                                                     android.widget.Toast.makeText(
                                                                         context,
@@ -406,9 +391,11 @@ fun SearchScreen(
                                                         )
                                                     }
                                                 }
+
                                                 else -> {
                                                     // Play online song - construct YouTube URL from videoId
-                                                    val youtubeUrl = "https://www.youtube.com/watch?v=${res.id}"
+                                                    val youtubeUrl =
+                                                        "https://www.youtube.com/watch?v=${res.id}"
                                                     playerViewModel.playUrl(
                                                         url = youtubeUrl,
                                                         title = res.title,
@@ -513,7 +500,7 @@ fun SearchScreen(
             steps = com.just_for_fun.synctax.ui.guide.GuideContent.searchScreenGuide,
             onDismiss = {
                 showGuide = false
-                userPreferences.setGuideShown(com.just_for_fun.synctax.data.preferences.UserPreferences.GUIDE_SEARCH)
+                userPreferences.setGuideShown(UserPreferences.GUIDE_SEARCH)
             }
         )
     }

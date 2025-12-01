@@ -1,8 +1,19 @@
 package com.just_for_fun.synctax.ui.screens
 
-import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,8 +22,25 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,14 +51,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.ui.components.card.SongCard
-import kotlinx.coroutines.Dispatchers
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
-import kotlinx.coroutines.withContext
+import com.just_for_fun.synctax.ui.components.card.SongCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,9 +67,16 @@ fun AlbumDetailScreen(
     onBackClick: () -> Unit,
     onSongClick: (Song) -> Unit,
     onPlayAll: () -> Unit,
-    onShuffle: () -> Unit
+    onShuffle: () -> Unit,
+    isOnline: Boolean = false,
+    albumDetails: com.just_for_fun.synctax.util.AlbumDetails? = null
 ) {
-    val albumArtUri = songs.firstOrNull()?.albumArtUri.orEmpty()
+    val displayAlbumName = if (isOnline && albumDetails != null) albumDetails.title else albumName
+    val displayArtistName = if (isOnline && albumDetails != null) albumDetails.artist else artistName
+    val displaySongs = songs // songs parameter is already converted to Song objects for online albums
+    val albumArtUri = if (isOnline && albumDetails != null) albumDetails.thumbnail else songs.firstOrNull()?.albumArtUri.orEmpty()
+    val description = if (isOnline && albumDetails != null) albumDetails.description ?: "" else ""
+
     val context = LocalContext.current
 
     var dominantColor by remember { mutableStateOf(Color(0xFF121212)) }
@@ -52,41 +85,28 @@ fun AlbumDetailScreen(
     // Extract colors from album art
     LaunchedEffect(albumArtUri) {
         if (albumArtUri.isNotEmpty()) {
-            withContext(Dispatchers.IO) {
-                try {
-                    val bitmap = when {
-                        albumArtUri.startsWith("http://") || albumArtUri.startsWith("https://") -> {
-                            // Load from URL
-                            val url = java.net.URL(albumArtUri)
-                            val connection = url.openConnection() as java.net.HttpURLConnection
-                            connection.doInput = true
-                            connection.connect()
-                            val inputStream = connection.inputStream
-                            BitmapFactory.decodeStream(inputStream)
-                        }
-                        else -> {
-                            // Load from local URI
-                            context.contentResolver.openInputStream(albumArtUri.toUri())?.use { inputStream ->
-                                BitmapFactory.decodeStream(inputStream)
-                            }
-                        }
-                    }
-                    
-                    bitmap?.let { bmp ->
-                        Palette.from(bmp).generate { palette ->
-                            val dominant = palette?.dominantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF121212)
-                            val vibrant = palette?.vibrantSwatch?.rgb?.let { Color(it) }
-                                ?: palette?.darkVibrantSwatch?.rgb?.let { Color(it) }
-                                ?: palette?.mutedSwatch?.rgb?.let { Color(it) }
-                                ?: dominant
+            try {
+                val request = ImageRequest.Builder(context)
+                    .data(albumArtUri)
+                    .allowHardware(false)
+                    .build()
 
-                            dominantColor = dominant
-                            vibrantColor = vibrant
+                val drawable = coil.Coil.imageLoader(context).execute(request).drawable
+                val bitmap = (drawable as? BitmapDrawable)?.bitmap
+
+                bitmap?.let {
+                    Palette.from(it).generate { palette ->
+                        palette?.let { p ->
+                            val dominant = p.getDominantColor(0xFF121212.toInt())
+                            val vibrant = p.getVibrantColor(0xFFE91D63.toInt())
+
+                            dominantColor = Color(dominant)
+                            vibrantColor = Color(vibrant)
                         }
                     }
-                } catch (e: Exception) {
-                    // Silently fail — keep fallback colors
                 }
+            } catch (e: Exception) {
+                // Keep default colors on error
             }
         }
     }
@@ -107,7 +127,7 @@ fun AlbumDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = albumName,
+                        text = displayAlbumName,
                         color = Color.White,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -175,7 +195,7 @@ fun AlbumDetailScreen(
                                 }
                             } else {
                                 AsyncImage(
-                                    model = coil.request.ImageRequest.Builder(context)
+                                    model = ImageRequest.Builder(context)
                                         .data(albumArtUri)
                                         .crossfade(true)
                                         .error(android.R.drawable.ic_menu_gallery)
@@ -193,7 +213,7 @@ fun AlbumDetailScreen(
 
                         // Album Name
                         Text(
-                            text = albumName,
+                            text = displayAlbumName,
                             style = MaterialTheme.typography.headlineLarge.copy(
                                 fontSize = 36.sp,
                                 fontWeight = FontWeight.ExtraBold
@@ -208,7 +228,7 @@ fun AlbumDetailScreen(
 
                         // Artist Name
                         Text(
-                            text = artistName,
+                            text = displayArtistName,
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
                             color = Color.White.copy(alpha = 0.9f),
                             modifier = Modifier.padding(horizontal = 32.dp)
@@ -218,9 +238,21 @@ fun AlbumDetailScreen(
 
                         // Song Count
                         Text(
-                            text = "${songs.size} songs",
+                            text = "${displaySongs.size} songs",
                             style = MaterialTheme.typography.bodyLarge,
                             color = Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Description
+                        Text(
+                            text = if (description.isNullOrBlank()) "No description available for this album" else description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 3,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 32.dp)
                         )
 
@@ -283,11 +315,60 @@ fun AlbumDetailScreen(
                 }
 
                 // Songs List
-                items(songs) { song ->
-                    SongCard(
-                        song = song,
-                        onClick = { onSongClick(song) }
-                    )
+                items(displaySongs) { song ->
+                    if (isOnline) {
+                        // Online album songs - use Song properties
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = song.albumArtUri,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(50.dp)
+                                        .clip(RoundedCornerShape(4.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = song.title,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = song.artist,
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                IconButton(onClick = { onSongClick(song) }) {
+                                    Icon(
+                                        Icons.Default.PlayArrow,
+                                        contentDescription = "Play",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // Local album songs
+                        SongCard(
+                            song = song,
+                            onClick = { onSongClick(song) }
+                        )
+                    }
                 }
             }
         }

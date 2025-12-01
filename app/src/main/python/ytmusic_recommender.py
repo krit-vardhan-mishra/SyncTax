@@ -183,6 +183,7 @@ class YTMusicRecommender:
                 'thumbnail': album.get('thumbnails', [{}])[-1].get('url', '') if album.get('thumbnails') else '',
                 'trackCount': album.get('trackCount', len(songs)),
                 'duration': album.get('duration', ''),
+                'description': album.get('description', ''),
                 'songs': songs
             }
             

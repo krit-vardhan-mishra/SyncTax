@@ -3,16 +3,28 @@ package com.just_for_fun.synctax.core.player
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class MusicPlayer(context: Context) {
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
+    companion object {
+        private const val TAG = "MusicPlayer"
+    }
+
+    // Use cached data source for better performance
+    private val cachedDataSourceFactory = StreamCache.createCachedDataSourceFactory(context)
+    private val mediaSourceFactory = DefaultMediaSourceFactory(cachedDataSourceFactory)
+    
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .build()
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val _playerState = MutableStateFlow(PlayerState())
@@ -88,6 +100,37 @@ class MusicPlayer(context: Context) {
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
 
+        _playerState.value = _playerState.value.copy(
+            currentSongId = songId,
+            duration = exoPlayer.duration,
+            isEnded = false
+        )
+    }
+
+    /**
+     * Prepare a media item with a custom cache key for cached playback.
+     * Use this for online songs to leverage pre-cached audio data.
+     * 
+     * @param uri The stream URL or file path
+     * @param songId The song ID for state tracking
+     * @param cacheKey Optional cache key (usually video ID for online songs)
+     */
+    fun prepareWithCacheKey(uri: String, songId: String, cacheKey: String? = null) {
+        _playerState.value = _playerState.value.copy(isEnded = false)
+        
+        val mediaItemBuilder = MediaItem.Builder()
+            .setUri(uri)
+        
+        // Set custom cache key if provided (for online songs)
+        if (cacheKey != null) {
+            mediaItemBuilder.setCustomCacheKey(cacheKey)
+            Log.d(TAG, "Preparing with cache key: $cacheKey")
+        }
+        
+        val mediaItem = mediaItemBuilder.build()
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        
         _playerState.value = _playerState.value.copy(
             currentSongId = songId,
             duration = exoPlayer.duration,
