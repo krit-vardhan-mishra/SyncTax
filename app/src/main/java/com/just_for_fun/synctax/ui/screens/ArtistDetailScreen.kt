@@ -52,52 +52,80 @@ fun ArtistDetailScreen(
     val displaySongs = if (isOnline && artistDetails != null) artistDetails.songs else songs
     val imageUri = if (isOnline && artistDetails != null) artistDetails.thumbnail else songs.firstOrNull()?.albumArtUri.orEmpty()
     val songCount = if (isOnline && artistDetails != null) artistDetails.songs.size else songs.size
-    val description = if (isOnline && artistDetails != null) artistDetails.description else ""
+    val description = when {
+        isOnline && artistDetails != null -> {
+            val desc = artistDetails.description
+            when {
+                desc.isNullOrBlank() -> "No details about this artist available"
+                desc == "null" -> "No details about this artist available"
+                else -> desc
+            }
+        }
+        else -> "No details about this artist available"
+    }
     val subscribers = if (isOnline && artistDetails != null) artistDetails.subscribers else ""
 
-    val albumArtUri = songs.firstOrNull()?.albumArtUri.orEmpty()
     val context = LocalContext.current
 
-    var dominantColor by remember { mutableStateOf(Color(0xFF121212)) }
-    var vibrantColor by remember { mutableStateOf(Color(0xFFD31212)) } // fallback vibrant red
+    var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
+    var vibrantColor by remember { mutableStateOf(Color(0xFF6C63FF)) }
+    var darkMutedColor by remember { mutableStateOf(Color(0xFF0F0F1E)) }
 
     LaunchedEffect(imageUri) {
         if (imageUri.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
                     if (imageUri.startsWith("http")) {
-                        // For online images, skip palette for now, use defaults
-                        dominantColor = Color(0xFF121212)
-                        vibrantColor = Color(0xFFE91D63)
+                        // For online images, use default rich colors
+                        dominantColor = Color(0xFF1A1A2E)
+                        vibrantColor = Color(0xFF6C63FF)
+                        darkMutedColor = Color(0xFF0F0F1E)
                     } else {
-                        // Local URI
+                        // Local URI - extract palette
                         context.contentResolver.openInputStream(imageUri.toUri())?.use { stream ->
                             val bitmap = BitmapFactory.decodeStream(stream)
                             bitmap?.let {
                                 Palette.from(it).generate { palette ->
-                                    val dominant = palette?.dominantSwatch?.rgb?.let { Color(it) } ?: Color(0xFF121212)
-                                    val vibrant = palette?.vibrantSwatch?.rgb?.let { Color(it) }
-                                        ?: palette?.darkVibrantSwatch?.rgb?.let { Color(it) }
-                                        ?: dominant
+                                    palette?.let { p ->
+                                        // Get vibrant color with fallback chain
+                                        val vibrant = p.vibrantSwatch?.rgb
+                                            ?: p.lightVibrantSwatch?.rgb
+                                            ?: p.mutedSwatch?.rgb
+                                            ?: 0xFF6C63FF.toInt()
 
-                                    dominantColor = dominant
-                                    vibrantColor = vibrant
+                                        // Get dark muted for depth
+                                        val darkMuted = p.darkMutedSwatch?.rgb
+                                            ?: p.darkVibrantSwatch?.rgb
+                                            ?: 0xFF0F0F1E.toInt()
+
+                                        // Get dominant for middle gradient
+                                        val dominant = p.dominantSwatch?.rgb
+                                            ?: p.mutedSwatch?.rgb
+                                            ?: 0xFF1A1A2E.toInt()
+
+                                        vibrantColor = Color(vibrant)
+                                        darkMutedColor = Color(darkMuted)
+                                        dominantColor = Color(dominant)
+                                    }
                                 }
                             }
                         }
                     }
-                } catch (e: Exception) { /* ignore */ }
+                } catch (e: Exception) { /* Keep defaults */ }
             }
         }
     }
 
-    // Beautiful gradient from top (vibrant) → bottom (dark)
+    // Enhanced gradient with richer color transitions
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
-            vibrantColor.copy(alpha = 0.85f),
-            dominantColor.copy(alpha = 0.6f),
-            Color(0xFF121212)
-        )
+            vibrantColor.copy(alpha = 0.9f),
+            dominantColor.copy(alpha = 0.7f),
+            darkMutedColor.copy(alpha = 0.85f),
+            Color(0xFF0A0A0F)
+        ),
+        startY = 0f,
+        endY = 2000f
     )
 
     Scaffold(
@@ -152,30 +180,47 @@ fun ArtistDetailScreen(
                     ) {
                         Spacer(modifier = Modifier.height(40.dp))
 
-                        // Large circular artist image
+                        // Enhanced circular artist image with glow effect
                         Box(
                             modifier = Modifier
                                 .size(220.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.1f)),
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            vibrantColor.copy(alpha = 0.3f),
+                                            Color.Transparent
+                                        ),
+                                        radius = 350f
+                                    ),
+                                    shape = CircleShape
+                                )
+                                .padding(8.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (imageUri.isEmpty()) {
-                                Icon(
-                                    Icons.Default.Person,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(100.dp),
-                                    tint = Color.White.copy(alpha = 0.7f)
-                                )
-                            } else {
-                                AsyncImage(
-                                    model = imageUri,
-                                    contentDescription = displayName,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(CircleShape)
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.08f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (imageUri.isEmpty()) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(100.dp),
+                                        tint = Color.White.copy(alpha = 0.6f)
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = imageUri,
+                                        contentDescription = displayName,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape)
+                                    )
+                                }
                             }
                         }
 
@@ -214,7 +259,7 @@ fun ArtistDetailScreen(
 
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // Play All (Red) + Shuffle (Outlined)
+                        // Action Buttons
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.padding(horizontal = 32.dp)
@@ -225,7 +270,7 @@ fun ArtistDetailScreen(
                                     .height(56.dp)
                                     .weight(1f),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE91D63), // Perfect red from your image
+                                    containerColor = Color(0xFFE91D63),
                                     contentColor = Color.White
                                 ),
                                 shape = MaterialTheme.shapes.large

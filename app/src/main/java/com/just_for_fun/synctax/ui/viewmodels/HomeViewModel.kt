@@ -751,6 +751,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // Search state management
+    fun updateSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+
+    fun updateSelectedFilter(filter: SearchFilterType) {
+        _uiState.value = _uiState.value.copy(selectedFilter = filter)
+    }
 }
 
 data class HomeUiState(
@@ -777,6 +786,9 @@ data class HomeUiState(
     val onlineSearchResults: List<com.just_for_fun.synctax.core.network.OnlineSearchResult> = emptyList(),
     val isLoadingArtistDetails: Boolean = false,
     val isLoadingAlbumDetails: Boolean = false,
+    // Search state
+    val searchQuery: String = "",
+    val selectedFilter: SearchFilterType = SearchFilterType.ALL,
     // Section-specific song lists
     val listenAgain: List<Song> = emptyList(),
     val speedDialSongs: List<Song> = emptyList(), // Now shows ML recommendations

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.palette.graphics.Palette
@@ -73,16 +74,27 @@ fun AlbumDetailScreen(
 ) {
     val displayAlbumName = if (isOnline && albumDetails != null) albumDetails.title else albumName
     val displayArtistName = if (isOnline && albumDetails != null) albumDetails.artist else artistName
-    val displaySongs = songs // songs parameter is already converted to Song objects for online albums
+    val displaySongs = songs
     val albumArtUri = if (isOnline && albumDetails != null) albumDetails.thumbnail else songs.firstOrNull()?.albumArtUri.orEmpty()
-    val description = if (isOnline && albumDetails != null) albumDetails.description ?: "" else ""
+    val description = when {
+        isOnline && albumDetails != null -> {
+            val desc = albumDetails.description
+            when {
+                desc.isNullOrBlank() -> "No description available for this album"
+                desc == "null" -> "No description available for this album"
+                else -> desc
+            }
+        }
+        else -> "No description available for this album"
+    }
 
     val context = LocalContext.current
 
-    var dominantColor by remember { mutableStateOf(Color(0xFF121212)) }
-    var vibrantColor by remember { mutableStateOf(Color(0xFFE91D63)) } // fallback: vibrant red
+    var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
+    var vibrantColor by remember { mutableStateOf(Color(0xFF6C63FF)) }
+    var darkMutedColor by remember { mutableStateOf(Color(0xFF0F0F1E)) }
 
-    // Extract colors from album art
+    // Extract colors from album art with improved palette
     LaunchedEffect(albumArtUri) {
         if (albumArtUri.isNotEmpty()) {
             try {
@@ -97,11 +109,25 @@ fun AlbumDetailScreen(
                 bitmap?.let {
                     Palette.from(it).generate { palette ->
                         palette?.let { p ->
-                            val dominant = p.getDominantColor(0xFF121212.toInt())
-                            val vibrant = p.getVibrantColor(0xFFE91D63.toInt())
+                            // Get vibrant color with fallback to light vibrant or muted
+                            val vibrant = p.vibrantSwatch?.rgb
+                                ?: p.lightVibrantSwatch?.rgb
+                                ?: p.mutedSwatch?.rgb
+                                ?: 0xFF6C63FF.toInt()
 
-                            dominantColor = Color(dominant)
+                            // Get dark muted for depth
+                            val darkMuted = p.darkMutedSwatch?.rgb
+                                ?: p.darkVibrantSwatch?.rgb
+                                ?: 0xFF0F0F1E.toInt()
+
+                            // Get dominant for middle gradient
+                            val dominant = p.dominantSwatch?.rgb
+                                ?: p.mutedSwatch?.rgb
+                                ?: 0xFF1A1A2E.toInt()
+
                             vibrantColor = Color(vibrant)
+                            darkMutedColor = Color(darkMuted)
+                            dominantColor = Color(dominant)
                         }
                     }
                 }
@@ -111,13 +137,16 @@ fun AlbumDetailScreen(
         }
     }
 
-    // Beautiful vertical gradient background
+    // Enhanced gradient with smoother transitions and richer colors
     val gradientBrush = Brush.verticalGradient(
         colors = listOf(
-            vibrantColor.copy(alpha = 0.9f),
-            dominantColor.copy(alpha = 0.6f),
-            Color(0xFF121212) // Pure black at bottom
-        )
+            vibrantColor.copy(alpha = 0.95f),
+            dominantColor.copy(alpha = 0.75f),
+            darkMutedColor.copy(alpha = 0.85f),
+            Color(0xFF0A0A0F)
+        ),
+        startY = 0f,
+        endY = 2000f
     )
 
     Scaffold(
@@ -173,39 +202,54 @@ fun AlbumDetailScreen(
                     ) {
                         Spacer(modifier = Modifier.height(40.dp))
 
-                        // Album Art - Large & Modern
+                        // Album Art with enhanced card styling
                         Card(
                             modifier = Modifier
                                 .size(260.dp)
-                                .clip(RoundedCornerShape(16.dp)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
+                                .clip(RoundedCornerShape(20.dp)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White.copy(alpha = 0.08f)
+                            )
                         ) {
-                            if (albumArtUri.isEmpty()) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    Icon(
-                                        Icons.Default.Album,
-                                        contentDescription = null,
-                                        tint = Color.White.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(100.dp)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(
+                                                vibrantColor.copy(alpha = 0.15f),
+                                                Color.Transparent
+                                            )
+                                        )
+                                    )
+                            ) {
+                                if (albumArtUri.isEmpty()) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Album,
+                                            contentDescription = null,
+                                            tint = Color.White.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(100.dp)
+                                        )
+                                    }
+                                } else {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(albumArtUri)
+                                            .crossfade(true)
+                                            .error(android.R.drawable.ic_menu_gallery)
+                                            .build(),
+                                        contentDescription = albumName,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(20.dp))
                                     )
                                 }
-                            } else {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(context)
-                                        .data(albumArtUri)
-                                        .crossfade(true)
-                                        .error(android.R.drawable.ic_menu_gallery)
-                                        .build(),
-                                    contentDescription = albumName,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(16.dp))
-                                )
                             }
                         }
 
@@ -248,7 +292,7 @@ fun AlbumDetailScreen(
 
                         // Description
                         Text(
-                            text = if (description.isNullOrBlank()) "No description available for this album" else description,
+                            text = description,
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.7f),
                             maxLines = 3,
@@ -258,7 +302,7 @@ fun AlbumDetailScreen(
 
                         Spacer(modifier = Modifier.height(40.dp))
 
-                        // Action Buttons - Play All (Red) + Shuffle (Outlined)
+                        // Action Buttons
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier
@@ -271,7 +315,7 @@ fun AlbumDetailScreen(
                                     .weight(1f)
                                     .height(58.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE91D63), // Exact red from your image
+                                    containerColor = Color(0xFFE91D63),
                                     contentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(30.dp)
@@ -317,7 +361,6 @@ fun AlbumDetailScreen(
                 // Songs List
                 items(displaySongs) { song ->
                     if (isOnline) {
-                        // Online album songs - use Song properties
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -345,7 +388,7 @@ fun AlbumDetailScreen(
                                         color = Color.White,
                                         fontWeight = FontWeight.Medium,
                                         maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = song.artist,
@@ -363,7 +406,6 @@ fun AlbumDetailScreen(
                             }
                         }
                     } else {
-                        // Local album songs
                         SongCard(
                             song = song,
                             onClick = { onSongClick(song) }

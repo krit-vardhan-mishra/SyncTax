@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.just_for_fun.synctax.util.AppConfig
 
 @Composable
 fun WelcomeScreen(
@@ -63,10 +64,29 @@ fun WelcomeScreen(
     var name by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
     var isVisible by remember { mutableStateOf(false) }
+    var showSpecialWelcome by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         isVisible = true
+    }
+
+    // Check if name is a creator name using AppConfig
+    val trimmedName = name.trim()
+    val isCreator = AppConfig.isCreator(context, trimmedName)
+
+    // Show special welcome screen for creators
+    if (showSpecialWelcome && isCreator) {
+        // *** CHANGE THIS LINE ***
+        SpecialCreatorWelcomeScreenTwo( // <--- Change SpecialCreatorWelcomeScreen to SpecialCreatorWelcomeScreenTwo
+            creatorName = trimmedName,
+            onContinue = {
+                showSpecialWelcome = false
+                onNameSubmit(trimmedName)
+            }
+        )
+        return
     }
 
     Box(
@@ -223,7 +243,7 @@ fun WelcomeScreen(
                         OutlinedTextField(
                             value = name,
                             onValueChange = {
-                                name = it
+                                name = it.trimStart() // Trim leading spaces only while typing
                                 isError = false
                             },
                             modifier = Modifier.fillMaxWidth(),
@@ -256,8 +276,13 @@ fun WelcomeScreen(
                             keyboardActions = KeyboardActions(
                                 onDone = {
                                     keyboardController?.hide()
-                                    if (name.trim().isNotEmpty()) {
-                                        onNameSubmit(name.trim())
+                                    val finalName = name.trim()
+                                    if (finalName.isNotEmpty()) {
+                                        if (isCreator) {
+                                            showSpecialWelcome = true
+                                        } else {
+                                            onNameSubmit(finalName)
+                                        }
                                     } else {
                                         isError = true
                                     }
@@ -277,8 +302,13 @@ fun WelcomeScreen(
 
                         Button(
                             onClick = {
-                                if (name.trim().isNotEmpty()) {
-                                    onNameSubmit(name.trim())
+                                val finalName = name.trim()
+                                if (finalName.isNotEmpty()) {
+                                    if (isCreator) {
+                                        showSpecialWelcome = true
+                                    } else {
+                                        onNameSubmit(finalName)
+                                    }
                                 } else {
                                     isError = true
                                 }

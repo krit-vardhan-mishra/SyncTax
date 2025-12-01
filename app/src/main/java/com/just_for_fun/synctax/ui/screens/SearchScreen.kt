@@ -30,6 +30,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
+import com.just_for_fun.synctax.ui.guide.GuideContent
+import com.just_for_fun.synctax.ui.guide.GuideOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,15 +47,12 @@ fun SearchScreen(
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedFilter by remember { mutableStateOf(SearchFilterType.ALL) }
+    val searchQuery = uiState.searchQuery
+    val selectedFilter = uiState.selectedFilter
 
     val context = LocalContext.current
     var isFocused by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
-
-    // Note: We no longer reset search on back navigation to preserve results
-    // The resetTrigger is kept for potential explicit reset scenarios but not triggered on navigation
 
     // Debounced online search - only search after user stops typing for 800ms
     LaunchedEffect(searchQuery) {
@@ -131,7 +130,7 @@ fun SearchScreen(
                 // Search Bar
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { searchQuery = it },
+                    onValueChange = { homeViewModel.updateSearchQuery(it.trim()) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -145,7 +144,7 @@ fun SearchScreen(
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                            IconButton(onClick = { homeViewModel.updateSearchQuery("") }) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
                                     contentDescription = "Clear"
@@ -162,10 +161,10 @@ fun SearchScreen(
                     SearchFilterChips(
                         selectedFilter = selectedFilter,
                         onFilterSelected = { filter ->
-                            selectedFilter = filter
+                            homeViewModel.updateSelectedFilter(filter)
                             // Trigger new online search with filter if no local results
                             if (filteredSongs.isEmpty()) {
-                                homeViewModel.searchOnline(searchQuery, selectedFilter)
+                                homeViewModel.searchOnline(searchQuery, filter)
                             }
                         },
                         showVideos = false // Only show Songs/Albums filters
@@ -336,7 +335,9 @@ fun SearchScreen(
                                                                         "SearchScreen",
                                                                         "Album loaded: ${albumDetails.title} with ${songs.size} songs"
                                                                     )
-                                                                    homeViewModel.setSelectedOnlineAlbum(albumDetails)
+                                                                    homeViewModel.setSelectedOnlineAlbum(
+                                                                        albumDetails
+                                                                    )
                                                                     onNavigateToAlbum(
                                                                         albumDetails.title,
                                                                         albumDetails.artist,
@@ -494,10 +495,9 @@ fun SearchScreen(
         }
     }
 
-
     if (showGuide) {
-        com.just_for_fun.synctax.ui.guide.GuideOverlay(
-            steps = com.just_for_fun.synctax.ui.guide.GuideContent.searchScreenGuide,
+        GuideOverlay(
+            steps = GuideContent.searchScreenGuide,
             onDismiss = {
                 showGuide = false
                 userPreferences.setGuideShown(UserPreferences.GUIDE_SEARCH)
