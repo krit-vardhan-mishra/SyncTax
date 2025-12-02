@@ -1,8 +1,11 @@
 package com.just_for_fun.synctax.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -11,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
@@ -51,8 +56,34 @@ fun SearchScreen(
     val selectedFilter = uiState.selectedFilter
 
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var isFocused by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
+    var suggestionsJob by remember { mutableStateOf<Job?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Function to perform search
+    fun performSearch() {
+        if (searchQuery.isNotEmpty()) {
+            keyboardController?.hide()
+            homeViewModel.clearSearchSuggestions()
+            homeViewModel.searchOnline(searchQuery, selectedFilter)
+        }
+    }
+
+    // Debounced search suggestions - fetch after 300ms of typing
+    LaunchedEffect(searchQuery) {
+        suggestionsJob?.cancel()
+        
+        if (searchQuery.length >= 2) {
+            suggestionsJob = launch {
+                delay(300) // Wait 300ms after user stops typing
+                homeViewModel.fetchSearchSuggestions(searchQuery)
+            }
+        } else {
+            homeViewModel.clearSearchSuggestions()
+        }
+    }
 
     // Debounced online search - only search after user stops typing for 800ms
     LaunchedEffect(searchQuery) {
@@ -130,7 +161,7 @@ fun SearchScreen(
                 // Search Bar
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { homeViewModel.updateSearchQuery(it.trim()) },
+                    onValueChange = { homeViewModel.updateSearchQuery(it) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -153,7 +184,13 @@ fun SearchScreen(
                         }
                     },
                     singleLine = true,
-                    shape = MaterialTheme.shapes.large
+                    shape = MaterialTheme.shapes.large,
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = { performSearch() }
+                    )
                 )
 
                 // Filter chips - shown when search query is not empty
@@ -169,6 +206,65 @@ fun SearchScreen(
                         },
                         showVideos = false // Only show Songs/Albums filters
                     )
+                }
+                
+                // Search suggestions - shown while typing
+                if (searchQuery.isNotEmpty() && uiState.searchSuggestions.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        uiState.searchSuggestions.forEach { suggestion ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        // Set search query and trigger search
+                                        homeViewModel.updateSearchQuery(suggestion)
+                                        homeViewModel.clearSearchSuggestions()
+                                        homeViewModel.searchOnline(suggestion, selectedFilter)
+                                    }
+                                    .padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = suggestion,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                
+                                // Arrow to fill search input
+                                IconButton(
+                                    onClick = {
+                                        homeViewModel.updateSearchQuery(suggestion)
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NorthWest,
+                                        contentDescription = "Use this suggestion",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Divider()
+                    }
                 }
 
                 // Show Listen Again (recently played / most played merged) when search field focused and empty
@@ -206,8 +302,89 @@ fun SearchScreen(
                     }
 
                     searchQuery.isEmpty() -> {
-                        // Show suggestions or recent searches
-                        EmptySearchState()
+                        // Show search history or empty state
+                        if (uiState.searchHistory.isNotEmpty()) {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(vertical = 8.dp)
+                            ) {
+                                item {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Recent Searches",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        TextButton(onClick = { homeViewModel.clearSearchHistory() }) {
+                                            Text(
+                                                text = "Clear all",
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                items(uiState.searchHistory) { historyItem ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                // Set the search query and trigger search
+                                                homeViewModel.updateSearchQuery(historyItem.query)
+                                                homeViewModel.searchOnline(historyItem.query, selectedFilter)
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.History,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = historyItem.query,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        
+                                        // Arrow button to fill search input
+                                        IconButton(
+                                            onClick = {
+                                                // Just fill the search box without triggering search
+                                                homeViewModel.updateSearchQuery(historyItem.query)
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.NorthWest,
+                                                contentDescription = "Use this search",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                    Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                                }
+                                
+                                item {
+                                    Spacer(modifier = Modifier.height(80.dp))
+                                }
+                            }
+                        } else {
+                            // No search history - show default empty state
+                            EmptySearchState()
+                        }
                     }
 
                     filteredSongs.isEmpty() -> {

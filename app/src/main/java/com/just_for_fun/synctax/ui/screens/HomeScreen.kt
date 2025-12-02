@@ -61,6 +61,9 @@ import com.just_for_fun.synctax.ui.guide.GuideOverlay
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.width
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,32 +199,18 @@ fun HomeScreen(
                         }
                     }
 
-                    uiState.allSongs.isEmpty() -> {
+                    else -> {
                         // Show directory selection dialog when no songs are scanned
-                        LaunchedEffect(Unit) {
-                            if (scanPaths.isEmpty() && !showDirectorySelectionDialog) {
+                        LaunchedEffect(uiState.allSongs.isEmpty(), scanPaths.isEmpty()) {
+                            if (uiState.allSongs.isEmpty() && scanPaths.isEmpty() && !showDirectorySelectionDialog) {
                                 showDirectorySelectionDialog = true
                             }
                         }
-
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            EmptyMusicState(
-                                onScanClick = {
-                                    if (scanPaths.isEmpty()) {
-                                        showDirectorySelectionDialog = true
-                                    } else {
-                                        homeViewModel.scanMusic()
-                                    }
-                                },
-                                isScanning = uiState.isScanning
-                            )
+                        
+                        // Set visibility to true even when no local songs (for online history display)
+                        LaunchedEffect(Unit) {
+                            isVisible = true
                         }
-                    }
-
-                    else -> {
                         AnimatedVisibility(
                             visible = isVisible,
                             enter = fadeIn(animationSpec = tween(600)) +
@@ -293,8 +282,8 @@ fun HomeScreen(
                                     }
                                 }
 
-                                // Listen Again Section
-                                if (selectedFilter == "All" || selectedFilter == "Listen Again") {
+                                // Listen Again Section (only show if there are local songs)
+                                if ((selectedFilter == "All" || selectedFilter == "Listen Again") && uiState.allSongs.isNotEmpty()) {
                                     @OptIn(ExperimentalFoundationApi::class)
                                     item {
                                         SectionHeader(
@@ -340,8 +329,8 @@ fun HomeScreen(
                                     }
                                 }
 
-                                // Speed Dial Section
-                                if (selectedFilter == "All" || selectedFilter == "Speed Dial") {
+                                // Speed Dial Section (only show if there are local songs)
+                                if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.speedDialSongs.isNotEmpty()) {
                                     item {
                                         SpeedDialSection(
                                             songs = uiState.speedDialSongs,
@@ -357,7 +346,8 @@ fun HomeScreen(
                                     }
                                 }
 
-                                if (selectedFilter == "All") {
+                                // Divider and Quick Access (only show if there are local songs)
+                                if (selectedFilter == "All" && uiState.allSongs.isNotEmpty()) {
                                     item {
                                         Spacer(modifier = Modifier.height(15.dp))
                                     }
@@ -373,28 +363,57 @@ fun HomeScreen(
                                     }
                                 }
 
-                                item {
-                                    QuickAccessGrid(
-                                        songs = uiState.quickAccessSongs,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(song, uiState.quickAccessSongs)
-                                        },
-                                        currentSong = playerState.currentSong
-                                    )
-                                }
+                                // Quick Access Grid (only show if there are local songs)
+                                if (uiState.quickAccessSongs.isNotEmpty()) {
+                                    item {
+                                        QuickAccessGrid(
+                                            songs = uiState.quickAccessSongs,
+                                            onSongClick = { song ->
+                                                playerViewModel.playSong(song, uiState.quickAccessSongs)
+                                            },
+                                            currentSong = playerState.currentSong
+                                        )
+                                    }
 
-                                item {
-                                    Spacer(modifier = Modifier.height(25.dp))
-                                }
+                                    item {
+                                        Spacer(modifier = Modifier.height(25.dp))
+                                    }
 
-                                item {
-                                    Divider(
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    )
-                                }
+                                    item {
+                                        Divider(
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        )
+                                    }
 
-                                item {
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                    item {
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                    }
+                                }
+                                
+                                // Empty Music State - Show when no local songs available
+                                if (uiState.allSongs.isEmpty()) {
+                                    item {
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                    }
+                                    
+                                    item {
+                                        Divider(
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        )
+                                    }
+                                    
+                                    item {
+                                        EmptyMusicState(
+                                            onScanClick = {
+                                                if (scanPaths.isEmpty()) {
+                                                    showDirectorySelectionDialog = true
+                                                } else {
+                                                    homeViewModel.scanMusic()
+                                                }
+                                            },
+                                            isScanning = uiState.isScanning
+                                        )
+                                    }
                                 }
 
                                 // Bottom padding for mini player

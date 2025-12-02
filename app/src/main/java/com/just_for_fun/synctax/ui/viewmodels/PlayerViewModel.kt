@@ -260,6 +260,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun restoreLastSong() {
+        // Check if the last played song was an online song
+        if (playerPreferences.isOnlineSong()) {
+            restoreOnlineSong()
+            return
+        }
+        
         val lastSongId = playerPreferences.getCurrentSongId() ?: return
         val lastPosition = playerPreferences.getLastPosition()
         val playlistIds = playerPreferences.getCurrentPlaylist()
@@ -268,6 +274,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         try {
             val song = repository.getSongById(lastSongId)
             if (song != null) {
+                // Clear any online song state since we're restoring a local song
+                playerPreferences.clearOnlineSongState()
+                
                 // Restore playlist if available
                 if (playlistIds.isNotEmpty()) {
                     val playlist = playlistIds.mapNotNull { id -> repository.getSongById(id) }
@@ -308,6 +317,93 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             e.printStackTrace()
         }
     }
+    
+    /**
+     * Restore online song state when app reopens
+     */
+    private suspend fun restoreOnlineSong() {
+        val onlineState = playerPreferences.getOnlineSongState() ?: return
+        
+        try {
+            Log.d("PlayerViewModel", "🔄 Restoring online song: ${onlineState.title}")
+            
+            // Create a Song object for the online song
+            val onlineSong = Song(
+                id = "online:${onlineState.videoId}",
+                title = onlineState.title,
+                artist = onlineState.artist,
+                album = null,
+                duration = 0L,
+                filePath = onlineState.watchUrl,
+                genre = null,
+                releaseYear = null,
+                albumArtUri = onlineState.thumbnailUrl
+            )
+            
+            // Initialize queue with the online song
+            queueManager.initializeQueue(listOf(onlineSong), 0)
+            
+            // Set the UI state with the restored song (don't auto-play)
+            _uiState.value = _uiState.value.copy(
+                currentSong = onlineSong,
+                position = onlineState.position,
+                isPlaying = false // Don't auto-play on restore
+            )
+            
+            // Update notification
+            updateNotification()
+            
+            // Fetch recommendations for the restored song
+            if (onlineState.videoId.isNotEmpty()) {
+                fetchRecommendationsForVideoId(onlineState.videoId)
+            }
+            
+            Log.d("PlayerViewModel", "✅ Online song restored: ${onlineState.title}")
+        } catch (e: Exception) {
+            Log.e("PlayerViewModel", "❌ Failed to restore online song: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * Fetch recommendations for a video ID
+     */
+    private fun fetchRecommendationsForVideoId(videoId: String) {
+        if (_uiState.value.upNextRecommendations.isEmpty() && playedRecommendationsHistory.isEmpty()) {
+            _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
+            originalRecommendationVideoId = videoId
+            
+            YTMusicRecommender.getRecommendations(
+                videoId = videoId,
+                limit = 50,
+                onResult = { recommendations ->
+                    Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations for restored song")
+                    // Convert RecommendedSong to Song
+                    val recommendedSongs = recommendations.map { rec ->
+                        Song(
+                            id = "youtube:${rec.videoId}",
+                            title = rec.title,
+                            artist = rec.artist,
+                            album = null,
+                            duration = 0L,
+                            filePath = rec.watchUrl,
+                            genre = null,
+                            releaseYear = null,
+                            albumArtUri = rec.thumbnail
+                        )
+                    }
+                    _uiState.value = _uiState.value.copy(
+                        upNextRecommendations = recommendedSongs,
+                        isLoadingRecommendations = false
+                    )
+                },
+                onError = { error ->
+                    Log.e("PlayerViewModel", "❌ Failed to fetch recommendations: $error")
+                    _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                }
+            )
+        }
+    }
 
     private fun savePlaylistState() {
         viewModelScope.launch {
@@ -329,6 +425,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (_uiState.value.currentSong != null) {
                 playbackCollector.stopCollecting(skipped = true)
             }
+            
+            // Clear online song state when switching to local songs
+            playerPreferences.clearOnlineSongState()
 
             // Initialize queue with new playlist
             val songIndex = playlist.indexOf(song).coerceAtLeast(0)
@@ -836,6 +935,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // Check if song is already downloaded
             checkIfSongDownloaded(onlineSong)
+            
+            // Save online song state for restoration when app reopens
+            playerPreferences.saveOnlineSongState(
+                videoId = videoId,
+                title = title,
+                artist = artist ?: "Unknown",
+                thumbnailUrl = highQualityThumbnail,
+                watchUrl = "https://www.youtube.com/watch?v=$videoId",
+                position = 0L,
+                isPlaying = true
+            )
 
             // Observe chunk download state and update UI; when completed swap file path to final cached file
             viewModelScope.launch {
@@ -870,6 +980,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         break
                     }
                     kotlinx.coroutines.delay(1000)
+                    
+                    // Update saved position periodically for online songs
+                    _uiState.value.currentSong?.let { song ->
+                        if (song.id.startsWith("online:")) {
+                            val currentPosition = player.getCurrentPosition()
+                            if (currentPosition % 5000 < 1000) { // Save every ~5 seconds
+                                playerPreferences.saveOnlineSongState(
+                                    videoId = videoId,
+                                    title = title,
+                                    artist = artist ?: "Unknown",
+                                    thumbnailUrl = highQualityThumbnail,
+                                    watchUrl = "https://www.youtube.com/watch?v=$videoId",
+                                    position = currentPosition,
+                                    isPlaying = _uiState.value.isPlaying
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -992,6 +1120,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(false))
             } else {
+                val currentSong = _uiState.value.currentSong
+                
+                // Check if this is a restored online song that needs stream URL preparation
+                if (currentSong != null && 
+                    currentSong.id.startsWith("online:") && 
+                    !player.isSourcePrepared()) {
+                    
+                    Log.d("PlayerViewModel", "🔄 Restored online song needs stream URL preparation")
+                    
+                    // Extract video ID and play using playUrl which handles stream extraction
+                    val videoId = currentSong.id.removePrefix("online:")
+                    val watchUrl = currentSong.filePath.ifEmpty { 
+                        "https://www.youtube.com/watch?v=$videoId" 
+                    }
+                    
+                    playUrl(
+                        url = watchUrl,
+                        title = currentSong.title,
+                        artist = currentSong.artist,
+                        durationMs = currentSong.duration,
+                        thumbnailUrl = currentSong.albumArtUri,
+                        skipRecommendationFetch = true // Already have recommendations from restore
+                    )
+                    return@launch
+                }
+                
                 player.play()
 
                 _uiState.value.currentSong?.let { song ->

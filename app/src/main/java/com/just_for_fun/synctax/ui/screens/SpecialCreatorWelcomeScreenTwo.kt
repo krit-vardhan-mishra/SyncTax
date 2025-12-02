@@ -1,51 +1,88 @@
 package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import com.just_for_fun.synctax.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import kotlinx.coroutines.delay
+
+// Custom overshoot easing
+private val OvershootEasing: Easing = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1.0f)
+
+// Montserrat font family (place font files in `app/src/main/res/font/`)
+// Expected resource names: montserrat_light, montserrat_regular, montserrat_medium,
+// montserrat_semibold, montserrat_bold, montserrat_extrabold, montserrat_italic
+private val MontserratFamily = FontFamily(
+    Font(R.font.montserrat_light, FontWeight.Light),
+    Font(R.font.montserrat_regular, FontWeight.Normal),
+    Font(R.font.montserrat_medium, FontWeight.Medium),
+    Font(R.font.montserrat_semibold, FontWeight.SemiBold),
+    Font(R.font.montserrat_bold, FontWeight.Bold),
+    Font(R.font.montserrat_extrabold, FontWeight.ExtraBold),
+    Font(R.font.montserrat_italic, style = FontStyle.Italic)
+)
 
 @Composable
 fun SpecialCreatorWelcomeScreenTwo(
     creatorName: String,
     onContinue: () -> Unit
 ) {
-    var isVisible by remember { mutableStateOf(false) }
-    var showSurprise by remember { mutableStateOf(false) }
+    var phase by remember { mutableIntStateOf(0) } // 0: confetti → 1: reveal → 2: message → 3: final glow
+
+    val goldGradient = Brush.linearGradient(
+        colors = listOf(Color(0xFFFFD700), Color(0xFFFFC107), Color(0xFFFF8C00)),
+        start = Offset.Zero,
+        end = Offset.Infinite
+    )
 
     LaunchedEffect(Unit) {
-        isVisible = true
-        kotlinx.coroutines.delay(3000) // Wait for initial animation
-        showSurprise = true
-        kotlinx.coroutines.delay(5000) // Show surprise for 5 seconds
+        delay(3500)  // Confetti
+        phase = 1
+        delay(1800)  // Name reveal
+        phase = 2
+        delay(3000)  // Thank you message
+        phase = 3
+        delay(2500)  // Final fade
         onContinue()
     }
 
@@ -54,151 +91,166 @@ fun SpecialCreatorWelcomeScreenTwo(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Special background with golden accents
-        Box(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Golden bubbles for special effect
-            Box(
-                modifier = Modifier
-                    .size(450.dp)
-                    .offset(x = (-120).dp, y = (-180).dp)
-                    .background(
-                        Color(0xFFFFD700).copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(60)
-                    )
-                    .blur(120.dp)
+
+        // Golden Confetti Burst (Phase 0, centered on screen)
+        if (phase == 0) {
+            val confetti by rememberLottieComposition(LottieCompositionSpec.Asset("golden_confetti_burst.json"))
+            val progress by animateLottieCompositionAsState(
+                composition = confetti,
+                iterations = 1
             )
-            Box(
+            LottieAnimation(
+                composition = confetti,
+                progress = { progress },
                 modifier = Modifier
-                    .size(400.dp)
-                    .align(Alignment.BottomEnd)
-                    .offset(x = 120.dp, y = 180.dp)
-                    .background(
-                        Color(0xFFFFA500).copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(60)
-                    )
-                    .blur(120.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .size(350.dp)
-                    .align(Alignment.CenterStart)
-                    .offset(x = (-60).dp, y = 250.dp)
-                    .background(
-                        Color(0xFFFFD700).copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(60)
-                    )
-                    .blur(120.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .align(Alignment.Center), // Explicitly center the animation
+                contentScale = ContentScale.FillHeight
             )
         }
 
+        // Main Content Column (Text and Icon) - Centered on screen
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(horizontal = 32.dp)
+                .padding(vertical = 60.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+
+            Spacer(modifier = Modifier.weight(0.3f))
+
+            // Name Reveal (Phase 1+)
             AnimatedVisibility(
-                visible = isVisible,
-                enter = fadeIn(animationSpec = tween(1200)) +
-                        slideInVertically(
-                            animationSpec = tween(1200, easing = FastOutSlowInEasing),
-                            initialOffsetY = { -it / 2 }
-                        )
+                visible = phase >= 1,
+                enter = fadeIn(tween(2000)) + scaleIn(tween(2200, easing = OvershootEasing))
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(horizontal = 32.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Crown icon effect with stars
-                    Text(
-                        text = "👑",
-                        style = MaterialTheme.typography.displayLarge,
-                        fontSize = 120.sp
-                    )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
                     Text(
-                        text = "Welcome Home,",
+                        text = "Welcome home,",
                         style = MaterialTheme.typography.displayMedium.copy(
-                            fontSize = 42.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontFamily = MontserratFamily,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Light,
+                            letterSpacing = 3.sp
                         ),
-                        color = Color(0xFFFFD700),
+                        color = Color.White.copy(0.9f),
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
+                    // Golden gradient text
                     Text(
                         text = creatorName,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontFamily = MontserratFamily,
+                            fontSize = 52.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            brush = goldGradient
                         ),
-                        color = Color.White,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Creator of SyncTax",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color(0xFFFFD700).copy(alpha = 0.8f),
+                        text = "The soul behind SyncTax",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = MontserratFamily,
+                            fontStyle = FontStyle.Italic,
+                            fontSize = 20.sp
+                        ),
+                        color = Color.White.copy(0.7f),
                         textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(0.5f))
+
+            // Personal Message (Phase 2+) - positioned below the Name Reveal block
+            AnimatedVisibility(
+                visible = phase >= 2,
+                enter = fadeIn(tween(1500, delayMillis = 200)) + slideInVertically(
+                    tween(
+                        1500,
+                        delayMillis = 200
+                    )
+                ) { it / 2 }
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val sparkle by rememberLottieComposition(LottieCompositionSpec.Asset("sparkle_burst.json"))
+
+                    LottieAnimation(
+                        sparkle,
+                        iterations = 2,
+                        modifier = Modifier.size(100.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "This app exists because of your vision.\nEvery beat. Every sync. Every moment.\nIt's all you.",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontFamily = MontserratFamily,
+                            lineHeight = 30.sp,
+                            fontSize = 20.sp
+                        ),
+                        color = Color.White.copy(0.9f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Surprise animation
-                    AnimatedVisibility(
-                        visible = showSurprise,
-                        enter = fadeIn(animationSpec = tween(800)) +
-                                slideInVertically(
-                                    animationSpec = tween(800, easing = FastOutSlowInEasing),
-                                    initialOffsetY = { it / 3 }
-                                )
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "🎉 ✨ 🎵 ✨ 🎉",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontSize = 48.sp,
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Text(
-                                text = "Thank you for building\nthis amazing music experience!",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontSize = 22.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = Color.White.copy(alpha = 0.9f),
-                                textAlign = TextAlign.Center,
-                                lineHeight = 30.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text(
-                                text = "Entering your creation...",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color(0xFFFFD700).copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
+                    Text(
+                        text = "We're not just loading your world…\nWe're coming home.",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontFamily = MontserratFamily,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF00D4FF),
+                            fontSize = 24.sp,
+                            lineHeight = 32.sp
+                        ),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.weight(0.3f))
+        }
+
+        // Final Fade to App
+        AnimatedVisibility(
+            visible = phase == 3,
+            enter = fadeIn(tween(2000))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.8f))
+            )
         }
     }
 }
+
+private data class OrbState(
+    val delay: Long,
+    val xOffset: androidx.compose.ui.unit.Dp,
+    val yOffset: androidx.compose.ui.unit.Dp,
+    val size: androidx.compose.ui.unit.Dp
+)

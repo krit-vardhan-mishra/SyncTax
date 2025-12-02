@@ -335,6 +335,61 @@ object YTMusicRecommender {
     }
     
     /**
+     * Get search suggestions for the given query
+     * @param query Partial search query string
+     * @param onResult Callback with list of suggestion strings
+     * @param onError Error callback
+     */
+    fun getSearchSuggestions(
+        query: String,
+        onResult: (List<String>) -> Unit,
+        onError: (String) -> Unit = { Log.e(TAG, it) }
+    ) {
+        scope.launch {
+            try {
+                Log.d(TAG, "getSearchSuggestions: query='$query'")
+                
+                val python = Python.getInstance()
+                val module = python.getModule("ytmusic_recommender")
+                val jsonResult = module.callAttr("get_search_suggestions", query).toString()
+                
+                val suggestions = parseSuggestionsFromJson(jsonResult)
+                Log.d(TAG, "Found ${suggestions.size} suggestions for query: $query")
+                
+                withContext(Dispatchers.Main) {
+                    onResult(suggestions)
+                }
+            } catch (e: PyException) {
+                Log.e(TAG, "Python get_search_suggestions failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Search suggestions failed: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "getSearchSuggestions failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Search suggestions failed: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Parse search suggestions from JSON string
+     */
+    private fun parseSuggestionsFromJson(jsonString: String): List<String> {
+        val suggestions = mutableListOf<String>()
+        try {
+            val jsonArray = JSONArray(jsonString)
+            for (i in 0 until jsonArray.length()) {
+                suggestions.add(jsonArray.getString(i))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse suggestions JSON", e)
+        }
+        return suggestions
+    }
+    
+    /**
      * Parse songs from JSON string returned by Python
      */
     private fun parseSongsFromJson(jsonString: String): List<RecommendedSong> {

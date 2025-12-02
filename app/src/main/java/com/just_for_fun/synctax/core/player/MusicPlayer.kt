@@ -210,6 +210,20 @@ class MusicPlayer(context: Context) {
         }
     }
 
+    /**
+     * Check if the player has a media source prepared and ready to play.
+     * This is useful to detect if a restored song needs stream URL extraction.
+     */
+    fun isSourcePrepared(): Boolean {
+        return if (Looper.myLooper() == Looper.getMainLooper()) {
+            exoPlayer.playbackState != Player.STATE_IDLE && 
+            exoPlayer.playbackState != Player.STATE_ENDED &&
+            exoPlayer.mediaItemCount > 0
+        } else {
+            _playerState.value.currentSongId != null && !_playerState.value.isEnded
+        }
+    }
+
     fun release() {
         mainHandler.post {
             exoPlayer.release()

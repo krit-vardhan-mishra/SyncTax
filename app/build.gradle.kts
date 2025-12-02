@@ -161,6 +161,9 @@ dependencies {
     implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
 
+    // Lottie for animations
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
+
     // Worker
     implementation("androidx.work:work-runtime-ktx:2.10.0")
 

@@ -51,6 +51,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         observeListeningHistoryForTraining()
         observeListenAgain()
         loadOnlineHistory()
+        loadSearchHistory()  // Load search history on init
         observeRecommendationsCount()
         // Start periodic refresh for deleted songs check
         startPeriodicRefresh()
@@ -165,6 +166,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun searchOnline(query: String, filterType: SearchFilterType = SearchFilterType.ALL) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSearchingOnline = true)
+            
+            // Save search query to history
+            if (query.isNotBlank()) {
+                addSearchHistory(query)
+            }
+            
             try {
                 val results = mutableListOf<com.just_for_fun.synctax.core.network.OnlineSearchResult>()
                 
@@ -760,6 +767,88 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun updateSelectedFilter(filter: SearchFilterType) {
         _uiState.value = _uiState.value.copy(selectedFilter = filter)
     }
+    
+    // Search history management
+    fun loadSearchHistory() {
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                database.onlineSearchHistoryDao().getRecentSearches(20).collect { history ->
+                    _uiState.value = _uiState.value.copy(searchHistory = history)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun addSearchHistory(query: String) {
+        if (query.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                // Delete existing entry with same query to move it to top
+                database.onlineSearchHistoryDao().deleteByQuery(query.trim())
+                // Insert new entry
+                database.onlineSearchHistoryDao().insertSearch(
+                    com.just_for_fun.synctax.core.data.local.entities.OnlineSearchHistory(
+                        query = query.trim()
+                    )
+                )
+                // Trim old records to keep only last 20
+                database.onlineSearchHistoryDao().trimOldRecords(20)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun deleteSearchHistoryItem(id: Long) {
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                database.onlineSearchHistoryDao().deleteById(id)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun clearSearchHistory() {
+        viewModelScope.launch {
+            try {
+                val database = com.just_for_fun.synctax.core.data.local.MusicDatabase.getDatabase(getApplication())
+                database.onlineSearchHistoryDao().clearAll()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    // Search suggestions management
+    fun fetchSearchSuggestions(query: String) {
+        if (query.isBlank() || query.length < 2) {
+            _uiState.value = _uiState.value.copy(searchSuggestions = emptyList())
+            return
+        }
+        
+        viewModelScope.launch {
+            com.just_for_fun.synctax.util.YTMusicRecommender.getSearchSuggestions(
+                query = query,
+                onResult = { suggestions ->
+                    _uiState.value = _uiState.value.copy(searchSuggestions = suggestions.take(8))
+                },
+                onError = { error ->
+                    android.util.Log.e("HomeViewModel", "Search suggestions failed: $error")
+                    _uiState.value = _uiState.value.copy(searchSuggestions = emptyList())
+                }
+            )
+        }
+    }
+    
+    fun clearSearchSuggestions() {
+        _uiState.value = _uiState.value.copy(searchSuggestions = emptyList())
+    }
 }
 
 data class HomeUiState(
@@ -794,6 +883,10 @@ data class HomeUiState(
     val speedDialSongs: List<Song> = emptyList(), // Now shows ML recommendations
     val quickAccessSongs: List<Song> = emptyList(), // Now shows random songs
     val onlineHistory: List<com.just_for_fun.synctax.core.data.local.entities.OnlineListeningHistory> = emptyList(), // Last 10 online songs
+    // Search history
+    val searchHistory: List<com.just_for_fun.synctax.core.data.local.entities.OnlineSearchHistory> = emptyList(),
+    // Search suggestions
+    val searchSuggestions: List<String> = emptyList(),
     // Pagination state for all songs
     val isLoadingMore: Boolean = false,
     val hasMoreSongs: Boolean = true
