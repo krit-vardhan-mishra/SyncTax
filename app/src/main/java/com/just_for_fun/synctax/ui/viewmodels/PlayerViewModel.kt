@@ -482,6 +482,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * Play a list of songs in shuffled order (for album/playlist shuffle playback)
+     * Shuffles the songs first, then plays from the beginning
+     */
+    fun playSongShuffled(playlist: List<Song>) {
+        if (playlist.isEmpty()) return
+        val shuffledPlaylist = playlist.shuffled()
+        playSong(shuffledPlaylist.first(), shuffledPlaylist)
+    }
+
     fun playUrl(url: String, title: String, artist: String? = null, durationMs: Long = 0L, thumbnailUrl: String? = null, skipRecommendationFetch: Boolean = false) {
         viewModelScope.launch {
             // Extract video ID from YouTube URL
@@ -849,6 +859,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun playOnlinePlaylistShuffled(songs: List<Song>) {
         val shuffledSongs = songs.shuffled()
         playOnlinePlaylist(shuffledSongs, 0)
+    }
+
+    /**
+     * Play a list of RecommendedSong objects in order (for online artist/playlist playback)
+     * Converts RecommendedSong to Song and sets remaining songs as "Up Next" queue
+     */
+    fun playRecommendedSongsPlaylist(recommendedSongs: List<com.just_for_fun.synctax.util.RecommendedSong>, startIndex: Int = 0) {
+        val songs = recommendedSongs.map { rec ->
+            Song(
+                id = "youtube:${rec.videoId}",
+                title = rec.title,
+                artist = rec.artist,
+                album = null,
+                duration = 0L,
+                filePath = rec.watchUrl,
+                genre = null,
+                releaseYear = null,
+                albumArtUri = rec.thumbnail
+            )
+        }
+        playOnlinePlaylist(songs, startIndex)
+    }
+
+    /**
+     * Play a list of RecommendedSong objects in shuffled order
+     */
+    fun playRecommendedSongsShuffled(recommendedSongs: List<com.just_for_fun.synctax.util.RecommendedSong>) {
+        val shuffled = recommendedSongs.shuffled()
+        playRecommendedSongsPlaylist(shuffled, 0)
     }
 
     /** Play a remote stream using chunked progressive download for 30s segments.

@@ -51,6 +51,7 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -95,12 +96,14 @@ import com.just_for_fun.synctax.ui.theme.PlayerSurface
 import com.just_for_fun.synctax.ui.theme.PlayerSurfaceVariant
 import com.just_for_fun.synctax.ui.theme.PlayerTextPrimary
 import com.just_for_fun.synctax.ui.theme.PlayerTextSecondary
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.ui.viewmodels.LyricsViewModel
-import kotlinx.coroutines.delay
+import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.util.AppConfig
+import com.just_for_fun.synctax.R
 import kotlin.math.abs
 import io.github.fletchmckee.liquid.rememberLiquidState
 import io.github.fletchmckee.liquid.liquefiable
+import kotlinx.coroutines.delay
 
 // Function to get current lyric line based on position
 fun getCurrentLyricLine(lyrics: List<LyricLine>, position: Long): Int {
@@ -340,6 +343,28 @@ fun FullScreenPlayerContent(
                             contentDescription = "Options",
                             tint = PlayerIconColor
                         )
+                    }
+
+                    // Contributor Badge (only for creators)
+                    if (AppConfig.isCreator(context, userPreferences.userName.collectAsState().value ?: "")) {
+                        Surface(
+                            color = Color(0xFFFFF3E0),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFFCC02)),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Icon(
+                                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_code),
+                                    contentDescription = "Contributor",
+                                    tint = Color(0xFFE65100),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
 

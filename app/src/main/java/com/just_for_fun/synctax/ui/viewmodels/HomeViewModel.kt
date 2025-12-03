@@ -497,8 +497,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             selectedAlbumArtist = albumDetails.artist,
             selectedAlbumSongs = albumDetails.songs.map { song ->
                 // Convert RecommendedSong to Song for compatibility
+                // Use "online:" prefix so PlayerViewModel recognizes these as online songs
                 Song(
-                    id = song.videoId,
+                    id = "online:${song.videoId}",
                     title = song.title,
                     artist = song.artist,
                     album = albumDetails.title,

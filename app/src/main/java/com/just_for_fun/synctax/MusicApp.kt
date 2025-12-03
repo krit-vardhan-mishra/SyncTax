@@ -221,6 +221,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 playerViewModel = playerViewModel,
                                 dynamicBgViewModel = dynamicBgViewModel,
                                 userPreferences = userPreferences,
+                                scaffoldState = scaffoldState,
                                 onOpenSettings = { navController.navigate("settings") },
                                 onPlaylistClick = { playlistId ->
                                     navController.navigate("playlist_detail/$playlistId")
@@ -249,6 +250,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                             PlaylistDetailScreen(
                                 playlistId = playlistId,
                                 playlistViewModel = playlistViewModel,
+                                scaffoldState = scaffoldState,
                                 onBackClick = { navController.popBackStack() },
                                 onSongClick = { song ->
                                     playerViewModel.playUrl(
@@ -329,10 +331,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                                         }
                                     },
                                     onShuffle = {
-                                        playerViewModel.toggleShuffle()
-                                        songs.firstOrNull()?.let { firstSong ->
-                                            playerViewModel.playSong(firstSong, songs)
-                                        }
+                                        // Shuffle and play all offline artist songs
+                                        playerViewModel.playSongShuffled(songs)
                                     }
                                 )
                             }
@@ -348,38 +348,29 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     },
                                     onSongClick = {}, // not used
                                     onPlayAll = {
-                                        artist.songs.firstOrNull()?.let { song ->
-                                            playerViewModel.playUrl(
-                                                url = song.watchUrl,
-                                                title = song.title,
-                                                artist = song.artist,
-                                                durationMs = 0L,
-                                                thumbnailUrl = song.thumbnail
-                                            )
-                                        }
+                                        // Play all online artist songs with queue
+                                        playerViewModel.playRecommendedSongsPlaylist(artist.songs, 0)
                                     },
                                     onShuffle = {
-                                        playerViewModel.toggleShuffle()
-                                        artist.songs.firstOrNull()?.let { song ->
-                                            playerViewModel.playUrl(
-                                                url = song.watchUrl,
-                                                title = song.title,
-                                                artist = song.artist,
-                                                durationMs = 0L,
-                                                thumbnailUrl = song.thumbnail
-                                            )
-                                        }
+                                        // Shuffle and play all online artist songs
+                                        playerViewModel.playRecommendedSongsShuffled(artist.songs)
                                     },
                                     isOnline = true,
                                     artistDetails = artist,
                                     onOnlineSongClick = { song ->
-                                        playerViewModel.playUrl(
-                                            url = song.watchUrl,
-                                            title = song.title,
-                                            artist = song.artist,
-                                            durationMs = 0L,
-                                            thumbnailUrl = song.thumbnail
-                                        )
+                                        // Play clicked song with remaining songs as queue
+                                        val clickedIndex = artist.songs.indexOf(song)
+                                        if (clickedIndex >= 0) {
+                                            playerViewModel.playRecommendedSongsPlaylist(artist.songs, clickedIndex)
+                                        } else {
+                                            playerViewModel.playUrl(
+                                                url = song.watchUrl,
+                                                title = song.title,
+                                                artist = song.artist,
+                                                durationMs = 0L,
+                                                thumbnailUrl = song.thumbnail
+                                            )
+                                        }
                                     }
                                 )
                             }
@@ -392,7 +383,10 @@ fun MusicApp(userPreferences: UserPreferences) {
                         ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             uiState.selectedAlbumSongs?.let { songs ->
-                                val isOnlineAlbum = songs.firstOrNull()?.id?.startsWith("youtube:") == true
+                                // Check for both "youtube:" and "online:" prefixes for online albums
+                                val isOnlineAlbum = songs.firstOrNull()?.id?.let { id ->
+                                    id.startsWith("youtube:") || id.startsWith("online:")
+                                } == true
                                 AlbumDetailScreen(
                                     albumName = uiState.selectedAlbum ?: "",
                                     artistName = uiState.selectedAlbumArtist ?: "",
@@ -428,10 +422,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                                             // Shuffle and play all online songs with queue
                                             playerViewModel.playOnlinePlaylistShuffled(songs)
                                         } else {
-                                            playerViewModel.toggleShuffle()
-                                            songs.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playSong(firstSong, songs)
-                                            }
+                                            // Shuffle and play all offline songs
+                                            playerViewModel.playSongShuffled(songs)
                                         }
                                     },
                                     isOnline = isOnlineAlbum,

@@ -32,6 +32,7 @@ import com.just_for_fun.synctax.ui.viewmodels.PlaylistViewModel
 fun PlaylistDetailScreen(
     playlistId: Int,
     playlistViewModel: PlaylistViewModel,
+    scaffoldState: BottomSheetScaffoldState,
     onBackClick: () -> Unit,
     onSongClick: (OnlineSong) -> Unit,
     onPlayAll: () -> Unit,
@@ -43,6 +44,11 @@ fun PlaylistDetailScreen(
     // Load playlist details
     LaunchedEffect(playlistId) {
         playlistViewModel.loadPlaylistDetail(playlistId)
+    }
+
+    // Ensure bottom sheet is partially expanded
+    LaunchedEffect(Unit) {
+        scaffoldState.bottomSheetState.partialExpand()
     }
     
     // Clean up on leaving

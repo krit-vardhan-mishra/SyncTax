@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -49,6 +50,7 @@ fun PlaylistScreen(
     playerViewModel: PlayerViewModel,
     dynamicBgViewModel: DynamicBackgroundViewModel,
     userPreferences: UserPreferences,
+    scaffoldState: BottomSheetScaffoldState,
     onOpenSettings: () -> Unit = {},
     onPlaylistClick: (Int) -> Unit = {},
     onImportClick: () -> Unit = {}
@@ -64,6 +66,11 @@ fun PlaylistScreen(
     // Update background when song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
+    }
+
+    // Ensure bottom sheet is partially expanded when on playlist screen
+    LaunchedEffect(Unit) {
+        scaffoldState.bottomSheetState.partialExpand()
     }
 
     // Collect error messages from player view model

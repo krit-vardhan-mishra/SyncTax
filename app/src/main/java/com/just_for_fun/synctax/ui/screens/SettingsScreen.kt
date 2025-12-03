@@ -1,14 +1,21 @@
 package com.just_for_fun.synctax.ui.screens
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,24 +28,236 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
+import com.just_for_fun.synctax.util.AppConfig
 import kotlinx.coroutines.launch
+
+/**
+ * Data class representing an app icon option
+ */
+data class AppIconOption(
+    val id: String,
+    val name: String,
+    val assetPath: String,
+    val isPremium: Boolean = false
+)
+
+/**
+ * Load bitmap from assets folder
+ */
+@Composable
+private fun rememberAssetBitmap(context: Context, assetPath: String): androidx.compose.ui.graphics.ImageBitmap? {
+    return remember(assetPath) {
+        try {
+            context.assets.open(assetPath).use { inputStream ->
+                BitmapFactory.decodeStream(inputStream)?.asImageBitmap()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+}
+
+// Helper component for Asset-based Icon Preview Cards (Telegram style)
+@Composable
+private fun AssetIconPreviewCard(
+    context: Context,
+    iconOption: AppIconOption,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val iconBitmap = rememberAssetBitmap(context, iconOption.assetPath)
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(8.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                    else MaterialTheme.colorScheme.surfaceVariant
+                )
+        ) {
+            iconBitmap?.let { bitmap ->
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = iconOption.name,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            }
+            
+            // Selection indicator
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(18.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(4.dp))
+        
+        // Icon name with premium indicator
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (iconOption.isPremium) {
+                Text(
+                    text = "★ ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFFFD700)
+                )
+            }
+            Text(
+                text = iconOption.name,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+// Helper component for Icon Preview Cards
+@Composable
+private fun IconPreviewCard(
+    iconRes: Int,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val iconDrawable = remember(iconRes) {
+        ContextCompat.getDrawable(context, iconRes)
+    }
+    val iconBitmap = remember(iconDrawable) {
+        iconDrawable?.toBitmap()?.asImageBitmap()
+    }
+    
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = 2.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+        ),
+        modifier = modifier
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                iconBitmap?.let { bitmap ->
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = label,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+            
+            Spacer(Modifier.height(8.dp))
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+                
+                if (isSelected) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
 
 // Helper component for Theme Radio Button Rows
 @Composable
@@ -128,6 +347,7 @@ fun SettingsScreen(
     val scanLocalAlbumArt by userPreferences.scanLocalAlbumArt.collectAsState(initial = false)
     val onlineHistoryCount by userPreferences.onlineHistoryCount.collectAsState(initial = 10)
     val recommendationsCount by userPreferences.recommendationsCount.collectAsState(initial = 20)
+    val userName by userPreferences.userName.collectAsState(initial = "")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -186,7 +406,7 @@ fun SettingsScreen(
                 }
             )
         }
-    ) { padding ->
+        ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .padding(padding)
@@ -194,6 +414,47 @@ fun SettingsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // --- Thank You Contributor Card ---
+            if (AppConfig.isCreator(context, userName)) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFFFF8E1)
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFFFFCC02)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = Color(0xFFE65100),
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "💛 Thank you for building SyncTax!",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color(0xFFE65100),
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Your contributions make this app amazing.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFFE65100)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // --- 1. Theme Settings ---
             item {
                 Text("Theme", style = MaterialTheme.typography.titleLarge)
@@ -216,6 +477,74 @@ fun SettingsScreen(
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            }
+
+            // --- Contributor Features (Hidden) ---
+            if (AppConfig.isCreator(context, userName)) {
+                item {
+                    Text("🎨 Contributor Features", style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.height(8.dp))
+
+                    // App Icon Variants with Visual Previews - Telegram Style
+                    Text("App Icon", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Choose your exclusive app icon",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    
+                    // Available icon options from assets
+                    val iconOptions = listOf(
+                        AppIconOption("default", "Default", "app_icon/app_icon_1.jpg"),
+                        AppIconOption("vintage", "Vintage", "app_icon/app_icon_2.png"),
+                        AppIconOption("aqua", "Aqua", "app_icon/app_icon_3.png"),
+                        AppIconOption("premium", "Premium", "app_icon/app_icon_4.png", isPremium = true),
+                        AppIconOption("turbo", "Turbo", "app_icon/app_icon_5.png"),
+                        AppIconOption("neon", "Neon", "app_icon/app_icon_6.png")
+                    )
+                    
+                    var selectedIconId by remember { mutableStateOf("default") }
+                    
+                    // Telegram-style horizontal scrolling icon picker
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        iconOptions.forEach { iconOption ->
+                            AssetIconPreviewCard(
+                                context = context,
+                                iconOption = iconOption,
+                                isSelected = selectedIconId == iconOption.id,
+                                onClick = { 
+                                    selectedIconId = iconOption.id
+                                    // TODO: Apply icon change using activity-alias
+                                }
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    // Note about icon change
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Changes take effect after app restart",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                    
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+                }
             }
 
             // --- 2. Album Art Section ---

@@ -4,9 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import com.just_for_fun.synctax.ui.utils.AlbumColors
 import com.just_for_fun.synctax.ui.theme.MainBackground
+import com.just_for_fun.synctax.ui.utils.AlbumColors
 
 @Composable
 fun DynamicAlbumBackground(
