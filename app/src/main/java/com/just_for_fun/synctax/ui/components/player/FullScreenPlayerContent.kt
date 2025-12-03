@@ -83,6 +83,7 @@ import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.components.SnackbarUtils.ShowSnackbar
 import com.just_for_fun.synctax.ui.components.utils.FormatSelectionDialog
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.guide.GuideContent
@@ -246,10 +247,7 @@ fun FullScreenPlayerContent(
     LaunchedEffect(uiState.downloadMessage) {
         uiState.downloadMessage?.let { message ->
             if (!message.startsWith("Downloading")) {
-                snackbarHostState.showSnackbar(
-                    message = message,
-                    duration = SnackbarDuration.Short
-                )
+                ShowSnackbar(scope, snackbarHostState, message, duration = SnackbarDuration.Short)
             }
             // Clear the message after processing
             playerViewModel.dismissDownloadMessage()

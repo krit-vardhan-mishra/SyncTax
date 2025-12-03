@@ -4,6 +4,7 @@ import android.content.Context
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyMusicAnalyzer
 import com.just_for_fun.synctax.core.data.local.MusicDatabase
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.data.repository.PlaylistRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.player.MusicPlayer
 
@@ -15,6 +16,7 @@ object AppModule {
 
     private var musicDatabase: MusicDatabase? = null
     private var musicRepository: MusicRepository? = null
+    private var playlistRepository: PlaylistRepository? = null
     private var recommendationManager: MusicRecommendationManager? = null
     private var musicPlayer: MusicPlayer? = null
     private var chaquopyAnalyzer: ChaquopyMusicAnalyzer? = null
@@ -31,6 +33,14 @@ object AppModule {
         return musicRepository ?: synchronized(this) {
             musicRepository ?: MusicRepository(context).also {
                 musicRepository = it
+            }
+        }
+    }
+
+    fun providePlaylistRepository(context: Context): PlaylistRepository {
+        return playlistRepository ?: synchronized(this) {
+            playlistRepository ?: PlaylistRepository(context).also {
+                playlistRepository = it
             }
         }
     }

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.ui.components.SnackbarUtils
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,13 +40,13 @@ fun UpNextItem(
                 SwipeToDismissBoxValue.StartToEnd -> {
                     onRemoveFromQueue(song)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    scope.launch { snackbarHostState.showSnackbar("Removed: ${song.title}") }
+                    SnackbarUtils.ShowSnackbar(scope, snackbarHostState, "Removed: ${song.title}")
                     false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
                     onPlaceNext(song)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    scope.launch { snackbarHostState.showSnackbar("Placed next: ${song.title}") }
+                    SnackbarUtils.ShowSnackbar(scope, snackbarHostState, "Placed next: ${song.title}")
                     false
                 }
                 SwipeToDismissBoxValue.Settled -> true

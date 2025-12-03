@@ -8,8 +8,17 @@ import com.just_for_fun.synctax.core.data.local.dao.*
 import com.just_for_fun.synctax.core.data.local.entities.*
 
 @Database(
-    entities = [Song::class, ListeningHistory::class, UserPreference::class, OnlineListeningHistory::class, OnlineSearchHistory::class],
-    version = 5,  // Incremented for adding OnlineSearchHistory
+    entities = [
+        Song::class,
+        ListeningHistory::class,
+        UserPreference::class,
+        OnlineListeningHistory::class,
+        OnlineSearchHistory::class,
+        Playlist::class,
+        OnlineSong::class,
+        PlaylistSong::class
+    ],
+    version = 6,  // Incremented for adding Playlist, OnlineSong, PlaylistSong
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
@@ -18,6 +27,9 @@ abstract class MusicDatabase : RoomDatabase() {
     abstract fun userPreferenceDao(): UserPreferenceDao
     abstract fun onlineListeningHistoryDao(): OnlineListeningHistoryDao
     abstract fun onlineSearchHistoryDao(): OnlineSearchHistoryDao
+    abstract fun playlistDao(): PlaylistDao
+    abstract fun onlineSongDao(): OnlineSongDao
+    abstract fun playlistSongDao(): PlaylistSongDao
 
     companion object {
         @Volatile

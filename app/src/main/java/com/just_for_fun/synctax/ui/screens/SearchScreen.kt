@@ -1,6 +1,7 @@
 package com.just_for_fun.synctax.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
+import com.just_for_fun.synctax.ui.components.SnackbarUtils
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
 
@@ -60,7 +62,9 @@ fun SearchScreen(
     var isFocused by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var suggestionsJob by remember { mutableStateOf<Job?>(null) }
+    var isSuggestionsExpanded by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     
     // Function to perform search
     fun performSearch() {
@@ -112,6 +116,13 @@ fun SearchScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
+    // Collect error messages from player view model
+    LaunchedEffect(Unit) {
+        playerViewModel.errorMessages.collect { message ->
+            SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
+        }
+    }
+
     // Filter songs based on search query and filter type
     val filteredSongs = remember(searchQuery, selectedFilter, uiState.allSongs) {
         if (searchQuery.isEmpty()) {
@@ -146,7 +157,8 @@ fun SearchScreen(
                 title = "Search",
                 albumColors = albumColors
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         DynamicAlbumBackground(
             albumColors = albumColors,
@@ -215,55 +227,75 @@ fun SearchScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                     ) {
-                        uiState.searchSuggestions.forEach { suggestion ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        // Set search query and trigger search
-                                        homeViewModel.updateSearchQuery(suggestion)
-                                        homeViewModel.clearSearchSuggestions()
-                                        homeViewModel.searchOnline(suggestion, selectedFilter)
-                                    }
-                                    .padding(vertical = 10.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isSuggestionsExpanded = !isSuggestionsExpanded }
+                                .padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Suggestions",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                imageVector = if (isSuggestionsExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isSuggestionsExpanded) "Collapse suggestions" else "Expand suggestions"
+                            )
+                        }
+                        if (isSuggestionsExpanded) {
+                            uiState.searchSuggestions.forEach { suggestion ->
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            // Set search query and trigger search
+                                            homeViewModel.updateSearchQuery(suggestion)
+                                            homeViewModel.clearSearchSuggestions()
+                                            homeViewModel.searchOnline(suggestion, selectedFilter)
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Text(
-                                        text = suggestion,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                
-                                // Arrow to fill search input
-                                IconButton(
-                                    onClick = {
-                                        homeViewModel.updateSearchQuery(suggestion)
-                                    },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.NorthWest,
-                                        contentDescription = "Use this suggestion",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Text(
+                                            text = suggestion,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    
+                                    // Arrow to fill search input
+                                    IconButton(
+                                        onClick = {
+                                            homeViewModel.updateSearchQuery(suggestion)
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.NorthWest,
+                                            contentDescription = "Use this suggestion",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
+                            Divider()
                         }
-                        Divider()
                     }
                 }
 
@@ -334,11 +366,17 @@ fun SearchScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable {
-                                                // Set the search query and trigger search
-                                                homeViewModel.updateSearchQuery(historyItem.query)
-                                                homeViewModel.searchOnline(historyItem.query, selectedFilter)
-                                            }
+                                            .combinedClickable(
+                                                onClick = {
+                                                    // Set the search query and trigger search
+                                                    homeViewModel.updateSearchQuery(historyItem.query)
+                                                    homeViewModel.searchOnline(historyItem.query, selectedFilter)
+                                                },
+                                                onLongClick = {
+                                                    homeViewModel.deleteSearchHistoryItem(historyItem.id)
+                                                    SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Search history item deleted")
+                                                }
+                                            )
                                             .padding(horizontal = 16.dp, vertical = 12.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
@@ -394,64 +432,6 @@ fun SearchScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // No local results message
-                            item {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 32.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SearchOff,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(64.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    Text(
-                                        text = "No Local",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "Results",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Text(
-                                        text = "No songs found on your device for \"$searchQuery\"",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-
-                                    // Show online search status
-                                    if (uiState.isSearchingOnline) {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center
-                                        ) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(20.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = "Searching online...",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
                             // Online results section
                             if (!uiState.isSearchingOnline) {
                                 if (uiState.onlineSearchResults.isNotEmpty()) {
@@ -521,19 +501,11 @@ fun SearchScreen(
                                                                         songs
                                                                     )
                                                                 } else {
-                                                                    android.widget.Toast.makeText(
-                                                                        context,
-                                                                        "Album has no songs available",
-                                                                        android.widget.Toast.LENGTH_SHORT
-                                                                    ).show()
+                                                                    SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Album has no songs available")
                                                                 }
                                                             },
                                                             onError = { error ->
-                                                                android.widget.Toast.makeText(
-                                                                    context,
-                                                                    "Failed to load album: $error",
-                                                                    android.widget.Toast.LENGTH_SHORT
-                                                                ).show()
+                                                                SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Failed to load album: $error")
                                                             }
                                                         )
                                                     }
@@ -552,19 +524,11 @@ fun SearchScreen(
                                                                     )
                                                                     navController.navigate("online_artist")
                                                                 } else {
-                                                                    android.widget.Toast.makeText(
-                                                                        context,
-                                                                        "Artist has no songs available",
-                                                                        android.widget.Toast.LENGTH_SHORT
-                                                                    ).show()
+                                                                    SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Artist has no songs available")
                                                                 }
                                                             },
                                                             onError = { error ->
-                                                                android.widget.Toast.makeText(
-                                                                    context,
-                                                                    "Failed to load artist: $error",
-                                                                    android.widget.Toast.LENGTH_SHORT
-                                                                ).show()
+                                                                SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Failed to load artist: $error")
                                                             }
                                                         )
                                                     }

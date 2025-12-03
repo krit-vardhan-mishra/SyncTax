@@ -39,9 +39,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import com.just_for_fun.synctax.core.player.PreloadManager
 import com.just_for_fun.synctax.core.player.StreamUrlCache
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -59,6 +62,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     
     // Preload manager for instant song switching
     private val preloadManager = PreloadManager(application)
+
+    // Error messages flow for UI
+    private val _errorMessages = MutableSharedFlow<String>()
+    val errorMessages = _errorMessages.asSharedFlow()
 
     // Track active download jobs for cancellation support
     private val activeDownloadJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
@@ -543,11 +550,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     Log.e("PlayerViewModel", "❌ Failed to extract stream URL for: $videoId")
                     // Clear loading state on error
                     _uiState.value = _uiState.value.copy(isLoadingSong = false)
-                    android.widget.Toast.makeText(
-                        getApplication(),
-                        "Failed to play song: Could not extract stream",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
+                    _errorMessages.emit("Failed to play song: Could not extract stream")
                 }
                 return@launch
             }
@@ -1032,14 +1035,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             
             // Fetch YouTube Music recommendations after stream extraction completes (songs only)
+            // Clear existing recommendations when starting a new song to get fresh ones
+            _uiState.value = _uiState.value.copy(upNextRecommendations = emptyList())
+            playedRecommendationsHistory.clear()
+            
             // Only fetch if recommendations list is completely empty (all songs played) and history is empty
-            val shouldFetchRecommendations = _uiState.value.upNextRecommendations.isEmpty() && 
-                                            playedRecommendationsHistory.isEmpty() &&
-                                            originalRecommendationVideoId != videoId
+            val shouldFetchRecommendations = originalRecommendationVideoId != videoId
             
             if (shouldFetchRecommendations) {
-                // Clear history when fetching fresh recommendations (new search)
-                playedRecommendationsHistory.clear()
                 Log.d("PlayerViewModel", "🎵 Stream extraction complete, fetching YouTube Music recommendations for videoId=$videoId")
                 _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
                 originalRecommendationVideoId = videoId

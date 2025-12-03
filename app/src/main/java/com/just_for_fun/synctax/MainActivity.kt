@@ -1,42 +1,25 @@
 package com.just_for_fun.synctax
 
 import android.Manifest
-import android.content.*
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.ui.components.app.AppNavigationBar
-import com.just_for_fun.synctax.ui.components.player.PlayerBottomSheet
-import com.just_for_fun.synctax.ui.screens.*
 import com.just_for_fun.synctax.ui.theme.synctaxTheme
-import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 
 class MainActivity : ComponentActivity() {
 

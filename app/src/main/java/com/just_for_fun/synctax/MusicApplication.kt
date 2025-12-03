@@ -15,6 +15,7 @@ import coil.memory.MemoryCache
 import coil.request.Options
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.just_for_fun.synctax.util.YTMusicRecommender
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +49,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
             initializePython()
         }
         
-        // Initialize YoutubeDL on background thread
+        // Initialize YoutubeDL and SpotDL on background thread
         applicationScope.launch {
             initializeYoutubeDLAndFFmpeg()
         }
@@ -84,7 +85,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
                 Log.d(TAG, "Python runtime initialized")
                 
                 // Initialize YTMusicRecommender for song-only recommendations
-                com.just_for_fun.synctax.util.YTMusicRecommender.initialize()
+                YTMusicRecommender.initialize()
                 Log.d(TAG, "YTMusicRecommender initialized")
             }
         } catch (e: Exception) {

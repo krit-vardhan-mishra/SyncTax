@@ -29,6 +29,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -64,6 +67,7 @@ import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import androidx.compose.foundation.background
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.width
+import com.just_for_fun.synctax.ui.components.SnackbarUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +92,10 @@ fun HomeScreen(
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
+
+    // Snackbar state
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     val listState = rememberLazyListState()
     var hasScrolledToBottom by remember { mutableStateOf(false) }
@@ -156,6 +164,13 @@ fun HomeScreen(
         }
     }
 
+    // Collect error messages from player view model
+    LaunchedEffect(Unit) {
+        playerViewModel.errorMessages.collect { message ->
+            SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -179,7 +194,8 @@ fun HomeScreen(
                     userName = userName,
                     userInitial = userInitial
                 )
-            }
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
             DynamicAlbumBackground(
                 albumColors = albumColors,

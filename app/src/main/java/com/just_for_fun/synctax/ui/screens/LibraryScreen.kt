@@ -61,6 +61,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.ui.components.SnackbarUtils
 import com.just_for_fun.synctax.ui.components.card.SongCard
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.ui.components.utils.SortOption
@@ -135,6 +136,13 @@ fun LibraryScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
+    // Collect error messages from player view model
+    LaunchedEffect(Unit) {
+        playerViewModel.errorMessages.collect { message ->
+            SnackbarUtils.ShowSnackbar(scope, snackbarHostState, message)
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -155,9 +163,7 @@ fun LibraryScreen(
                     if (songsToShuffle.isNotEmpty()) {
                         playerViewModel.shufflePlay(songsToShuffle)
                     } else {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("No songs available on your device, listen songs online")
-                        }
+                        SnackbarUtils.ShowSnackbar(scope, snackbarHostState, "No songs available on your device, listen songs online")
                     }
                 },
                 onRefreshClick = { homeViewModel.scanMusic() },

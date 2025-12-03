@@ -20,8 +20,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -39,7 +41,10 @@ import com.just_for_fun.synctax.ui.components.player.PlayerBottomSheet
 import com.just_for_fun.synctax.ui.screens.AlbumDetailScreen
 import com.just_for_fun.synctax.ui.screens.ArtistDetailScreen
 import com.just_for_fun.synctax.ui.screens.HomeScreen
+import com.just_for_fun.synctax.ui.screens.ImportPlaylistScreen
 import com.just_for_fun.synctax.ui.screens.LibraryScreen
+import com.just_for_fun.synctax.ui.screens.PlaylistDetailScreen
+import com.just_for_fun.synctax.ui.screens.PlaylistScreen
 import com.just_for_fun.synctax.ui.screens.QuickPicksScreen
 import com.just_for_fun.synctax.ui.screens.SearchScreen
 import com.just_for_fun.synctax.ui.screens.SettingsScreen
@@ -47,9 +52,7 @@ import com.just_for_fun.synctax.ui.screens.TrainingScreen
 import com.just_for_fun.synctax.ui.screens.WelcomeScreen
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import com.just_for_fun.synctax.util.ArtistDetails
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import com.just_for_fun.synctax.ui.viewmodels.PlaylistViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -209,6 +212,81 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 },
                                 onOpenSettings = { navController.navigate("settings") },
                                 onTrainClick = { navController.navigate("train") }
+                            )
+                        }
+                        composable("playlists") {
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            PlaylistScreen(
+                                playlistViewModel = playlistViewModel,
+                                playerViewModel = playerViewModel,
+                                dynamicBgViewModel = dynamicBgViewModel,
+                                userPreferences = userPreferences,
+                                onOpenSettings = { navController.navigate("settings") },
+                                onPlaylistClick = { playlistId ->
+                                    navController.navigate("playlist_detail/$playlistId")
+                                },
+                                onImportClick = {
+                                    navController.navigate("import_playlist")
+                                }
+                            )
+                        }
+                        composable("import_playlist") {
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            ImportPlaylistScreen(
+                                playlistViewModel = playlistViewModel,
+                                onBackClick = { navController.popBackStack() },
+                                onImportSuccess = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            route = "playlist_detail/{playlistId}",
+                            arguments = listOf(navArgument("playlistId") {
+                                type = NavType.IntType
+                            })
+                        ) { backStackEntry ->
+                            val playlistId = backStackEntry.arguments?.getInt("playlistId") ?: 0
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            PlaylistDetailScreen(
+                                playlistId = playlistId,
+                                playlistViewModel = playlistViewModel,
+                                onBackClick = { navController.popBackStack() },
+                                onSongClick = { song ->
+                                    playerViewModel.playUrl(
+                                        url = "https://music.youtube.com/watch?v=${song.videoId}",
+                                        title = song.title,
+                                        artist = song.artist,
+                                        durationMs = (song.duration ?: 0) * 1000L,
+                                        thumbnailUrl = song.thumbnailUrl
+                                    )
+                                },
+                                onPlayAll = {
+                                    val songs = playlistViewModel.detailState.value.songs
+                                    if (songs.isNotEmpty()) {
+                                        val firstSong = songs.first()
+                                        playerViewModel.playUrl(
+                                            url = "https://music.youtube.com/watch?v=${firstSong.videoId}",
+                                            title = firstSong.title,
+                                            artist = firstSong.artist,
+                                            durationMs = (firstSong.duration ?: 0) * 1000L,
+                                            thumbnailUrl = firstSong.thumbnailUrl
+                                        )
+                                        // TODO: Add remaining songs to queue
+                                    }
+                                },
+                                onShuffle = {
+                                    val songs = playlistViewModel.detailState.value.songs.shuffled()
+                                    if (songs.isNotEmpty()) {
+                                        val firstSong = songs.first()
+                                        playerViewModel.playUrl(
+                                            url = "https://music.youtube.com/watch?v=${firstSong.videoId}",
+                                            title = firstSong.title,
+                                            artist = firstSong.artist,
+                                            durationMs = (firstSong.duration ?: 0) * 1000L,
+                                            thumbnailUrl = firstSong.thumbnailUrl
+                                        )
+                                        // TODO: Add remaining songs to queue
+                                    }
+                                }
                             )
                         }
                         composable("quick_picks") {
