@@ -103,8 +103,11 @@ object NewPipeUtils {
         streamUrl
     }
 
-    fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {
-        YoutubeJavaScriptPlayerManager.getSignatureTimestamp(videoId)
+    /**
+     * Ensure NewPipe is initialized. Call this early in app lifecycle.
+     */
+    fun ensureInitialized() {
+        // This will trigger object initialization if not already done
     }
 
     /**

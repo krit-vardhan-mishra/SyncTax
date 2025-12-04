@@ -98,9 +98,9 @@ fun PlaylistScreen(
                 showShuffleButton = false,
                 showRefreshButton = true,
                 showProfileButton = true,
-                onRefreshClick = { 
+                onRefreshClick = {
                     Log.d(TAG, "Refresh button clicked")
-                    playlistViewModel.reloadPlaylists() 
+                    playlistViewModel.reloadPlaylists()
                 },
                 userPreferences = userPreferences,
                 userName = userName,
@@ -116,7 +116,6 @@ fun PlaylistScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    Log.d(TAG, "Import FAB clicked")
                     onImportClick()
                 },
                 icon = {
@@ -127,7 +126,8 @@ fun PlaylistScreen(
                 },
                 text = { Text("Import") },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(bottom = 50.dp)
             )
         }
     ) { paddingValues ->
@@ -166,9 +166,12 @@ fun PlaylistScreen(
                     items(uiState.playlists) { playlist ->
                         PlaylistCard(
                             playlist = playlist,
-                            onClick = { 
-                                Log.d(TAG, "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})")
-                                onPlaylistClick(playlist.playlistId) 
+                            onClick = {
+                                Log.d(
+                                    TAG,
+                                    "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})"
+                                )
+                                onPlaylistClick(playlist.playlistId)
                             }
                         )
                     }
@@ -196,25 +199,25 @@ private fun EmptyPlaylistsState(
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = "No playlists yet",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = "Import your favorite YouTube playlists to get started",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             ExtendedFloatingActionButton(
                 onClick = onImportClick,
                 icon = {

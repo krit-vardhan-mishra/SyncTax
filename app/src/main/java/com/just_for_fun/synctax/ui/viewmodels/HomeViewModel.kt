@@ -57,6 +57,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         startPeriodicRefresh()
         // Refresh album art for songs without embedded art
         refreshAlbumArtForSongs()
+        // Load training-related data
+        loadTrainingStatistics()
+        loadModelStatus()
     }
 
     private fun observeListenAgain() {
@@ -446,19 +449,182 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun loadTrainingStatistics() {
+        viewModelScope.launch {
+            try {
+                val history = repository.getRecentHistory(1000).first() // Get more history for better stats
+                val preferences = repository.getTopPreferences(200).first()
+
+                // Calculate statistics
+                val totalPlays = history.size
+                val uniqueSongsPlayed = history.distinctBy { it.songId }.size
+                val averageCompletionRate = if (history.isNotEmpty()) {
+                    history.map { it.completionRate }.average().toFloat()
+                } else 0f
+
+                // Find most active hour and day
+                val hourCounts = history.groupBy { it.timeOfDay }.mapValues { it.value.size }
+                val dayCounts = history.groupBy { it.dayOfWeek }.mapValues { it.value.size }
+                val mostActiveHour = hourCounts.maxByOrNull { it.value }?.key ?: 0
+                val mostActiveDay = dayCounts.maxByOrNull { it.value }?.key ?: 0
+
+                // Get top songs
+                val topSongs = preferences
+                    .sortedByDescending { it.playCount }
+                    .take(5)
+                    .mapNotNull { pref ->
+                        repository.getSongById(pref.songId)?.let { song ->
+                            SongPlayCount(
+                                songId = pref.songId,
+                                title = song.title,
+                                artist = song.artist,
+                                playCount = pref.playCount
+                            )
+                        }
+                    }
+
+                // Create listening patterns heatmap data
+                val listeningPatterns = mutableMapOf<String, Int>()
+                history.forEach { entry ->
+                    val key = "${entry.timeOfDay}:${entry.dayOfWeek}"
+                    listeningPatterns[key] = listeningPatterns.getOrDefault(key, 0) + 1
+                }
+
+                val statistics = TrainingStatistics(
+                    totalPlays = totalPlays,
+                    uniqueSongsPlayed = uniqueSongsPlayed,
+                    averageCompletionRate = averageCompletionRate,
+                    mostActiveHour = mostActiveHour,
+                    mostActiveDay = mostActiveDay,
+                    topSongs = topSongs,
+                    listeningPatterns = listeningPatterns
+                )
+
+                _uiState.value = _uiState.value.copy(trainingStatistics = statistics)
+            } catch (e: Exception) {
+                // Silently handle errors for statistics loading
+            }
+        }
+    }
+
+    private fun loadModelStatus() {
+        viewModelScope.launch {
+            try {
+                // Check if models are trained by attempting to get model status
+                val modelStatus = recommendationManager.getModelStatus()
+                val currentStatus = ModelTrainingStatus(
+                    statisticalAgentTrained = true, // Statistical agent is always ready
+                    collaborativeAgentTrained = modelStatus.isTrained, // Based on vector DB
+                    pythonModelTrained = modelStatus.isTrained,
+                    fusionAgentReady = true, // Fusion agent is always ready
+                    lastTrainingTime = System.currentTimeMillis(), // TODO: Store this persistently
+                    modelVersion = "1.0.0"
+                )
+                _uiState.value = _uiState.value.copy(modelStatus = currentStatus)
+            } catch (e: Exception) {
+                // Model status check failed, keep defaults
+            }
+        }
+    }
+
     fun trainModels() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isTraining = true)
+            val startTime = System.currentTimeMillis()
+            val phases = mutableListOf<TrainingPhase>()
+            val logs = mutableListOf<String>()
+
+            // Initialize training state
+            _uiState.value = _uiState.value.copy(
+                isTraining = true,
+                trainingComplete = false,
+                trainingProgress = 0f,
+                currentTrainingPhase = "Initializing training...",
+                trainingLogs = logs.toList()
+            )
 
             try {
-                recommendationManager.trainModels()
+                // Phase 1: Load training data
+                logs.add("Loading listening history and user preferences...")
                 _uiState.value = _uiState.value.copy(
-                    isTraining = false,
-                    trainingComplete = true
+                    currentTrainingPhase = "Loading training data...",
+                    trainingLogs = logs.toList()
                 )
-            } catch (e: Exception) {
+
+                // Phase 2: Train collaborative filtering
+                logs.add("Training collaborative filtering agent...")
+                _uiState.value = _uiState.value.copy(
+                    currentTrainingPhase = "Training collaborative filtering...",
+                    trainingProgress = 0.4f,
+                    trainingLogs = logs.toList()
+                )
+
+                val collabStart = System.currentTimeMillis()
+                // Note: The actual training happens inside recommendationManager.trainModels()
+                // We'll track it as a single phase for now
+
+                // Phase 3: Train Python ML model
+                logs.add("Training Python ML model...")
+                _uiState.value = _uiState.value.copy(
+                    currentTrainingPhase = "Training Python ML model...",
+                    trainingProgress = 0.7f,
+                    trainingLogs = logs.toList()
+                )
+
+                val pythonStart = System.currentTimeMillis()
+
+                // Execute the actual training
+                recommendationManager.trainModels()
+
+                val endTime = System.currentTimeMillis()
+                logs.add("Training completed successfully in ${(endTime - startTime) / 1000}s")
+                phases.add(TrainingPhase("Collaborative Training", collabStart, pythonStart, true,
+                    "Trained on user listening patterns"))
+                phases.add(TrainingPhase("Python ML Training", pythonStart, endTime, true,
+                    "Trained on listening history"))
+
+                // Update training history
+                val session = TrainingSession(
+                    timestamp = startTime,
+                    duration = endTime - startTime,
+                    success = true,
+                    phases = phases
+                )
+
+                val updatedHistory = (_uiState.value.trainingHistory + session).takeLast(10) // Keep last 10 sessions
+
                 _uiState.value = _uiState.value.copy(
                     isTraining = false,
+                    trainingComplete = true,
+                    trainingProgress = 1f,
+                    currentTrainingPhase = "Training complete",
+                    trainingLogs = logs.toList(),
+                    trainingHistory = updatedHistory
+                )
+
+                // Refresh model status and statistics after training
+                loadModelStatus()
+                loadTrainingStatistics()
+
+            } catch (e: Exception) {
+                val endTime = System.currentTimeMillis()
+                logs.add("Training failed: ${e.message}")
+                phases.add(TrainingPhase("Training Failed", startTime, endTime, false, e.message ?: "Unknown error"))
+
+                val session = TrainingSession(
+                    timestamp = startTime,
+                    duration = endTime - startTime,
+                    success = false,
+                    phases = phases
+                )
+
+                val updatedHistory = (_uiState.value.trainingHistory + session).takeLast(10)
+
+                _uiState.value = _uiState.value.copy(
+                    isTraining = false,
+                    trainingProgress = 0f,
+                    currentTrainingPhase = "",
+                    trainingLogs = logs.toList(),
+                    trainingHistory = updatedHistory,
                     error = e.message
                 )
             }
@@ -890,5 +1056,54 @@ data class HomeUiState(
     val searchSuggestions: List<String> = emptyList(),
     // Pagination state for all songs
     val isLoadingMore: Boolean = false,
-    val hasMoreSongs: Boolean = true
+    val hasMoreSongs: Boolean = true,
+    // Training enhancements
+    val trainingLogs: List<String> = emptyList(),
+    val trainingProgress: Float = 0f,
+    val currentTrainingPhase: String = "",
+    val modelStatus: ModelTrainingStatus = ModelTrainingStatus(),
+    val trainingStatistics: TrainingStatistics = TrainingStatistics(),
+    val trainingHistory: List<TrainingSession> = emptyList()
+)
+
+// Training-related data classes
+data class ModelTrainingStatus(
+    val statisticalAgentTrained: Boolean = false,
+    val collaborativeAgentTrained: Boolean = false,
+    val pythonModelTrained: Boolean = false,
+    val fusionAgentReady: Boolean = false,
+    val lastTrainingTime: Long = 0L,
+    val modelVersion: String = "1.0.0"
+)
+
+data class TrainingStatistics(
+    val totalPlays: Int = 0,
+    val uniqueSongsPlayed: Int = 0,
+    val averageCompletionRate: Float = 0f,
+    val mostActiveHour: Int = 0,
+    val mostActiveDay: Int = 0,
+    val topSongs: List<SongPlayCount> = emptyList(),
+    val listeningPatterns: Map<String, Int> = emptyMap() // "hour:day" -> count
+)
+
+data class SongPlayCount(
+    val songId: String,
+    val title: String,
+    val artist: String,
+    val playCount: Int
+)
+
+data class TrainingSession(
+    val timestamp: Long,
+    val duration: Long, // in milliseconds
+    val success: Boolean,
+    val phases: List<TrainingPhase>
+)
+
+data class TrainingPhase(
+    val name: String,
+    val startTime: Long,
+    val endTime: Long,
+    val success: Boolean,
+    val message: String = ""
 )

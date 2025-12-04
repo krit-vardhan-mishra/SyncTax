@@ -36,6 +36,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.navigation.NavController
+import com.just_for_fun.synctax.core.network.OnlineResultType
 import com.just_for_fun.synctax.ui.components.SnackbarUtils
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
@@ -65,7 +66,7 @@ fun SearchScreen(
     var isSuggestionsExpanded by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    
+
     // Function to perform search
     fun performSearch() {
         if (searchQuery.isNotEmpty()) {
@@ -78,7 +79,7 @@ fun SearchScreen(
     // Debounced search suggestions - fetch after 300ms of typing
     LaunchedEffect(searchQuery) {
         suggestionsJob?.cancel()
-        
+
         if (searchQuery.length >= 2) {
             suggestionsJob = launch {
                 delay(300) // Wait 300ms after user stops typing
@@ -219,7 +220,7 @@ fun SearchScreen(
                         showVideos = false // Only show Songs/Albums filters
                     )
                 }
-                
+
                 // Search suggestions - shown while typing
                 if (searchQuery.isNotEmpty() && uiState.searchSuggestions.isNotEmpty()) {
                     Column(
@@ -277,7 +278,7 @@ fun SearchScreen(
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
-                                    
+
                                     // Arrow to fill search input
                                     IconButton(
                                         onClick = {
@@ -361,7 +362,7 @@ fun SearchScreen(
                                         }
                                     }
                                 }
-                                
+
                                 items(uiState.searchHistory) { historyItem ->
                                     Row(
                                         modifier = Modifier
@@ -397,7 +398,7 @@ fun SearchScreen(
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
-                                        
+
                                         // Arrow button to fill search input
                                         IconButton(
                                             onClick = {
@@ -414,7 +415,7 @@ fun SearchScreen(
                                     }
                                     Divider(modifier = Modifier.padding(horizontal = 16.dp))
                                 }
-                                
+
                                 item {
                                     Spacer(modifier = Modifier.height(80.dp))
                                 }
@@ -433,6 +434,28 @@ fun SearchScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             // Online results section
+                            if (uiState.isSearchingOnline) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 32.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                                        ) {
+                                            CircularProgressIndicator()
+                                            Text(
+                                                text = "Searching online...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                             if (!uiState.isSearchingOnline) {
                                 if (uiState.onlineSearchResults.isNotEmpty()) {
                                     item {
@@ -464,7 +487,7 @@ fun SearchScreen(
                                         OnlineResultCard(result) { res ->
                                             // Check result type and navigate accordingly
                                             when (res.type) {
-                                                com.just_for_fun.synctax.core.network.OnlineResultType.ALBUM -> {
+                                                OnlineResultType.ALBUM -> {
                                                     // Fetch album details and show detail screen
                                                     coroutineScope.launch {
                                                         homeViewModel.fetchAlbumDetails(
@@ -475,7 +498,7 @@ fun SearchScreen(
                                                                     // Use album's thumbnail for all songs to ensure consistent album art display
                                                                     val songs =
                                                                         albumDetails.songs.map { track ->
-                                                                            com.just_for_fun.synctax.core.data.local.entities.Song(
+                                                                            Song(
                                                                                 id = "youtube:${track.videoId}",
                                                                                 title = track.title,
                                                                                 artist = track.artist,
@@ -511,7 +534,7 @@ fun SearchScreen(
                                                     }
                                                 }
 
-                                                com.just_for_fun.synctax.core.network.OnlineResultType.ARTIST -> {
+                                                OnlineResultType.ARTIST -> {
                                                     // Fetch artist details and show detail screen
                                                     coroutineScope.launch {
 

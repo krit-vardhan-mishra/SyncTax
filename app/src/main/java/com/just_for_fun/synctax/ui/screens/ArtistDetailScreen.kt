@@ -2,6 +2,7 @@ package com.just_for_fun.synctax.ui.screens
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -304,7 +305,8 @@ fun ArtistDetailScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .clickable { onOnlineSongClick(song) },
                             colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
                         ) {
                             Row(

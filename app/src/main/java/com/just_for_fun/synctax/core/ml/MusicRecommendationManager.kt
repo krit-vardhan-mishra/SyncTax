@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.*
 import org.schabi.newpipe.extractor.NewPipe.init
 import java.io.File
 import java.util.Calendar
+import com.just_for_fun.synctax.core.chaquopy.ModelStatus
 
 /**
  * Manager that orchestrates the recommendation pipeline.
@@ -159,6 +160,20 @@ class MusicRecommendationManager(private val context: Context) {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+    }
+
+    /**
+     * Get current model training status
+     */
+    suspend fun getModelStatus(): ModelStatus {
+        return withContext(Dispatchers.IO) {
+            try {
+                chaquopyAnalyzer.getModelStatus()
+            } catch (e: Exception) {
+                // Return default status if unable to get model status
+                ModelStatus(isTrained = false, hasScorer = false, nClusters = 0)
             }
         }
     }

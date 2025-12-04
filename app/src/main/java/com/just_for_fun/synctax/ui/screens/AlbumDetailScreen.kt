@@ -2,6 +2,7 @@ package com.just_for_fun.synctax.ui.screens
 
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -364,7 +365,8 @@ fun AlbumDetailScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                .padding(horizontal = 16.dp, vertical = 4.dp)
+                                .clickable { onSongClick(song) },
                             colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
                         ) {
                             Row(

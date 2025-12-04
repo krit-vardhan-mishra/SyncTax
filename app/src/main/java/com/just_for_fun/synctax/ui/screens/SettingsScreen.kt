@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import androidx.compose.material3.SliderDefaults
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -208,7 +209,8 @@ private fun ThemeOptionRow(label: String, selected: Boolean, onSelect: () -> Uni
     }
 }
 
-// Helper component for numerical settings (Slider + Text Field)
+// Updated with Custom "Thick Track" Design
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NumericalSetting(
     label: String,
@@ -217,6 +219,10 @@ private fun NumericalSetting(
     onValueChange: (Int) -> Unit,
     valueRange: ClosedFloatingPointRange<Float> = 1f..100f
 ) {
+    // Custom Colors extracted from the reference image
+    val activeColor = Color(0xFFFF0033)
+    val inactiveColor = Color(0xFFE8DEF8) // Light Lavender
+
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         Text(label, style = MaterialTheme.typography.titleSmall)
         Text(
@@ -224,7 +230,7 @@ private fun NumericalSetting(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp)) // Increased spacing slightly for the taller slider
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -235,8 +241,36 @@ private fun NumericalSetting(
                 onValueChange = { onValueChange(it.toInt()) },
                 valueRange = valueRange,
                 steps = (valueRange.endInclusive - valueRange.start).toInt() - 1,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+
+                // 1. Custom Thumb: A vertical bar extending beyond the track
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 4.dp, height = 32.dp) // Tall, thin vertical bar
+                            .clip(RoundedCornerShape(50)) // Fully rounded ends
+                            .background(activeColor)
+                    )
+                },
+
+                // 2. Custom Track: Thick and rounded
+                track = { sliderState ->
+                    SliderDefaults.Track(
+                        sliderState = sliderState,
+                        modifier = Modifier
+                            .height(20.dp) // Much thicker than default
+                            .clip(RoundedCornerShape(50)), // Rounded track edges
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = activeColor,
+                            inactiveTrackColor = inactiveColor,
+                            thumbColor = activeColor // Matches thumb
+                        ),
+                        thumbTrackGapSize = 0.dp, // Removes the gap between track and thumb
+                        drawStopIndicator = null // Hides the little dots for steps to keep it clean
+                    )
+                }
             )
+
             OutlinedTextField(
                 value = currentValue.toString(),
                 onValueChange = { input ->
@@ -250,7 +284,6 @@ private fun NumericalSetting(
                 modifier = Modifier.width(80.dp),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge,
-                // Make it look simple and small
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,

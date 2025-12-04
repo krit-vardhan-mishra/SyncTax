@@ -15,6 +15,7 @@ import coil.memory.MemoryCache
 import coil.request.Options
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.just_for_fun.synctax.core.network.NewPipeUtils
 import com.just_for_fun.synctax.util.YTMusicRecommender
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +53,14 @@ class MusicApplication : Application(), ImageLoaderFactory {
         // Initialize YoutubeDL and SpotDL on background thread
         applicationScope.launch {
             initializeYoutubeDLAndFFmpeg()
+        }
+
+        // Initialize NewPipe early to avoid delays on first use
+        try {
+            NewPipeUtils.ensureInitialized()
+            Log.d(TAG, "✅ NewPipe initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize NewPipe", e)
         }
 
         Log.d(TAG, "Music Application initialized")
