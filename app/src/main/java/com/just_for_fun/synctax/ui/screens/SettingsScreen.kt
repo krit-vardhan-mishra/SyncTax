@@ -76,6 +76,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.util.AppConfig
+import com.just_for_fun.synctax.util.AppIconManager
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
 
@@ -463,7 +464,8 @@ fun SettingsScreen(
                         AppIconOption("neon", "Neon", "app_icon/app_icon_6.png")
                     )
                     
-                    var selectedIconId by remember { mutableStateOf("default") }
+                    // Get current icon from AppIconManager
+                    var selectedIconId by remember { mutableStateOf(AppIconManager.getCurrentIconId(context)) }
                     
                     // Telegram-style horizontal scrolling icon picker
                     Row(
@@ -479,7 +481,8 @@ fun SettingsScreen(
                                 isSelected = selectedIconId == iconOption.id,
                                 onClick = { 
                                     selectedIconId = iconOption.id
-                                    // TODO: Apply icon change using activity-alias
+                                    // Apply icon change using AppIconManager
+                                    AppIconManager.setIconById(context, iconOption.id)
                                 }
                             )
                         }

@@ -52,13 +52,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.sp
 import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.ui.components.card.SongCard
+import com.just_for_fun.synctax.util.AlbumDetails
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +74,10 @@ fun AlbumDetailScreen(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     isOnline: Boolean = false,
-    albumDetails: com.just_for_fun.synctax.util.AlbumDetails? = null
+    albumDetails: AlbumDetails? = null,
+    isAlbumSaved: Boolean = false,
+    onSaveAlbumClick: () -> Unit = {},
+    onUnsaveAlbumClick: () -> Unit = {}
 ) {
     val displayAlbumName = if (isOnline && albumDetails != null) albumDetails.title else albumName
     val displayArtistName = if (isOnline && albumDetails != null) albumDetails.artist else artistName
@@ -174,6 +180,27 @@ fun AlbumDetailScreen(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = Color.White
+                        )
+                    }
+                },
+                actions = {
+                    TooltipIconButton(
+                        onClick = {
+                            if (isAlbumSaved) {
+                                onUnsaveAlbumClick()
+                            } else {
+                                onSaveAlbumClick()
+                            }
+                        },
+                        tooltipText = if (isAlbumSaved) "Remove from playlists" else "Add to playlists"
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                id = if (isAlbumSaved) R.drawable.playlist_added else R.drawable.playlist_add
+                            ),
+                            contentDescription = if (isAlbumSaved) "Remove from playlists" else "Add to playlists",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 },

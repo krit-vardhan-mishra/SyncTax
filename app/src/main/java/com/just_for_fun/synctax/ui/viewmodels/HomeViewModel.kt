@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.data.cache.ListenAgainManager
 import com.just_for_fun.synctax.core.data.cache.QuickAccessManager
 import com.just_for_fun.synctax.core.data.cache.SpeedDialManager
+import com.just_for_fun.synctax.core.data.local.entities.Playlist
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.core.data.repository.PlaylistRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
@@ -28,6 +30,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val repository = MusicRepository(application)
+    private val playlistRepository = PlaylistRepository(application)
     private val recommendationManager = MusicRecommendationManager(application)
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -60,6 +63,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // Load training-related data
         loadTrainingStatistics()
         loadModelStatus()
+        // Load saved playlists from YouTube Music
+        loadSavedPlaylists()
     }
 
     private fun observeListenAgain() {
@@ -893,6 +898,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    /**
+     * Load saved playlists from YouTube Music
+     */
+    private fun loadSavedPlaylists() {
+        viewModelScope.launch {
+            try {
+                playlistRepository.getAllPlaylists().collect { playlists ->
+                    _uiState.value = _uiState.value.copy(savedPlaylists = playlists)
+                    android.util.Log.d("HomeViewModel", "Loaded ${playlists.size} saved playlists")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Error loading saved playlists", e)
+            }
+        }
+    }
     
     /**
      * Delete a song from the database and update UI
@@ -1050,6 +1071,8 @@ data class HomeUiState(
     val speedDialSongs: List<Song> = emptyList(), // Now shows ML recommendations
     val quickAccessSongs: List<Song> = emptyList(), // Now shows random songs
     val onlineHistory: List<com.just_for_fun.synctax.core.data.local.entities.OnlineListeningHistory> = emptyList(), // Last 10 online songs
+    // Saved playlists from YouTube Music
+    val savedPlaylists: List<Playlist> = emptyList(),
     // Search history
     val searchHistory: List<com.just_for_fun.synctax.core.data.local.entities.OnlineSearchHistory> = emptyList(),
     // Search suggestions

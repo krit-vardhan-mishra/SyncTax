@@ -291,4 +291,126 @@ class PlaylistRepository(private val context: Context) {
             Python.start(AndroidPlatform(context))
         }
     }
+    
+    /**
+     * Save an album as a playlist (user's saved albums)
+     * 
+     * @param albumName The name of the album
+     * @param artistName The artist name
+     * @param thumbnailUrl The album thumbnail URL
+     * @param songs List of songs in the album
+     * @return The saved playlist ID, or null if failed
+     */
+    suspend fun saveAlbumAsPlaylist(
+        albumName: String,
+        artistName: String,
+        thumbnailUrl: String?,
+        songs: List<com.just_for_fun.synctax.core.data.local.entities.Song>
+    ): Int? = withContext(Dispatchers.IO) {
+        try {
+            // Create a unique URL for saved albums to identify them
+            val albumUrl = "saved_album://$artistName/$albumName"
+            
+            // Check if album is already saved
+            val existingPlaylist = playlistDao.getPlaylistByUrl(albumUrl)
+            if (existingPlaylist != null) {
+                Log.d(TAG, "Album already saved: $albumName")
+                return@withContext existingPlaylist.playlistId
+            }
+            
+            // Create playlist entity for the album
+            val playlist = Playlist(
+                name = albumName,
+                description = "Album by $artistName",
+                platform = "Saved Album",
+                playlistUrl = albumUrl,
+                thumbnailUrl = thumbnailUrl,
+                songCount = songs.size
+            )
+            
+            // Insert playlist and get ID
+            val playlistId = playlistDao.insertPlaylist(playlist).toInt()
+            Log.d(TAG, "Created saved album playlist with ID: $playlistId")
+            
+            // Process and insert songs
+            val playlistSongs = mutableListOf<PlaylistSong>()
+            
+            songs.forEachIndexed { index, song ->
+                val videoId = song.id.removePrefix("youtube:").removePrefix("online:")
+                
+                val onlineSong = OnlineSong(
+                    videoId = videoId,
+                    title = song.title,
+                    artist = song.artist,
+                    album = albumName,
+                    thumbnailUrl = song.albumArtUri,
+                    duration = song.duration.toInt(),
+                    sourcePlatform = "Saved Album"
+                )
+                
+                // Get or insert the song
+                val songId = onlineSongDao.getOrInsertByVideoId(onlineSong)
+                
+                // Create junction entry
+                playlistSongs.add(
+                    PlaylistSong(
+                        playlistId = playlistId,
+                        onlineSongId = songId,
+                        position = index
+                    )
+                )
+            }
+            
+            // Batch insert playlist-song associations
+            playlistSongDao.insertPlaylistSongs(playlistSongs)
+            
+            Log.d(TAG, "Successfully saved album: $albumName with ${playlistSongs.size} songs")
+            playlistId
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save album as playlist", e)
+            null
+        }
+    }
+    
+    /**
+     * Remove a saved album playlist
+     * 
+     * @param albumName The name of the album
+     * @param artistName The artist name
+     * @return true if deleted, false otherwise
+     */
+    suspend fun unsaveAlbum(albumName: String, artistName: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val albumUrl = "saved_album://$artistName/$albumName"
+            val playlist = playlistDao.getPlaylistByUrl(albumUrl)
+            
+            if (playlist != null) {
+                playlistDao.deletePlaylistById(playlist.playlistId)
+                Log.d(TAG, "Removed saved album: $albumName")
+                return@withContext true
+            }
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to unsave album", e)
+            false
+        }
+    }
+    
+    /**
+     * Check if an album is saved as a playlist
+     * 
+     * @param albumName The name of the album
+     * @param artistName The artist name
+     * @return true if album is saved, false otherwise
+     */
+    suspend fun isAlbumSaved(albumName: String, artistName: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val albumUrl = "saved_album://$artistName/$albumName"
+            playlistDao.getPlaylistByUrl(albumUrl) != null
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check if album is saved", e)
+            false
+        }
+    }
 }

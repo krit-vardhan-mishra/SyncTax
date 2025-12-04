@@ -22,7 +22,7 @@ fun FilterChipsRow(
     selectedChip: String = "All",
     onChipSelected: (String) -> Unit = {}
 ) {
-    val chips = listOf("All", "Quick Picks", "Listen Again", "Speed Dial", "Quick Access")
+    val chips = listOf("All", "Quick Picks", "Listen Again", "Speed Dial", "Playlists", "Quick Access")
 
     LazyRow(
         modifier = Modifier

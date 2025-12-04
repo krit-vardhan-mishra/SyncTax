@@ -254,40 +254,21 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 scaffoldState = scaffoldState,
                                 onBackClick = { navController.popBackStack() },
                                 onSongClick = { song ->
-                                    playerViewModel.playUrl(
-                                        url = "https://music.youtube.com/watch?v=${song.videoId}",
-                                        title = song.title,
-                                        artist = song.artist,
-                                        durationMs = (song.duration ?: 0) * 1000L,
-                                        thumbnailUrl = song.thumbnailUrl
-                                    )
+                                    // Play individual song WITH recommendations for continuous playback
+                                    playerViewModel.playOnlineSongEntityWithRecommendations(song)
                                 },
                                 onPlayAll = {
                                     val songs = playlistViewModel.detailState.value.songs
                                     if (songs.isNotEmpty()) {
-                                        val firstSong = songs.first()
-                                        playerViewModel.playUrl(
-                                            url = "https://music.youtube.com/watch?v=${firstSong.videoId}",
-                                            title = firstSong.title,
-                                            artist = firstSong.artist,
-                                            durationMs = (firstSong.duration ?: 0) * 1000L,
-                                            thumbnailUrl = firstSong.thumbnailUrl
-                                        )
-                                        // TODO: Add remaining songs to queue
+                                        // Play all playlist songs in order - NO recommendations
+                                        playerViewModel.playOnlineSongEntitiesPlaylist(songs, 0)
                                     }
                                 },
                                 onShuffle = {
-                                    val songs = playlistViewModel.detailState.value.songs.shuffled()
+                                    val songs = playlistViewModel.detailState.value.songs
                                     if (songs.isNotEmpty()) {
-                                        val firstSong = songs.first()
-                                        playerViewModel.playUrl(
-                                            url = "https://music.youtube.com/watch?v=${firstSong.videoId}",
-                                            title = firstSong.title,
-                                            artist = firstSong.artist,
-                                            durationMs = (firstSong.duration ?: 0) * 1000L,
-                                            thumbnailUrl = firstSong.thumbnailUrl
-                                        )
-                                        // TODO: Add remaining songs to queue
+                                        // Shuffle and play all playlist songs - NO recommendations
+                                        playerViewModel.playOnlineSongEntitiesShuffled(songs)
                                     }
                                 }
                             )
@@ -349,29 +330,18 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     },
                                     onSongClick = {}, // not used
                                     onPlayAll = {
-                                        // Play all online artist songs with queue
+                                        // Play all online artist songs with queue - NO recommendations
                                         playerViewModel.playRecommendedSongsPlaylist(artist.songs, 0)
                                     },
                                     onShuffle = {
-                                        // Shuffle and play all online artist songs
+                                        // Shuffle and play all online artist songs - NO recommendations
                                         playerViewModel.playRecommendedSongsShuffled(artist.songs)
                                     },
                                     isOnline = true,
                                     artistDetails = artist,
                                     onOnlineSongClick = { song ->
-                                        // Play clicked song with remaining songs as queue
-                                        val clickedIndex = artist.songs.indexOf(song)
-                                        if (clickedIndex >= 0) {
-                                            playerViewModel.playRecommendedSongsPlaylist(artist.songs, clickedIndex)
-                                        } else {
-                                            playerViewModel.playUrl(
-                                                url = song.watchUrl,
-                                                title = song.title,
-                                                artist = song.artist,
-                                                durationMs = 0L,
-                                                thumbnailUrl = song.thumbnail
-                                            )
-                                        }
+                                        // Play individual song WITH recommendations for continuous playback
+                                        playerViewModel.playRecommendedSongWithRecommendations(song)
                                     }
                                 )
                             }
@@ -383,25 +353,43 @@ fun MusicApp(userPreferences: UserPreferences) {
                             })
                         ) {
                             val uiState by homeViewModel.uiState.collectAsState()
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            
+                            // Track if album is saved
+                            var isAlbumSaved by remember { mutableStateOf(false) }
+                            
                             uiState.selectedAlbumSongs?.let { songs ->
                                 // Check for both "youtube:" and "online:" prefixes for online albums
                                 val isOnlineAlbum = songs.firstOrNull()?.id?.let { id ->
                                     id.startsWith("youtube:") || id.startsWith("online:")
                                 } == true
+                                
+                                val currentAlbumName = uiState.selectedAlbum ?: ""
+                                val currentArtistName = uiState.selectedAlbumArtist ?: ""
+                                val albumThumbnail = if (isOnlineAlbum) uiState.selectedOnlineAlbum?.thumbnail else songs.firstOrNull()?.albumArtUri
+                                
+                                // Check if album is saved when screen loads or album changes
+                                LaunchedEffect(currentAlbumName, currentArtistName) {
+                                    playlistViewModel.isAlbumSaved(currentAlbumName, currentArtistName) { saved ->
+                                        isAlbumSaved = saved
+                                    }
+                                }
+                                
                                 AlbumDetailScreen(
-                                    albumName = uiState.selectedAlbum ?: "",
-                                    artistName = uiState.selectedAlbumArtist ?: "",
+                                    albumName = currentAlbumName,
+                                    artistName = currentArtistName,
                                     songs = songs,
                                     onBackClick = { 
                                         navController.popBackStack() 
                                     },
                                     onSongClick = { song ->
                                         if (isOnlineAlbum) {
-                                            playerViewModel.playUrl(
-                                                url = song.filePath,
+                                            // Play individual song WITH recommendations for continuous playback
+                                            val videoId = song.id.removePrefix("youtube:").removePrefix("online:")
+                                            playerViewModel.playOnlineSongWithRecommendations(
+                                                videoId = videoId,
                                                 title = song.title,
                                                 artist = song.artist,
-                                                durationMs = song.duration,
                                                 thumbnailUrl = song.albumArtUri
                                             )
                                         } else {
@@ -410,7 +398,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     },
                                     onPlayAll = {
                                         if (isOnlineAlbum) {
-                                            // Play all online songs in order with queue
+                                            // Play all online songs in order with queue - NO recommendations
                                             playerViewModel.playOnlinePlaylist(songs, 0)
                                         } else {
                                             songs.firstOrNull()?.let { firstSong ->
@@ -420,7 +408,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     },
                                     onShuffle = {
                                         if (isOnlineAlbum) {
-                                            // Shuffle and play all online songs with queue
+                                            // Shuffle and play all online songs with queue - NO recommendations
                                             playerViewModel.playOnlinePlaylistShuffled(songs)
                                         } else {
                                             // Shuffle and play all offline songs
@@ -428,7 +416,30 @@ fun MusicApp(userPreferences: UserPreferences) {
                                         }
                                     },
                                     isOnline = isOnlineAlbum,
-                                    albumDetails = uiState.selectedOnlineAlbum
+                                    albumDetails = uiState.selectedOnlineAlbum,
+                                    isAlbumSaved = isAlbumSaved,
+                                    onSaveAlbumClick = {
+                                        playlistViewModel.saveAlbumAsPlaylist(
+                                            albumName = currentAlbumName,
+                                            artistName = currentArtistName,
+                                            thumbnailUrl = albumThumbnail,
+                                            songs = songs
+                                        ) { success ->
+                                            if (success) {
+                                                isAlbumSaved = true
+                                            }
+                                        }
+                                    },
+                                    onUnsaveAlbumClick = {
+                                        playlistViewModel.unsaveAlbum(
+                                            albumName = currentAlbumName,
+                                            artistName = currentArtistName
+                                        ) { success ->
+                                            if (success) {
+                                                isAlbumSaved = false
+                                            }
+                                        }
+                                    }
                                 )
                             }
                         }

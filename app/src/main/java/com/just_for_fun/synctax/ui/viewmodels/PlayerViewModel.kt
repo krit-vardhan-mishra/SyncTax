@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
+import com.just_for_fun.synctax.core.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.Format
 import com.just_for_fun.synctax.core.data.preferences.PlayerPreferences
@@ -530,7 +531,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         title = title,
                         artist = artist,
                         durationMs = durationMs,
-                        thumbnailUrl = finalThumbnailUrl
+                        thumbnailUrl = finalThumbnailUrl,
+                        skipRecommendationFetch = skipRecommendationFetch
                     )
                     return@launch
                 }
@@ -554,7 +556,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         title = title,
                         artist = artist,
                         durationMs = durationMs,
-                        thumbnailUrl = finalThumbnailUrl
+                        thumbnailUrl = finalThumbnailUrl,
+                        skipRecommendationFetch = skipRecommendationFetch
                     )
                 } else {
                     Log.e("PlayerViewModel", "❌ Failed to extract stream URL for: $videoId")
@@ -864,6 +867,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Play a list of RecommendedSong objects in order (for online artist/playlist playback)
      * Converts RecommendedSong to Song and sets remaining songs as "Up Next" queue
+     * This is used for "Play All" - no recommendations will be fetched
      */
     fun playRecommendedSongsPlaylist(recommendedSongs: List<com.just_for_fun.synctax.util.RecommendedSong>, startIndex: Int = 0) {
         val songs = recommendedSongs.map { rec ->
@@ -884,14 +888,102 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Play a list of RecommendedSong objects in shuffled order
+     * This is used for "Shuffle" - no recommendations will be fetched
      */
     fun playRecommendedSongsShuffled(recommendedSongs: List<com.just_for_fun.synctax.util.RecommendedSong>) {
         val shuffled = recommendedSongs.shuffled()
         playRecommendedSongsPlaylist(shuffled, 0)
     }
 
+    /**
+     * Play a single online song with recommendations
+     * This is used when user clicks on an individual song in artist/album/playlist detail screen
+     * Recommendations WILL be fetched for continuous playback
+     */
+    fun playOnlineSongWithRecommendations(
+        videoId: String,
+        title: String,
+        artist: String,
+        thumbnailUrl: String?
+    ) {
+        viewModelScope.launch {
+            // Clear existing queue and recommendations
+            playedRecommendationsHistory.clear()
+            _uiState.value = _uiState.value.copy(upNextRecommendations = emptyList())
+            
+            // Play the song - this will fetch recommendations automatically
+            playUrl(
+                url = "https://music.youtube.com/watch?v=$videoId",
+                title = title,
+                artist = artist,
+                durationMs = 0L,
+                thumbnailUrl = thumbnailUrl,
+                skipRecommendationFetch = false // Fetch recommendations for individual song click
+            )
+        }
+    }
+
+    /**
+     * Play a RecommendedSong with recommendations
+     * This is used when user clicks on an individual song in online artist detail screen
+     * Recommendations WILL be fetched for continuous playback
+     */
+    fun playRecommendedSongWithRecommendations(song: com.just_for_fun.synctax.util.RecommendedSong) {
+        playOnlineSongWithRecommendations(
+            videoId = song.videoId,
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = song.thumbnail
+        )
+    }
+
+    /**
+     * Play an OnlineSong with recommendations
+     * This is used when user clicks on an individual song in playlist detail screen
+     * Recommendations WILL be fetched for continuous playback
+     */
+    fun playOnlineSongEntityWithRecommendations(song: OnlineSong) {
+        playOnlineSongWithRecommendations(
+            videoId = song.videoId,
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = song.thumbnailUrl
+        )
+    }
+
+    /**
+     * Play a list of OnlineSong entities in order (for playlist detail "Play All")
+     * Sets the remaining songs as "Up Next" queue - NO recommendations fetched
+     */
+    fun playOnlineSongEntitiesPlaylist(songs: List<OnlineSong>, startIndex: Int = 0) {
+        val convertedSongs = songs.map { song ->
+            Song(
+                id = "youtube:${song.videoId}",
+                title = song.title,
+                artist = song.artist,
+                album = song.album,
+                duration = (song.duration ?: 0) * 1000L,
+                filePath = "https://music.youtube.com/watch?v=${song.videoId}",
+                genre = null,
+                releaseYear = null,
+                albumArtUri = song.thumbnailUrl
+            )
+        }
+        playOnlinePlaylist(convertedSongs, startIndex)
+    }
+
+    /**
+     * Play a list of OnlineSong entities in shuffled order (for playlist detail "Shuffle")
+     * NO recommendations fetched
+     */
+    fun playOnlineSongEntitiesShuffled(songs: List<OnlineSong>) {
+        val shuffledSongs = songs.shuffled()
+        playOnlineSongEntitiesPlaylist(shuffledSongs, 0)
+    }
+
     /** Play a remote stream using chunked progressive download for 30s segments.
      * This writes to a temp cache file and starts playback as soon as the first chunk is available.
+     * @param skipRecommendationFetch If true, don't fetch recommendations (used for playlist/album playback)
      */
     fun playChunkedStream(
         videoId: String,
@@ -899,7 +991,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         title: String,
         artist: String? = null,
         durationMs: Long = 0L,
-        thumbnailUrl: String? = null
+        thumbnailUrl: String? = null,
+        skipRecommendationFetch: Boolean = false
     ) {
         viewModelScope.launch {
             // Clean up tmp file from previous stream if it's complete
@@ -1071,6 +1164,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } catch (e: Exception) {
                     Log.w("PlayerViewModel", "📥 Metadata fetch failed for stream: ${e.message}")
                 }
+            }
+            
+            // Skip recommendation fetching if playing from a playlist/album (Play All or Shuffle)
+            if (skipRecommendationFetch) {
+                Log.d("PlayerViewModel", "🎵 Skipping recommendation fetch (playlist/album mode)")
+                // Don't clear upNextRecommendations - they were already set by playOnlinePlaylist
+                return@launch
             }
             
             // Fetch YouTube Music recommendations after stream extraction completes (songs only)

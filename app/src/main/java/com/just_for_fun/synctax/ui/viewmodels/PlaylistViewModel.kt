@@ -193,8 +193,8 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Delete a playlist
-     */
+ * Delete a playlist
+ */
     fun deletePlaylist(playlistId: Int) {
         viewModelScope.launch {
             playlistRepository.deletePlaylist(playlistId)
@@ -206,5 +206,63 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
      */
     fun clearDetailState() {
         _detailState.value = PlaylistDetailState()
+    }
+    
+    /**
+     * Save an album as a playlist
+     * 
+     * @param albumName The name of the album
+     * @param artistName The artist name
+     * @param thumbnailUrl The album thumbnail URL
+     * @param songs List of songs in the album
+     * @param onResult Callback with result (true if saved, false if failed)
+     */
+    fun saveAlbumAsPlaylist(
+        albumName: String,
+        artistName: String,
+        thumbnailUrl: String?,
+        songs: List<com.just_for_fun.synctax.core.data.local.entities.Song>,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = playlistRepository.saveAlbumAsPlaylist(albumName, artistName, thumbnailUrl, songs)
+            onResult(result != null)
+        }
+    }
+    
+    /**
+     * Remove a saved album
+     * 
+     * @param albumName The name of the album
+     * @param artistName The artist name
+     * @param onResult Callback with result (true if removed, false if failed)
+     */
+    fun unsaveAlbum(
+        albumName: String,
+        artistName: String,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = playlistRepository.unsaveAlbum(albumName, artistName)
+            onResult(result)
+        }
+    }
+    
+    /**
+     * Check if an album is saved
+     * 
+     * @param albumName The name of the album
+     * @param artistName The artist name
+     * @param onResult Callback with result (true if saved, false otherwise)
+     */
+    fun isAlbumSaved(
+        albumName: String,
+        artistName: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = playlistRepository.isAlbumSaved(albumName, artistName)
+            onResult(result)
+        }
     }
 }

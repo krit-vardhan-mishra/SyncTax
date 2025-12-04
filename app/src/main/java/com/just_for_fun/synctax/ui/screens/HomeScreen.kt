@@ -53,6 +53,7 @@ import com.just_for_fun.synctax.ui.components.onboarding.DirectorySelectionDialo
 import com.just_for_fun.synctax.ui.components.section.EmptyMusicState
 import com.just_for_fun.synctax.ui.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.ui.components.section.OnlineHistorySection
+import com.just_for_fun.synctax.ui.components.section.SavedPlaylistsSection
 import com.just_for_fun.synctax.ui.components.section.SectionHeader
 import com.just_for_fun.synctax.ui.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.ui.components.section.SpeedDialSection
@@ -78,7 +79,8 @@ fun HomeScreen(
     userPreferences: UserPreferences,
     onTrainClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
-    onNavigateToLibrary: () -> Unit = {}
+    onNavigateToLibrary: () -> Unit = {},
+    onNavigateToPlaylist: (Int) -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -358,6 +360,19 @@ fun HomeScreen(
                                             },
                                             userInitial = userInitial,
                                             currentSong = playerState.currentSong
+                                        )
+                                    }
+                                }
+
+                                // Saved Playlists Section (only show if there are saved playlists)
+                                if ((selectedFilter == "All" || selectedFilter == "Playlists") && uiState.savedPlaylists.isNotEmpty()) {
+                                    item {
+                                        SavedPlaylistsSection(
+                                            playlists = uiState.savedPlaylists,
+                                            onPlaylistClick = { playlist ->
+                                                onNavigateToPlaylist(playlist.playlistId)
+                                            },
+                                            onViewAllClick = onNavigateToLibrary
                                         )
                                     }
                                 }
