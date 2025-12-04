@@ -71,12 +71,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import android.app.Activity
+import android.os.Process
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.util.AppConfig
 import com.just_for_fun.synctax.util.AppIconManager
+import com.just_for_fun.synctax.ui.components.SnackbarUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
 
@@ -310,6 +317,7 @@ fun SettingsScreen(
     val userName by userPreferences.userName.collectAsState(initial = "")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Permission state and launcher logic remains the same for correctness
     var hasImagePermission by remember {
@@ -365,7 +373,8 @@ fun SettingsScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -483,6 +492,20 @@ fun SettingsScreen(
                                     selectedIconId = iconOption.id
                                     // Apply icon change using AppIconManager
                                     AppIconManager.setIconById(context, iconOption.id)
+                                    
+                                    // Show snackbar and close app
+                                    scope.launch {
+                                        SnackbarUtils.ShowSnackbar(
+                                            scope = scope,
+                                            snackbarHostState = snackbarHostState,
+                                            message = "App icon changed! Restarting app...",
+                                            duration = androidx.compose.material3.SnackbarDuration.Short
+                                        )
+                                        // Wait for snackbar to show
+                                        delay(1500)
+                                        // Close the app
+                                        (context as? Activity)?.finishAffinity() ?: Process.killProcess(Process.myPid())
+                                    }
                                 }
                             )
                         }

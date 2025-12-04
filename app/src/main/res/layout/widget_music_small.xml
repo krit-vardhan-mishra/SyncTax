@@ -11,7 +11,7 @@
         android:id="@+id/widget_album_art"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:src="@mipmap/ic_launcher"
+        android:src="@mipmap/app_icon_main"
         android:scaleType="centerCrop"
         android:background="@drawable/album_art_background"
         android:layout_centerVertical="true"

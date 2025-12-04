@@ -111,7 +111,7 @@ class MusicInfoWidgetProvider : AppWidgetProvider() {
                     }
                 }
             } else {
-                views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
+                views.setImageViewResource(R.id.widget_album_art, R.mipmap.app_icon_main)
             }
 
             appWidgetManager.updateAppWidget(appWidgetId, views)

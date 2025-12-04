@@ -379,7 +379,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                     }
                 }
             } else {
-                views.setImageViewResource(R.id.widget_album_art, R.mipmap.ic_launcher)
+                views.setImageViewResource(R.id.widget_album_art, R.mipmap.app_icon_main)
             }
 
             // Apply the update

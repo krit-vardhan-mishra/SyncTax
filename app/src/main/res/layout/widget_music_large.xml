@@ -15,7 +15,7 @@
         android:background="@drawable/album_art_background"
         android:clipToOutline="true"
         android:scaleType="centerCrop"
-        android:src="@mipmap/ic_launcher"
+        android:src="@mipmap/app_icon_main"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
         tools:ignore="ContentDescription" />

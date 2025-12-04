@@ -8,7 +8,7 @@
     android:minResizeHeight="60dp"
     android:maxResizeWidth="400dp"
     android:maxResizeHeight="400dp"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewImage="@mipmap/app_icon_main"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
     android:targetCellHeight="2"
