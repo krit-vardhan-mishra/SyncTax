@@ -71,12 +71,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
 import com.just_for_fun.synctax.util.AppConfig
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 /**
  * Data class representing an app icon option
@@ -184,81 +184,6 @@ private fun AssetIconPreviewCard(
     }
 }
 
-// Helper component for Icon Preview Cards
-@Composable
-private fun IconPreviewCard(
-    iconRes: Int,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val iconDrawable = remember(iconRes) {
-        ContextCompat.getDrawable(context, iconRes)
-    }
-    val iconBitmap = remember(iconDrawable) {
-        iconDrawable?.toBitmap()?.asImageBitmap()
-    }
-    
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            width = 2.dp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-        ),
-        modifier = modifier
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(12.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                iconBitmap?.let { bitmap ->
-                    Image(
-                        bitmap = bitmap,
-                        contentDescription = label,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-            }
-            
-            Spacer(Modifier.height(8.dp))
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-                
-                if (isSelected) {
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = "Selected",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
 // Helper component for Theme Radio Button Rows
 @Composable
 private fun ThemeOptionRow(label: String, selected: Boolean, onSelect: () -> Unit) {
@@ -340,7 +265,8 @@ private fun NumericalSetting(
 fun SettingsScreen(
     userPreferences: UserPreferences,
     onBackClick: () -> Unit,
-    onScanTrigger: () -> Unit = {}
+    onScanTrigger: () -> Unit = {},
+    onNavigateToPlaylists: () -> Unit = {}
 ) {
     val themeMode by userPreferences.themeMode.collectAsState(initial = UserPreferences.KEY_THEME_MODE_SYSTEM)
     val scanPaths by userPreferences.scanPaths.collectAsState(initial = emptyList())
@@ -482,7 +408,7 @@ fun SettingsScreen(
             // --- Contributor Features (Hidden) ---
             if (AppConfig.isCreator(context, userName)) {
                 item {
-                    Text("🎨 Contributor Features", style = MaterialTheme.typography.titleLarge)
+                    Text("Contributor Features", style = MaterialTheme.typography.titleLarge)
                     Spacer(Modifier.height(8.dp))
 
                     // App Icon Variants with Visual Previews - Telegram Style
@@ -659,7 +585,7 @@ fun SettingsScreen(
 
             // User-added scan paths
             items(scanPaths) { uriString ->
-                val uri = runCatching { Uri.parse(uriString) }.getOrNull()
+                val uri = runCatching { uriString.toUri() }.getOrNull()
                 val displayName = remember(uri) {
                     uri?.let { DocumentFile.fromTreeUri(context, it)?.name ?: "External Folder" } ?: "Invalid Path"
                 }
@@ -694,6 +620,10 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }

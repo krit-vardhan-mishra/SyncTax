@@ -33,6 +33,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -435,8 +436,12 @@ fun MusicApp(userPreferences: UserPreferences) {
                 }
             }
 
+            // Get current route to determine navigation bar visibility
+            val navBackStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = navBackStackEntry?.destination?.route
+
             AnimatedVisibility(
-                visible = !isPlayerExpanded,
+                visible = !isPlayerExpanded && currentRoute != "train" && currentRoute != "settings",
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it })
             ) {

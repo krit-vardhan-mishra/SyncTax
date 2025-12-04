@@ -1,5 +1,6 @@
 package com.just_for_fun.synctax.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,8 @@ import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlaylistViewModel
 
+private const val TAG = "PlaylistScreen"
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PlaylistScreen(
@@ -62,6 +65,11 @@ fun PlaylistScreen(
     val userInitial = userPreferences.getUserInitial()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+
+    // Debug: Log when PlaylistScreen is composed
+    LaunchedEffect(Unit) {
+        Log.d(TAG, "PlaylistScreen composed - screen is now active")
+    }
 
     // Update background when song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -90,18 +98,27 @@ fun PlaylistScreen(
                 showShuffleButton = false,
                 showRefreshButton = true,
                 showProfileButton = true,
-                onRefreshClick = { playlistViewModel.reloadPlaylists() },
+                onRefreshClick = { 
+                    Log.d(TAG, "Refresh button clicked")
+                    playlistViewModel.reloadPlaylists() 
+                },
                 userPreferences = userPreferences,
                 userName = userName,
                 userInitial = userInitial,
                 sortOption = null,
                 currentTab = 0,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = {
+                    Log.d(TAG, "Settings button clicked")
+                    onOpenSettings()
+                }
             )
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onImportClick,
+                onClick = {
+                    Log.d(TAG, "Import FAB clicked")
+                    onImportClick()
+                },
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -122,7 +139,10 @@ fun PlaylistScreen(
         ) {
             if (uiState.playlists.isEmpty() && !uiState.isLoading) {
                 // Empty state
-                EmptyPlaylistsState(onImportClick = onImportClick)
+                EmptyPlaylistsState(onImportClick = {
+                    Log.d(TAG, "Empty state Import clicked")
+                    onImportClick()
+                })
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -146,7 +166,10 @@ fun PlaylistScreen(
                     items(uiState.playlists) { playlist ->
                         PlaylistCard(
                             playlist = playlist,
-                            onClick = { onPlaylistClick(playlist.playlistId) }
+                            onClick = { 
+                                Log.d(TAG, "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})")
+                                onPlaylistClick(playlist.playlistId) 
+                            }
                         )
                     }
                 }

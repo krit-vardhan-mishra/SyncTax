@@ -149,7 +149,7 @@ fun AppNavigationBar(
     }
 
     if (showLibraryBottomSheet) {
-        ModalBottomSheet(onDismissRequest = { }) {
+        ModalBottomSheet(onDismissRequest = { showLibraryBottomSheet = false }) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -164,6 +164,7 @@ fun AppNavigationBar(
                     text = "Library",
                     selected = currentRoute == "library",
                     onClick = {
+                        showLibraryBottomSheet = false
                         if (currentRoute != "library") {
                             navController.navigate("library") {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -180,6 +181,7 @@ fun AppNavigationBar(
                     text = "Playlists",
                     selected = currentRoute == "playlists",
                     onClick = {
+                        showLibraryBottomSheet = false
                         navController.navigate("playlists") {
                             popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
