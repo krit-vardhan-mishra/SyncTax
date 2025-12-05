@@ -24,15 +24,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -177,6 +175,14 @@ fun HomeScreen(
         }
     }
 
+    // Show error from uiState via Snackbar (auto-dismiss)
+    LaunchedEffect(uiState.error) {
+        uiState.error?.takeIf { it.isNotBlank() }?.let { error ->
+            SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, error)
+            homeViewModel.dismissError()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -200,8 +206,7 @@ fun HomeScreen(
                     userName = userName,
                     userInitial = userInitial
                 )
-            },
-            snackbarHost = { SnackbarHost(snackbarHostState) }
+            }
         ) { paddingValues ->
             DynamicAlbumBackground(
                 albumColors = albumColors,
@@ -396,8 +401,9 @@ fun HomeScreen(
                                     }
 
                                     item {
-                                        Divider(
-                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            color = AppColors.divider
                                         )
                                     }
 
@@ -423,8 +429,9 @@ fun HomeScreen(
                                     }
 
                                     item {
-                                        Divider(
-                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            color = AppColors.divider
                                         )
                                     }
 
@@ -440,8 +447,9 @@ fun HomeScreen(
                                     }
                                     
                                     item {
-                                        Divider(
-                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(horizontal = 16.dp),
+                                            color = AppColors.divider
                                         )
                                     }
                                     
@@ -474,22 +482,6 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Snackbar for errors
-                uiState.error?.let { error ->
-                    Snackbar(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(16.dp),
-                        action = {
-                            TextButton(onClick = { homeViewModel.dismissError() }) {
-                                Text("Dismiss")
-                            }
-                        }
-                    ) {
-                        Text(error)
-                    }
-                }
-
                 // Training indicator
                 AnimatedVisibility(
                     visible = uiState.isTraining,
@@ -558,5 +550,13 @@ fun HomeScreen(
                 }
             }
         }
+        
+        // Snackbar positioned above mini player
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (playerState.currentSong != null) 90.dp else 16.dp)
+        )
     }
 }

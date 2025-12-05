@@ -21,6 +21,7 @@ import com.just_for_fun.synctax.presentation.model.SearchFilterType
 import com.just_for_fun.synctax.core.utils.AlbumDetails
 import com.just_for_fun.synctax.core.utils.ArtistDetails
 import com.just_for_fun.synctax.core.utils.YTMusicRecommender
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -132,6 +133,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         refreshSections()
                     }
                 }
+            } catch (e: CancellationException) {
+                // Coroutine cancellation is expected, don't show as error
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -173,6 +177,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 
                 // Refresh all sections after scanning
                 refreshSections()
+            } catch (e: CancellationException) {
+                // Coroutine cancellation is expected, don't show as error
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
@@ -314,6 +321,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     isSearchingOnline = false,
                     onlineSearchResults = results
                 )
+            } catch (e: CancellationException) {
+                // Coroutine cancellation is expected, don't show as error
+                _uiState.value = _uiState.value.copy(isSearchingOnline = false)
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSearchingOnline = false,
@@ -404,6 +415,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 // Update Speed Dial with top 9 recommendations
                 speedDialManager.updateRecommendations(recommendedSongs)
                 speedDialManager.setGenerating(false)
+            } catch (e: CancellationException) {
+                // Coroutine cancellation is expected, don't show as error
+                speedDialManager.setGenerating(false)
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isGeneratingRecommendations = false,
@@ -442,6 +457,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Refresh all sections after scanning
                 refreshSections()
+            } catch (e: CancellationException) {
+                // Coroutine cancellation is expected, don't show as error
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isScanning = false,
@@ -476,6 +494,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             isTraining = false,
                             trainingComplete = true
                         )
+                    } catch (e: CancellationException) {
+                        // Coroutine cancellation is expected, don't show as error
+                        throw e
                     } catch (e: Exception) {
                         _uiState.value = _uiState.value.copy(
                             isTraining = false,
@@ -643,6 +664,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 loadModelStatus()
                 loadTrainingStatistics()
 
+            } catch (e: CancellationException) {
+                // Coroutine cancellation is expected, don't show as error
+                _uiState.value = _uiState.value.copy(
+                    isTraining = false,
+                    trainingProgress = 0f,
+                    currentTrainingPhase = ""
+                )
+                throw e
             } catch (e: Exception) {
                 val endTime = System.currentTimeMillis()
                 logs.add("Training failed: ${e.message}")

@@ -6,11 +6,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.presentation.model.SearchFilterType
-import com.just_for_fun.synctax.presentation.ui.theme.ChipSelected
-import com.just_for_fun.synctax.presentation.ui.theme.ChipUnselected
+import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 
 /**
  * Filter chips for search results
@@ -93,15 +91,15 @@ private fun FilterChipItem(
         onClick = onClick,
         label = { Text(label) },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = ChipSelected,
-            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-            containerColor = ChipUnselected,
-            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+            selectedContainerColor = AppColors.chipSelected,
+            selectedLabelColor = AppColors.chipSelectedText,
+            containerColor = AppColors.chipUnselected,
+            labelColor = AppColors.chipUnselectedText
         ),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            selectedBorderColor = Color.White,
+            selectedBorderColor = AppColors.chipSelectedBorder,
             borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
         ),
         shape = MaterialTheme.shapes.medium,

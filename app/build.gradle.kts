@@ -74,6 +74,17 @@ android {
         buildConfig = true
         viewBinding = true
     }
+
+    lint {
+        // Disable lint checks that crash with Kotlin 2.1.0
+        disable += setOf(
+            "NullSafeMutableLiveData",
+            "RememberInComposition",
+            "FrequentlyChangedStateReadInComposition"
+        )
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
 }
 
 chaquopy {

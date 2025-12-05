@@ -570,6 +570,14 @@ object AppColors {
         @Composable @ReadOnlyComposable
         get() = Color.White
     
+    val snackbarContent: Color
+        @Composable @ReadOnlyComposable
+        get() = Color.White
+    
+    val snackbarAction: Color
+        @Composable @ReadOnlyComposable
+        get() = if (isSystemInDarkTheme()) AccentPrimary else LightAccentPrimary
+    
     // Dialog
     val dialogBackground: Color
         @Composable @ReadOnlyComposable
