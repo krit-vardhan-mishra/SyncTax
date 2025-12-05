@@ -7,7 +7,7 @@ import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
-import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow

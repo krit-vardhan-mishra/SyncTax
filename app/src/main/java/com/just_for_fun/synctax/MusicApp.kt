@@ -37,23 +37,24 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.components.app.AppNavigationBar
-import com.just_for_fun.synctax.ui.components.player.PlayerBottomSheet
-import com.just_for_fun.synctax.ui.screens.AlbumDetailScreen
-import com.just_for_fun.synctax.ui.screens.ArtistDetailScreen
-import com.just_for_fun.synctax.ui.screens.HomeScreen
-import com.just_for_fun.synctax.ui.screens.ImportPlaylistScreen
-import com.just_for_fun.synctax.ui.screens.LibraryScreen
-import com.just_for_fun.synctax.ui.screens.PlaylistDetailScreen
-import com.just_for_fun.synctax.ui.screens.PlaylistScreen
-import com.just_for_fun.synctax.ui.screens.QuickPicksScreen
-import com.just_for_fun.synctax.ui.screens.SearchScreen
-import com.just_for_fun.synctax.ui.screens.SettingsScreen
-import com.just_for_fun.synctax.ui.screens.TrainingScreen
-import com.just_for_fun.synctax.ui.screens.WelcomeScreen
-import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import com.just_for_fun.synctax.ui.viewmodels.PlaylistViewModel
+import com.just_for_fun.synctax.presentation.components.app.AppNavigationBar
+import com.just_for_fun.synctax.presentation.components.player.PlayerBottomSheet
+import com.just_for_fun.synctax.presentation.screens.AlbumDetailScreen
+import com.just_for_fun.synctax.presentation.screens.ArtistDetailScreen
+import com.just_for_fun.synctax.presentation.screens.HomeScreen
+import com.just_for_fun.synctax.presentation.screens.ImportPlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.LibraryScreen
+import com.just_for_fun.synctax.presentation.screens.PlaylistDetailScreen
+import com.just_for_fun.synctax.presentation.screens.PlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.QuickPicksScreen
+import com.just_for_fun.synctax.presentation.screens.SearchScreen
+import com.just_for_fun.synctax.presentation.screens.SettingsScreen
+import com.just_for_fun.synctax.presentation.screens.TrainingScreen
+import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
+import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +76,7 @@ fun MusicApp(userPreferences: UserPreferences) {
     val navController = rememberNavController()
     val playerViewModel: PlayerViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
-    val dynamicBgViewModel: com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel =
+    val dynamicBgViewModel: DynamicBackgroundViewModel =
         viewModel()
 
     // --- HOISTED STATE ---

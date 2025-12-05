@@ -2,7 +2,7 @@ package com.just_for_fun.synctax.core.ml
 
 import android.content.Context
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyMusicAnalyzer
-import com.just_for_fun.synctax.core.data.local.MusicDatabase
+import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.core.ml.agents.*
 import com.just_for_fun.synctax.core.ml.models.*
 import com.just_for_fun.synctax.core.utils.VectorDatabase
@@ -203,8 +203,8 @@ class MusicRecommendationManager(private val context: Context) {
      */
     private suspend fun extractSongFeatures(
         songId: String,
-        history: List<com.just_for_fun.synctax.core.data.local.entities.ListeningHistory>,
-        preferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        history: List<com.just_for_fun.synctax.data.local.entities.ListeningHistory>,
+        preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): SongFeatures {
         val song = database.songDao().getSongById(songId)
         val pref = preferences.find { it.songId == songId }
@@ -241,7 +241,7 @@ class MusicRecommendationManager(private val context: Context) {
     }
 
     private fun calculateTimeOfDayMatch(
-        songHistory: List<com.just_for_fun.synctax.core.data.local.entities.ListeningHistory>,
+        songHistory: List<com.just_for_fun.synctax.data.local.entities.ListeningHistory>,
         currentHour: Int
     ): Double {
         if (songHistory.isEmpty()) return 0.5
@@ -257,7 +257,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private suspend fun calculateGenreAffinity(
         genre: String?,
-        preferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): Double {
         if (genre == null) return 0.5
 
@@ -273,7 +273,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private suspend fun calculateArtistAffinity(
         artist: String?,
-        preferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): Double {
         if (artist == null) return 0.5
 
@@ -288,7 +288,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private fun calculateConsecutivePlays(
         songId: String,
-        history: List<com.just_for_fun.synctax.core.data.local.entities.ListeningHistory>
+        history: List<com.just_for_fun.synctax.data.local.entities.ListeningHistory>
     ): Double {
         var maxConsecutive = 0
         var currentConsecutive = 0
@@ -307,7 +307,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private fun calculateSessionContext(
         songId: String,
-        history: List<com.just_for_fun.synctax.core.data.local.entities.ListeningHistory>
+        history: List<com.just_for_fun.synctax.data.local.entities.ListeningHistory>
     ): Double {
         // Check if song was played in recent session (last 30 minutes)
         val thirtyMinutesAgo = System.currentTimeMillis() - 30 * 60 * 1000
@@ -318,7 +318,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private suspend fun calculateDurationScore(
         duration: Long,
-        preferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): Double {
         if (duration == 0L || preferences.isEmpty()) return 0.5
         
@@ -340,7 +340,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private suspend fun calculateAlbumAffinity(
         album: String?,
-        preferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): Double {
         if (album.isNullOrEmpty()) return 0.5
 
@@ -355,7 +355,7 @@ class MusicRecommendationManager(private val context: Context) {
 
     private suspend fun calculateReleaseYearScore(
         releaseYear: Int?,
-        preferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): Double {
         if (releaseYear == null || preferences.isEmpty()) return 0.5
         
@@ -382,8 +382,8 @@ class MusicRecommendationManager(private val context: Context) {
     }
 
     private fun calculateSongPopularity(
-        pref: com.just_for_fun.synctax.core.data.local.entities.UserPreference?,
-        allPreferences: List<com.just_for_fun.synctax.core.data.local.entities.UserPreference>
+        pref: com.just_for_fun.synctax.data.local.entities.UserPreference?,
+        allPreferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): Double {
         if (pref == null || allPreferences.isEmpty()) return 0.0
         

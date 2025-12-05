@@ -17,9 +17,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import com.just_for_fun.synctax.core.service.MusicService
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.ui.theme.SynctaxTheme
+import com.just_for_fun.synctax.presentation.ui.theme.SynctaxTheme
 
 class MainActivity : ComponentActivity() {
 

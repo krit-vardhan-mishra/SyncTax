@@ -169,7 +169,7 @@ class UserPreferences(context: Context) {
 
         // new: key for scan paths
         private const val KEY_SCAN_PATHS = "scan_paths"
-        
+
         // Album art scanning from local library
         private const val KEY_SCAN_LOCAL_ALBUM_ART = "scan_local_album_art"
 

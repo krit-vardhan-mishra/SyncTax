@@ -125,13 +125,13 @@
         </activity-alias>
 
         <service
-            android:name=".service.MusicService"
+            android:name=".core.service.MusicService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver
-            android:name=".widget.MusicWidgetProvider"
+            android:name=".presentation.ui.widget.MusicWidgetProvider"
             android:exported="true"
             android:label="Music Player">
             <intent-filter>
@@ -147,7 +147,7 @@
         </receiver>
 
         <receiver
-            android:name=".widget.MusicInfoWidgetProvider"
+            android:name=".presentation.ui.widget.MusicInfoWidgetProvider"
             android:exported="true"
             android:label="Music Info">
             <intent-filter>

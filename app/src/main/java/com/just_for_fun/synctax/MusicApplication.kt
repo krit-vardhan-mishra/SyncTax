@@ -16,7 +16,7 @@ import coil.request.Options
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import com.just_for_fun.synctax.core.network.NewPipeUtils
-import com.just_for_fun.synctax.util.YTMusicRecommender
+import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

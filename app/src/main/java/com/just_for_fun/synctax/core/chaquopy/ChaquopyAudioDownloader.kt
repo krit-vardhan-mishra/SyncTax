@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
-import com.just_for_fun.synctax.core.data.model.Format
+import com.just_for_fun.synctax.data.model.Format
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -119,11 +119,11 @@ class ChaquopyAudioDownloader private constructor(context: Context) {
 
                 // Parse formats with all available metadata
                 val formatsArray = result.optJSONArray("formats")
-                val formats = mutableListOf<com.just_for_fun.synctax.core.data.model.Format>()
+                val formats = mutableListOf<com.just_for_fun.synctax.data.model.Format>()
                 if (formatsArray != null) {
                     for (i in 0 until formatsArray.length()) {
                         val formatJson = formatsArray.getJSONObject(i)
-                        val format = com.just_for_fun.synctax.core.data.model.Format(
+                        val format = com.just_for_fun.synctax.data.model.Format(
                             format_id = formatJson.optString("format_id", ""),
                             container = formatJson.optString(
                                 "container",
