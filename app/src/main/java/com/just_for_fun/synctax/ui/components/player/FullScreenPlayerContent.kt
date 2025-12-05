@@ -3,10 +3,12 @@ package com.just_for_fun.synctax.ui.components.player
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,19 +23,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
@@ -51,10 +40,23 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.VolumeUp
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -81,14 +83,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.data.local.entities.Song
 import com.just_for_fun.synctax.core.data.model.LyricLine
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.ui.components.SnackbarUtils.ShowSnackbar
-import com.just_for_fun.synctax.ui.components.utils.FormatSelectionDialog
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
+import com.just_for_fun.synctax.ui.components.utils.FormatSelectionDialog
 import com.just_for_fun.synctax.ui.guide.GuideContent
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
+import com.just_for_fun.synctax.ui.theme.LightPlayerAccent
+import com.just_for_fun.synctax.ui.theme.LightPlayerSurfaceVariant
+import com.just_for_fun.synctax.ui.theme.LightPlayerTextPrimary
+import com.just_for_fun.synctax.ui.theme.LightPlayerTextSecondary
 import com.just_for_fun.synctax.ui.theme.PlayerAccent
 import com.just_for_fun.synctax.ui.theme.PlayerIconColor
 import com.just_for_fun.synctax.ui.theme.PlayerOnAccent
@@ -99,11 +106,10 @@ import com.just_for_fun.synctax.ui.theme.PlayerTextSecondary
 import com.just_for_fun.synctax.ui.viewmodels.LyricsViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.util.AppConfig
-import com.just_for_fun.synctax.R
-import kotlin.math.abs
-import io.github.fletchmckee.liquid.rememberLiquidState
 import io.github.fletchmckee.liquid.liquefiable
+import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 // Function to get current lyric line based on position
 fun getCurrentLyricLine(lyrics: List<LyricLine>, position: Long): Int {
@@ -154,6 +160,7 @@ fun FullScreenPlayerContent(
 ) {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val isDarkTheme = isSystemInDarkTheme()
 
 
     // Get LyricsViewModel for lyrics functionality
@@ -266,13 +273,16 @@ fun FullScreenPlayerContent(
             // Show download progress bar at bottom when downloading
             if (uiState.downloadingSongs.contains(song.id)) {
                 val progress = animatedProgress
+                val progressBarColor = if (isDarkTheme) Color(0xFF4CAF50) else Color.White
+                val trackColor = if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.2f)
+                
                 LinearProgressIndicator(
                     progress = progress,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp),
-                    color = Color(0xFF4CAF50), // Bright green color
-                    trackColor = Color.White.copy(alpha = 0.3f),
+                    color = progressBarColor,
+                    trackColor = trackColor,
                 )
             }
         }
@@ -343,28 +353,6 @@ fun FullScreenPlayerContent(
                             contentDescription = "Options",
                             tint = PlayerIconColor
                         )
-                    }
-
-                    // Contributor Badge (only for creators)
-                    if (AppConfig.isCreator(context, userPreferences.userName.collectAsState().value ?: "")) {
-                        Surface(
-                            color = Color(0xFFFFF3E0),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color(0xFFFFCC02)),
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Icon(
-                                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_code),
-                                    contentDescription = "Contributor",
-                                    tint = Color(0xFFE65100),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -626,7 +614,13 @@ fun FullScreenPlayerContent(
                                 isDownloading = isDownloading,
                                 isDownloaded = isDownloaded,
                                 downloadProgress = downloadProgress,
-                                onClick = { playerViewModel.startDownloadProcess() }
+                                onClick = {
+                                    if (isDownloading) {
+                                        showCancelDownloadDialog = true
+                                    } else {
+                                        playerViewModel.startDownloadProcess()
+                                    }
+                                }
                             )
                         }
                     }
@@ -657,7 +651,7 @@ fun FullScreenPlayerContent(
 
                     // Optional: Download Progress for Online songs
                     val downloadPercentInt = (animatedProgress.times(100f).toInt()).coerceIn(0, 100)
-                    if (downloadPercentInt in 1..99) {
+                    if (downloadPercentInt in 1..99 && uiState.downloadingSongs.contains(song.id)) {
                         Text(
                             text = "Downloading $downloadPercentInt%",
                             style = MaterialTheme.typography.labelSmall,
@@ -989,6 +983,32 @@ fun FullScreenPlayerContent(
                 }
             )
         }
+
+        // Cancel Download Dialog
+        if (showCancelDownloadDialog) {
+            AlertDialog(
+                onDismissRequest = { showCancelDownloadDialog = false },
+                title = { Text("Cancel Download") },
+                text = { Text("Are you sure you want to cancel the download?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            playerViewModel.cancelDownload(song.id)
+                            showCancelDownloadDialog = false
+                        }
+                    ) {
+                        Text("Yes", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showCancelDownloadDialog = false }
+                    ) {
+                        Text("No")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -1007,10 +1027,20 @@ fun RecommendedSongItem(
     index: Int,
     onClick: () -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+
+    // Theme-aware colors
+    val surfaceColor = if (isDarkTheme) PlayerSurfaceVariant.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.9f)
+    val indexColor = if (isDarkTheme) PlayerTextSecondary else LightPlayerTextSecondary
+    val thumbnailBackground = if (isDarkTheme) PlayerSurfaceVariant else LightPlayerSurfaceVariant
+    val titleColor = if (isDarkTheme) PlayerTextPrimary else LightPlayerTextPrimary
+    val artistColor = if (isDarkTheme) PlayerTextSecondary else LightPlayerTextSecondary
+    val playIconColor = if (isDarkTheme) PlayerAccent else LightPlayerAccent
+
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
-        color = PlayerSurfaceVariant.copy(alpha = 0.3f),
+        color = surfaceColor,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
@@ -1026,7 +1056,7 @@ fun RecommendedSongItem(
                 text = "$index",
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
-                color = PlayerTextSecondary,
+                color = indexColor,
                 modifier = Modifier.width(32.dp)
             )
             
@@ -1038,7 +1068,7 @@ fun RecommendedSongItem(
                 modifier = Modifier
                     .size(56.dp)
                     .shadow(4.dp, RoundedCornerShape(8.dp))
-                    .background(PlayerSurfaceVariant, RoundedCornerShape(8.dp))
+                    .background(thumbnailBackground, RoundedCornerShape(8.dp))
             )
             
             Spacer(modifier = Modifier.width(12.dp))
@@ -1051,7 +1081,7 @@ fun RecommendedSongItem(
                     text = song.title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    color = PlayerTextPrimary,
+                    color = titleColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1059,7 +1089,7 @@ fun RecommendedSongItem(
                 Text(
                     text = song.artist,
                     style = MaterialTheme.typography.bodySmall,
-                    color = PlayerTextSecondary,
+                    color = artistColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1069,7 +1099,7 @@ fun RecommendedSongItem(
             Icon(
                 imageVector = Icons.Rounded.PlayArrow,
                 contentDescription = "Play",
-                tint = PlayerAccent,
+                tint = playIconColor,
                 modifier = Modifier.size(32.dp)
             )
         }

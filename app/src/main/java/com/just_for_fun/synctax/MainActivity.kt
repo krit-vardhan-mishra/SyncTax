@@ -19,7 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.ui.theme.synctaxTheme
+import com.just_for_fun.synctax.ui.theme.SynctaxTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
-            synctaxTheme(darkTheme = darkTheme) {
+            SynctaxTheme(darkTheme = darkTheme) {
                 MusicApp(userPreferences = userPreferences)
             }
         }

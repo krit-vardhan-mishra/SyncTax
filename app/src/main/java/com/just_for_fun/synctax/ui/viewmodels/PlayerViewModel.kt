@@ -361,6 +361,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Update notification
             updateNotification()
             
+            // Preload the current song's stream URL for instant playback when user presses play
+            Log.d("PlayerViewModel", "🚀 Preloading stream for restored song: ${onlineSong.title}")
+            preloadManager.preloadSong(onlineSong)
+            
             // Fetch recommendations for the restored song
             if (onlineState.videoId.isNotEmpty()) {
                 fetchRecommendationsForVideoId(onlineState.videoId)

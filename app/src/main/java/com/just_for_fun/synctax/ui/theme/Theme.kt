@@ -52,44 +52,44 @@ private val YTMusicDarkColorScheme = darkColorScheme(
 
 // YouTube Music Light Theme Colors
 private val YTMusicLightColorScheme = lightColorScheme(
-    primary = Color(0xFFFF0033),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFDAD6),
+    primary = LightAccentPrimary,
+    onPrimary = LightButtonPrimaryText,
+    primaryContainer = LightAccentPressed,
     onPrimaryContainer = Color(0xFF7C1E1F),
 
-    secondary = Color(0xFF6A1B9A),
+    secondary = LightAccentSecondary,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF3E5F5),
+    secondaryContainer = LightAccentTertiary,
     onSecondaryContainer = Color(0xFF1A237E),
 
-    tertiary = Color(0xFF2E7D32),
+    tertiary = LightAccentTertiary,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFC8E6C9),
+    tertiaryContainer = LightSuccessBackground,
     onTertiaryContainer = Color(0xFF1B5E20),
 
-    error = Color(0xFFBA1A1A),
+    error = LightErrorText,
     onError = Color.White,
-    errorContainer = Color(0xFFFFDAD6),
+    errorContainer = LightErrorBackground,
     onErrorContainer = Color(0xFF410002),
 
-    background = Color(0xFFFFFBFE),
-    onBackground = Color(0xFF1C1B1F),
+    background = LightMainBackground,
+    onBackground = LightTextTitle,
 
-    surface = Color(0xFFFFFBFE),
-    onSurface = Color(0xFF1C1B1F),
-    surfaceVariant = Color(0xFFF5F5F5),
-    onSurfaceVariant = Color(0xFF49454F),
+    surface = LightAppBarBackground,
+    onSurface = LightTextTitle,
+    surfaceVariant = LightCardBackground,
+    onSurfaceVariant = LightTextBody,
 
-    surfaceContainer = Color(0xFFF0F0F0),
-    surfaceContainerHigh = Color(0xFFE8E8E8),
-    surfaceContainerHighest = Color(0xFFE0E0E0),
+    surfaceContainer = LightCardBackground,
+    surfaceContainerHigh = LightCardBackground,
+    surfaceContainerHighest = LightCardBackground,
 
-    outline = Color(0xFF79747E),
-    outlineVariant = Color(0xFFCAC4D0)
+    outline = LightCardBorder,
+    outlineVariant = LightInputBorder
 )
 
 @Composable
-fun synctaxTheme(
+fun SynctaxTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Disabled by default for YT Music theme
     content: @Composable () -> Unit

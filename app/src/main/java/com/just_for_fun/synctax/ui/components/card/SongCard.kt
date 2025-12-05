@@ -80,7 +80,10 @@ fun SongCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = false,
-    onDelete: ((Song) -> Unit)? = null
+    onDelete: ((Song) -> Unit)? = null,
+    backgroundColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    titleColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    artistColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -114,7 +117,7 @@ fun SongCard(
         Surface(
             modifier = Modifier.size(56.dp),
             shape = RoundedCornerShape(4.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest
+            color = backgroundColor
         ) {
             if (song.albumArtUri.isNullOrEmpty()) {
                 Box(
@@ -162,14 +165,14 @@ fun SongCard(
                 color = if (isPlaying)
                     MaterialTheme.colorScheme.primary
                 else
-                    MaterialTheme.colorScheme.onSurface,
+                    titleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "${song.artist} • ${song.album ?: "Unknown Album"}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = artistColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

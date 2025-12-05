@@ -40,11 +40,16 @@ import com.just_for_fun.synctax.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
-import kotlinx.coroutines.delay
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.just_for_fun.synctax.ui.theme.LightWelcomeBackground
+import com.just_for_fun.synctax.ui.theme.LightWelcomeTitle
+import com.just_for_fun.synctax.ui.theme.LightWelcomeSubtitle
+import com.just_for_fun.synctax.ui.theme.LightAccentPrimary
 
 // Custom overshoot easing
 private val OvershootEasing: Easing = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1.0f)
@@ -69,6 +74,13 @@ fun SpecialCreatorWelcomeScreenTwo(
 ) {
     var phase by remember { mutableIntStateOf(0) } // 0: confetti → 1: reveal → 2: message → 3: final glow
 
+    // Theme-aware colors
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color.Black else LightWelcomeBackground
+    val textPrimaryColor = if (isDarkTheme) Color.White.copy(0.9f) else LightWelcomeTitle
+    val textSecondaryColor = if (isDarkTheme) Color.White.copy(0.7f) else LightWelcomeSubtitle
+    val accentColor = if (isDarkTheme) Color(0xFF00D4FF) else LightAccentPrimary
+
     val goldGradient = Brush.linearGradient(
         colors = listOf(Color(0xFFFFD700), Color(0xFFFFC107), Color(0xFFFF8C00)),
         start = Offset.Zero,
@@ -89,7 +101,7 @@ fun SpecialCreatorWelcomeScreenTwo(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(backgroundColor)
     ) {
 
         // Golden Confetti Burst (Phase 0, centered on screen)
@@ -142,7 +154,7 @@ fun SpecialCreatorWelcomeScreenTwo(
                             fontWeight = FontWeight.Light,
                             letterSpacing = 3.sp
                         ),
-                        color = Color.White.copy(0.9f),
+                        color = textPrimaryColor,
                         textAlign = TextAlign.Center
                     )
 
@@ -170,7 +182,7 @@ fun SpecialCreatorWelcomeScreenTwo(
                             fontStyle = FontStyle.Italic,
                             fontSize = 20.sp
                         ),
-                        color = Color.White.copy(0.7f),
+                        color = textSecondaryColor,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -209,7 +221,7 @@ fun SpecialCreatorWelcomeScreenTwo(
                             lineHeight = 30.sp,
                             fontSize = 20.sp
                         ),
-                        color = Color.White.copy(0.9f),
+                        color = textPrimaryColor,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 24.dp)
                     )
@@ -221,7 +233,7 @@ fun SpecialCreatorWelcomeScreenTwo(
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontFamily = MontserratFamily,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF00D4FF),
+                            color = accentColor,
                             fontSize = 24.sp,
                             lineHeight = 32.sp
                         ),
@@ -242,7 +254,7 @@ fun SpecialCreatorWelcomeScreenTwo(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.8f))
+                    .background(backgroundColor.copy(alpha = 0.8f))
             )
         }
     }

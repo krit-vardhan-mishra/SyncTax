@@ -1,12 +1,19 @@
 package com.just_for_fun.synctax.ui.components.player
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import ir.mahozad.multiplatform.wavyslider.material3.WavySlider
 
 @Composable
@@ -15,6 +22,13 @@ fun WavyPlayerSlider(
     duration: Long,
     onSeek: (Long) -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    
+    // Theme-aware slider colors
+    val sliderThumbColor = if (isDarkTheme) MaterialTheme.colorScheme.onBackground else Color.White
+    val sliderActiveTrackColor = if (isDarkTheme) MaterialTheme.colorScheme.onBackground else Color.White
+    val sliderInactiveTrackColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f)
+
     val safeDuration = maxOf(1L, duration)
     val safePosition = position.coerceIn(0, safeDuration)
 
@@ -43,9 +57,9 @@ fun WavyPlayerSlider(
             valueRange = 0f..safeDuration.toFloat(),
             enabled = duration > 0,
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.onBackground,
-                activeTrackColor = MaterialTheme.colorScheme.onBackground,
-                inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                thumbColor = sliderThumbColor,
+                activeTrackColor = sliderActiveTrackColor,
+                inactiveTrackColor = sliderInactiveTrackColor
             ),
             modifier = Modifier.fillMaxWidth()
         )

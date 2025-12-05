@@ -54,7 +54,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.unit.sp
+import com.just_for_fun.synctax.ui.theme.LightAccentPrimary
+import com.just_for_fun.synctax.ui.theme.LightWelcomeBackground
+import com.just_for_fun.synctax.ui.theme.LightWelcomeTitle
+import com.just_for_fun.synctax.ui.theme.LightWelcomeSubtitle
+import com.just_for_fun.synctax.ui.theme.LightAccentSecondary
+import com.just_for_fun.synctax.ui.theme.LightTextHint
+import com.just_for_fun.synctax.ui.theme.LightErrorText
 import com.just_for_fun.synctax.util.AppConfig
 
 @Composable
@@ -67,6 +75,24 @@ fun WelcomeScreen(
     var showSpecialWelcome by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
+    val isDarkTheme = isSystemInDarkTheme()
+
+    // Theme-aware colors
+    val backgroundColor = if (isDarkTheme) Color.Black else LightWelcomeBackground
+    val textPrimaryColor = if (isDarkTheme) Color.White else LightWelcomeTitle
+    val textSecondaryColor = if (isDarkTheme) Color.White.copy(alpha = 0.7f) else LightWelcomeSubtitle
+    val textHintColor = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else LightTextHint
+    val accentColor = if (isDarkTheme) Color(0xFFE94560) else LightAccentPrimary
+    val cardBackgroundColor = if (isDarkTheme) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.9f)
+    val inputBorderColor = if (isDarkTheme) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.3f)
+    val inputFocusedBorderColor = if (isDarkTheme) Color.White.copy(alpha = 0.8f) else LightAccentPrimary
+    val errorColor = if (isDarkTheme) Color(0xFFE94560) else LightErrorText
+    val bottomTextColor = if (isDarkTheme) Color.White.copy(alpha = 0.5f) else LightTextHint
+
+    // Background bubble colors for light theme
+    val bubble1Color = if (isDarkTheme) Color(0xFFE94560).copy(alpha = 0.4f) else LightAccentPrimary.copy(alpha = 0.1f)
+    val bubble2Color = if (isDarkTheme) Color(0xFF77AEC9).copy(alpha = 0.3f) else LightAccentSecondary.copy(alpha = 0.1f)
+    val bubble3Color = if (isDarkTheme) Color(0xFFFFFFFF).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.2f)
 
     LaunchedEffect(Unit) {
         isVisible = true
@@ -79,7 +105,7 @@ fun WelcomeScreen(
     // Show special welcome screen for creators
     if (showSpecialWelcome && isCreator) {
         // *** CHANGE THIS LINE ***
-        SpecialCreatorWelcomeScreenTwo( // <--- Change SpecialCreatorWelcomeScreen to SpecialCreatorWelcomeScreenTwo
+        SpecialCreatorWelcomeScreenTwo(
             creatorName = trimmedName,
             onContinue = {
                 showSpecialWelcome = false
@@ -92,7 +118,7 @@ fun WelcomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(backgroundColor)
     ) {
         // Background circles for depth
         Box(
@@ -105,7 +131,7 @@ fun WelcomeScreen(
                     .size(400.dp)
                     .offset(x = (-100).dp, y = (-150).dp)
                     .background(
-                        Color(0xFFE94560).copy(alpha = 0.4f),
+                        bubble1Color,
                         shape = RoundedCornerShape(50)
                     )
                     .blur(100.dp)
@@ -117,7 +143,7 @@ fun WelcomeScreen(
                     .align(Alignment.BottomEnd)
                     .offset(x = 100.dp, y = 150.dp)
                     .background(
-                        Color(0xFF77AEC9).copy(alpha = 0.3f),
+                        bubble2Color,
                         shape = RoundedCornerShape(50)
                     )
                     .blur(100.dp)
@@ -129,7 +155,7 @@ fun WelcomeScreen(
                     .align(Alignment.CenterStart)
                     .offset(x = (-50).dp, y = 200.dp)
                     .background(
-                        Color(0xFFFFFFFF).copy(alpha = 0.15f),
+                        bubble3Color,
                         shape = RoundedCornerShape(50)
                     )
                     .blur(100.dp)
@@ -190,7 +216,7 @@ fun WelcomeScreen(
                             fontSize = 56.sp,
                             fontWeight = FontWeight.ExtraBold
                         ),
-                        color = Color.White,
+                        color = textPrimaryColor,
                         textAlign = TextAlign.Center
                     )
 
@@ -199,7 +225,7 @@ fun WelcomeScreen(
                     Text(
                         text = "Your Personal Music Experience",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = textSecondaryColor,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -220,7 +246,7 @@ fun WelcomeScreen(
                         .padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.1f)
+                        containerColor = cardBackgroundColor
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
@@ -234,7 +260,7 @@ fun WelcomeScreen(
                             text = "What should we call you?",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = textPrimaryColor,
                             textAlign = TextAlign.Center
                         )
 
@@ -250,13 +276,13 @@ fun WelcomeScreen(
                             label = {
                                 Text(
                                     "Your Name",
-                                    color = Color.White.copy(alpha = 0.7f)
+                                    color = textHintColor
                                 )
                             },
                             placeholder = {
                                 Text(
                                     "Enter your name",
-                                    color = Color.White.copy(alpha = 0.5f)
+                                    color = textHintColor
                                 )
                             },
                             isError = isError,
@@ -264,7 +290,7 @@ fun WelcomeScreen(
                                 if (isError) {
                                     Text(
                                         text = "Please enter your name",
-                                        color = Color(0xFFE94560)
+                                        color = errorColor
                                     )
                                 }
                             },
@@ -289,11 +315,11 @@ fun WelcomeScreen(
                                 }
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.White.copy(alpha = 0.8f),
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                cursorColor = Color.White
+                                focusedBorderColor = inputFocusedBorderColor,
+                                unfocusedBorderColor = inputBorderColor,
+                                focusedTextColor = textPrimaryColor,
+                                unfocusedTextColor = textPrimaryColor,
+                                cursorColor = textPrimaryColor
                             ),
                             shape = RoundedCornerShape(16.dp)
                         )
@@ -317,7 +343,7 @@ fun WelcomeScreen(
                                 .fillMaxWidth()
                                 .height(60.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFE94560)
+                                containerColor = accentColor
                             ),
                             shape = RoundedCornerShape(16.dp),
                             elevation = ButtonDefaults.buttonElevation(
@@ -354,7 +380,7 @@ fun WelcomeScreen(
                     Text(
                         text = "made by Krit",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.5f),
+                        color = bottomTextColor,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 32.dp)
                     )

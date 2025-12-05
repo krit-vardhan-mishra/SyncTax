@@ -34,6 +34,10 @@ import com.just_for_fun.synctax.util.ArtistDetails
 import com.just_for_fun.synctax.util.RecommendedSong
 import kotlinx.coroutines.Dispatchers
 import com.just_for_fun.synctax.ui.components.app.TooltipIconButton
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.just_for_fun.synctax.ui.theme.LightHomeCardBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionTitle
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionSubtitle
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,6 +75,12 @@ fun ArtistDetailScreen(
     var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
     var vibrantColor by remember { mutableStateOf(Color(0xFF6C63FF)) }
     var darkMutedColor by remember { mutableStateOf(Color(0xFF0F0F1E)) }
+
+    // Theme-aware colors
+    val isDarkTheme = isSystemInDarkTheme()
+    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1A1A1D) else LightHomeCardBackground
+    val sectionTitleColor = if (isDarkTheme) Color.White else LightHomeSectionTitle
+    val sectionSubtitleColor = if (isDarkTheme) Color(0xFFB3B3B3) else LightHomeSectionSubtitle
 
     LaunchedEffect(imageUri) {
         if (imageUri.isNotEmpty()) {
@@ -352,7 +362,10 @@ fun ArtistDetailScreen(
                     items(songs) { song ->
                         SongCard(
                             song = song,
-                            onClick = { onSongClick(song) }
+                            onClick = { onSongClick(song) },
+                            backgroundColor = cardBackgroundColor,
+                            titleColor = sectionTitleColor,
+                            artistColor = sectionSubtitleColor
                         )
                     }
                 }

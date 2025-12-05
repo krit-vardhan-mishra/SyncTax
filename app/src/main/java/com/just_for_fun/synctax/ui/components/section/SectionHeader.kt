@@ -33,7 +33,9 @@ fun SectionHeader(
     onViewAllClick: (() -> Unit)? = null,
     showSortButton: Boolean = false,
     currentSortOption: SortOption = SortOption.TITLE_ASC,
-    onSortOptionChange: ((SortOption) -> Unit)? = null
+    onSortOptionChange: ((SortOption) -> Unit)? = null,
+    titleColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onBackground,
+    subtitleColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Row(
         modifier = Modifier
@@ -47,13 +49,13 @@ fun SectionHeader(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = titleColor
             )
             subtitle?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = subtitleColor
                 )
             }
         }

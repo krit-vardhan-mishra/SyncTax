@@ -39,7 +39,12 @@ import androidx.navigation.NavController
 import com.just_for_fun.synctax.core.network.OnlineResultType
 import com.just_for_fun.synctax.ui.components.SnackbarUtils
 import com.just_for_fun.synctax.ui.guide.GuideContent
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.Color
 import com.just_for_fun.synctax.ui.guide.GuideOverlay
+import com.just_for_fun.synctax.ui.theme.LightHomeCardBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionTitle
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionSubtitle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +71,12 @@ fun SearchScreen(
     var isSuggestionsExpanded by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Theme-aware colors
+    val isDarkTheme = isSystemInDarkTheme()
+    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1A1A1D) else LightHomeCardBackground
+    val sectionTitleColor = if (isDarkTheme) Color.White else LightHomeSectionTitle
+    val sectionSubtitleColor = if (isDarkTheme) Color(0xFFB3B3B3) else LightHomeSectionSubtitle
 
     // Function to perform search
     fun performSearch() {
@@ -314,7 +325,13 @@ fun SearchScreen(
                         val recent = uiState.listenAgain.take(6)
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             recent.forEach { song ->
-                                SongCard(song = song, onClick = { playerViewModel.playSong(song) })
+                                SongCard(
+                                    song = song,
+                                    onClick = { playerViewModel.playSong(song) },
+                                    backgroundColor = cardBackgroundColor,
+                                    titleColor = sectionTitleColor,
+                                    artistColor = sectionSubtitleColor
+                                )
                             }
                         }
                     }
@@ -649,7 +666,10 @@ fun SearchScreen(
                             items(filteredSongs) { song ->
                                 SongCard(
                                     song = song,
-                                    onClick = { playerViewModel.playSong(song, filteredSongs) }
+                                    onClick = { playerViewModel.playSong(song, filteredSongs) },
+                                    backgroundColor = cardBackgroundColor,
+                                    titleColor = sectionTitleColor,
+                                    artistColor = sectionSubtitleColor
                                 )
                             }
                         }

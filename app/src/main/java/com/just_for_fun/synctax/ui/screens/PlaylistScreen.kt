@@ -2,6 +2,7 @@ package com.just_for_fun.synctax.ui.screens
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -185,6 +187,9 @@ fun PlaylistScreen(
 private fun EmptyPlaylistsState(
     onImportClick: () -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+    val importTextColor = if (isDarkTheme) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -223,10 +228,11 @@ private fun EmptyPlaylistsState(
                 icon = {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = null
+                        contentDescription = null,
+                        tint = importTextColor
                     )
                 },
-                text = { Text("Import Playlist") }
+                text = { Text("Import Playlist", color = importTextColor) }
             )
         }
     }

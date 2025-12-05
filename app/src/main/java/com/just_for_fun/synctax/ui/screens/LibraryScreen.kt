@@ -23,7 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import androidx.compose.foundation.pager.rememberPagerState
@@ -69,7 +69,15 @@ import com.just_for_fun.synctax.ui.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import kotlinx.coroutines.launch
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.just_for_fun.synctax.ui.theme.LightHomeBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeCardBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionTitle
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionSubtitle
+import com.just_for_fun.synctax.ui.theme.LightHomeGreetingText
+import com.just_for_fun.synctax.ui.theme.LightLibraryBackground
+import com.just_for_fun.synctax.ui.theme.LightTabIndicator
+import com.just_for_fun.synctax.ui.theme.LightTabUnselected
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -94,6 +102,18 @@ fun LibraryScreen(
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // Theme-aware colors
+    val isDarkTheme = isSystemInDarkTheme()
+    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1A1A1D) else LightHomeCardBackground
+    val sectionTitleColor = if (isDarkTheme) Color.White else LightHomeSectionTitle
+    val sectionSubtitleColor = if (isDarkTheme) Color(0xFFB3B3B3) else LightHomeSectionSubtitle
+    
+    // Tab colors
+    val tabContainerColor = if (isDarkTheme) Color(0xFF252525) else LightLibraryBackground
+    val tabIndicatorColor = if (isDarkTheme) MaterialTheme.colorScheme.primary else LightTabIndicator
+    val tabSelectedTextColor = if (isDarkTheme) MaterialTheme.colorScheme.onPrimary else Color.White
+    val tabUnselectedTextColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else LightTabUnselected
     
     // Storage permission launcher for Android 11+
     val storagePermissionLauncher = rememberLauncherForActivityResult(
@@ -193,7 +213,7 @@ fun LibraryScreen(
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
                     // Container color: Slightly lighter than background for contrast
-                    containerColor = Color(0xFF252525),
+                    containerColor = tabContainerColor,
                     contentColor = MaterialTheme.colorScheme.onSurface,
                     divider = {}, // Remove the default bottom line
                     indicator = { tabPositions ->
@@ -205,7 +225,7 @@ fun LibraryScreen(
                                     .fillMaxSize()
                                     .padding(4.dp) // Inset slightly
                                     .background(
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = tabIndicatorColor,
                                         shape = CircleShape
                                     )
                                     .zIndex(-1f) // Behind the text
@@ -234,9 +254,9 @@ fun LibraryScreen(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     // Text color changes based on selection for contrast
                                     color = if (isSelected)
-                                        MaterialTheme.colorScheme.onPrimary
+                                        tabSelectedTextColor
                                     else
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                        tabUnselectedTextColor
                                 )
                             },
                             modifier = Modifier.zIndex(1f)
@@ -256,7 +276,10 @@ fun LibraryScreen(
                             onSongClick = { song, queue ->
                                 playerViewModel.playSong(song, queue)
                             },
-                            homeViewModel = homeViewModel
+                            homeViewModel = homeViewModel,
+                            cardBackgroundColor = cardBackgroundColor,
+                            sectionTitleColor = sectionTitleColor,
+                            sectionSubtitleColor = sectionSubtitleColor
                         )
 
                         1 -> ArtistsTab(
@@ -292,7 +315,10 @@ fun SongsTab(
     songs: List<Song>,
     sortOption: SortOption,
     onSongClick: (Song, List<Song>) -> Unit,
-    homeViewModel: HomeViewModel
+    homeViewModel: HomeViewModel,
+    cardBackgroundColor: Color,
+    sectionTitleColor: Color,
+    sectionSubtitleColor: Color
 ) {
     val lazyListState = rememberLazyListState()
     
@@ -418,7 +444,10 @@ fun SongsTab(
                 onDelete = { deletedSong ->
                     // Remove from local database and refresh UI
                     homeViewModel.deleteSong(deletedSong)
-                }
+                },
+                backgroundColor = cardBackgroundColor,
+                titleColor = sectionTitleColor,
+                artistColor = sectionSubtitleColor
             )
         }
     }

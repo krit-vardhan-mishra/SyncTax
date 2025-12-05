@@ -179,7 +179,10 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 playerViewModel = playerViewModel,
                                 userPreferences = userPreferences,
                                 onTrainClick = { navController.navigate("train") },
-                                onOpenSettings = { navController.navigate("settings") }
+                                onOpenSettings = { navController.navigate("settings") },
+                                onNavigateToPlaylist = { playlistId ->
+                                    navController.navigate("playlist_detail/$playlistId")
+                                }
                             )
                         }
                         composable("search") {

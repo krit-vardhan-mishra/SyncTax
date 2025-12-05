@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.ui.theme.LightAccentPrimary
+import com.just_for_fun.synctax.ui.theme.LightPlayerTextPrimary
+import com.just_for_fun.synctax.ui.theme.LightPlayerTextSecondary
+import com.just_for_fun.synctax.ui.theme.LightQuickPickCardBackground
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -49,6 +54,16 @@ fun RecommendationCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
+
+    // Theme-aware colors
+    val rankTextColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else LightPlayerTextSecondary
+    val albumArtBackgroundColor = if (isDarkTheme) MaterialTheme.colorScheme.surfaceContainerHighest else LightQuickPickCardBackground
+    val iconColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else LightPlayerTextSecondary
+    val titleColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else LightPlayerTextPrimary
+    val artistColor = if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else LightPlayerTextSecondary
+    val reasonColor = if (isDarkTheme) MaterialTheme.colorScheme.primary else LightAccentPrimary
+
     var isPressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.98f else 1f,
@@ -73,7 +88,7 @@ fun RecommendationCard(
             text = rank.toString(),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Light,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = rankTextColor,
             modifier = Modifier.width(32.dp)
         )
 
@@ -81,7 +96,7 @@ fun RecommendationCard(
         Surface(
             modifier = Modifier.size(64.dp),
             shape = RoundedCornerShape(4.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHighest
+            color = albumArtBackgroundColor
         ) {
             if (song.albumArtUri.isNullOrEmpty()) {
                 Box(
@@ -92,7 +107,7 @@ fun RecommendationCard(
                         imageVector = Icons.Default.MusicNote,
                         contentDescription = null,
                         modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = iconColor
                     )
                 }
             } else {
@@ -114,14 +129,14 @@ fun RecommendationCard(
                 text = song.title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = titleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = artistColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -129,7 +144,7 @@ fun RecommendationCard(
                 Text(
                     text = reason ?: "Recommended for you",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = reasonColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -144,7 +159,7 @@ fun RecommendationCard(
             Icon(
                 imageVector = Icons.Default.MoreVert,
                 contentDescription = "More Options",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = iconColor
             )
         }
     }

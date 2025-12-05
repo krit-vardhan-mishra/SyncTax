@@ -51,8 +51,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.just_for_fun.synctax.ui.theme.LightHomeCardBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionTitle
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionSubtitle
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.palette.graphics.Palette
 import coil.compose.AsyncImage
@@ -100,6 +104,12 @@ fun AlbumDetailScreen(
     var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
     var vibrantColor by remember { mutableStateOf(Color(0xFF6C63FF)) }
     var darkMutedColor by remember { mutableStateOf(Color(0xFF0F0F1E)) }
+
+    // Theme-aware colors
+    val isDarkTheme = isSystemInDarkTheme()
+    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1A1A1D) else LightHomeCardBackground
+    val sectionTitleColor = if (isDarkTheme) Color.White else LightHomeSectionTitle
+    val sectionSubtitleColor = if (isDarkTheme) Color(0xFFB3B3B3) else LightHomeSectionSubtitle
 
     // Extract colors from album art with improved palette
     LaunchedEffect(albumArtUri) {
@@ -437,7 +447,10 @@ fun AlbumDetailScreen(
                     } else {
                         SongCard(
                             song = song,
-                            onClick = { onSongClick(song) }
+                            onClick = { onSongClick(song) },
+                            backgroundColor = cardBackgroundColor,
+                            titleColor = sectionTitleColor,
+                            artistColor = sectionSubtitleColor
                         )
                     }
                 }

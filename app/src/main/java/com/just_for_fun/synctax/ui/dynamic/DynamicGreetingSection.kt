@@ -21,7 +21,10 @@ import com.just_for_fun.synctax.ui.utils.AlbumColors
 @Composable
 fun DynamicGreetingSection(
     userName: String,
-    albumColors: AlbumColors
+    albumColors: AlbumColors,
+    greetingTextColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onBackground,
+    userNameColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
+    subGreetingColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
 ) {
     val greeting = remember {
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
@@ -57,7 +60,7 @@ fun DynamicGreetingSection(
                     style = SpanStyle(
                         fontSize = MaterialTheme.typography.headlineMedium.fontSize,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = greetingTextColor
                     )
                 ) {
                     append("$greeting, ")
@@ -66,7 +69,7 @@ fun DynamicGreetingSection(
                     style = SpanStyle(
                         fontSize = MaterialTheme.typography.headlineLarge.fontSize,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = userNameColor
                     )
                 ) {
                     append(userName)
@@ -83,7 +86,7 @@ fun DynamicGreetingSection(
             Text(
                 text = subGreeting,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                color = subGreetingColor
             )
         }
     }

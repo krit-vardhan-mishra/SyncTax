@@ -48,7 +48,7 @@ fun AnimatedDownloadButton(
             .size(48.dp) // Standard touch target size
             .clip(CircleShape) // Ripple stays circular
             .clickable(
-                enabled = !isDownloading && !isDownloaded,
+                enabled = !isDownloaded, // Allow clicking when downloading to cancel, but not when already downloaded
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center

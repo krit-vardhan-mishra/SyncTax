@@ -1,5 +1,6 @@
 package com.just_for_fun.synctax.ui.components.app
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,6 +37,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.just_for_fun.synctax.ui.theme.AccentPrimary
 import com.just_for_fun.synctax.ui.theme.BottomNavBackground
 import com.just_for_fun.synctax.ui.theme.IconSecondary
+import com.just_for_fun.synctax.ui.theme.LightAccentPrimary
+import com.just_for_fun.synctax.ui.theme.LightBottomNavBackground
+import com.just_for_fun.synctax.ui.theme.LightIconSecondary
+import com.just_for_fun.synctax.ui.theme.LightTextTitle
 import com.just_for_fun.synctax.ui.utils.AlbumColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,12 +49,16 @@ fun AppNavigationBar(
     navController: NavController,
     albumColors: AlbumColors = AlbumColors.default()
 ) {
-    val backgroundColor = BottomNavBackground
-    val glowColor = AccentPrimary
-    val unselectedIconColor = IconSecondary
-    val unselectedTextColor = IconSecondary
+    val isDarkTheme = isSystemInDarkTheme()
 
-    var lastLibraryClickTime by remember { mutableStateOf(0L) }
+    val backgroundColor = if (isDarkTheme) BottomNavBackground else LightBottomNavBackground
+    val glowColor = if (isDarkTheme) AccentPrimary else LightAccentPrimary
+    val unselectedIconColor = if (isDarkTheme) IconSecondary else LightIconSecondary
+    val unselectedTextColor = if (isDarkTheme) IconSecondary else LightIconSecondary
+    val selectedTextColor = if (isDarkTheme) Color.White else LightTextTitle
+    val selectedIconColor = if (isDarkTheme) Color.White else LightTextTitle
+
+    var lastLibraryClickTime by remember { mutableLongStateOf(0L) }
     var showLibraryBottomSheet by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -139,8 +149,8 @@ fun AppNavigationBar(
                 },
                 colors = NavigationBarItemDefaults.colors(
                     indicatorColor = Color.Transparent,
-                    selectedTextColor = Color.White,
-                    selectedIconColor = Color.White,
+                    selectedTextColor = selectedTextColor,
+                    selectedIconColor = selectedIconColor,
                     unselectedIconColor = unselectedIconColor,
                     unselectedTextColor = unselectedTextColor,
                 )

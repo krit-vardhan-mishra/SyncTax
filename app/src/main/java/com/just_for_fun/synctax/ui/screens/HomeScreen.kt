@@ -65,10 +65,15 @@ import com.just_for_fun.synctax.ui.guide.GuideOverlay
 import com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
-import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.width
 import com.just_for_fun.synctax.ui.components.SnackbarUtils
+import com.just_for_fun.synctax.ui.theme.LightHomeBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeCardBackground
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionTitle
+import com.just_for_fun.synctax.ui.theme.LightHomeSectionSubtitle
+import com.just_for_fun.synctax.ui.theme.LightHomeGreetingText
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +107,14 @@ fun HomeScreen(
     val listState = rememberLazyListState()
     var hasScrolledToBottom by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf("All") }
+
+    // Theme-aware colors
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = if (isDarkTheme) Color.Black else LightHomeBackground
+    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1A1A1D) else LightHomeCardBackground
+    val sectionTitleColor = if (isDarkTheme) Color.White else LightHomeSectionTitle
+    val sectionSubtitleColor = if (isDarkTheme) Color(0xFFB3B3B3) else LightHomeSectionSubtitle
+    val greetingTextColor = if (isDarkTheme) Color.White else LightHomeGreetingText
 
     // Detect scroll to bottom
     LaunchedEffect(listState) {
@@ -244,7 +257,10 @@ fun HomeScreen(
                                     item {
                                         DynamicGreetingSection(
                                             userName = userName,
-                                            albumColors = albumColors
+                                            albumColors = albumColors,
+                                            greetingTextColor = greetingTextColor,
+                                            userNameColor = sectionTitleColor,
+                                            subGreetingColor = sectionSubtitleColor
                                         )
                                     }
                                 }
@@ -307,7 +323,9 @@ fun HomeScreen(
                                         SectionHeader(
                                             title = "Listen again",
                                             subtitle = null,
-                                            onViewAllClick = null
+                                            onViewAllClick = null,
+                                            titleColor = sectionTitleColor,
+                                            subtitleColor = sectionSubtitleColor
                                         )
 
                                         val songsPerPage = 4
@@ -338,7 +356,10 @@ fun HomeScreen(
                                                             },
                                                             modifier = Modifier
                                                                 .fillMaxWidth()
-                                                                .animateItem()
+                                                                .animateItem(),
+                                                            backgroundColor = cardBackgroundColor,
+                                                            titleColor = sectionTitleColor,
+                                                            artistColor = sectionSubtitleColor
                                                         )
                                                     }
                                                 }
@@ -488,7 +509,7 @@ fun HomeScreen(
                     Card(
                         modifier = Modifier.padding(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color.DarkGray
+                            containerColor = cardBackgroundColor
                         )
                     ) {
                         Row(
