@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.di.AppModule
+import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.local.entities.*
 import com.just_for_fun.synctax.data.repository.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,7 +73,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
      * Load all playlists from database
      */
     private fun loadPlaylists() {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             _uiState.value = _uiState.value.copy(isLoading = true)
             
             playlistRepository.getAllPlaylists().collectLatest { playlists ->
@@ -104,7 +105,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             return
         }
         
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             _importState.value = _importState.value.copy(isValidating = true)
             
             val result = playlistRepository.validatePlaylistUrl(url)
@@ -128,7 +129,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             return
         }
         
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             _importState.value = _importState.value.copy(
                 isImporting = true,
                 importSuccess = null,
@@ -167,7 +168,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
      * Load playlist detail with songs
      */
     fun loadPlaylistDetail(playlistId: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             _detailState.value = _detailState.value.copy(isLoading = true)
             
             val playlist = playlistRepository.getPlaylistById(playlistId)
@@ -195,7 +196,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
  * Delete a playlist
  */
     fun deletePlaylist(playlistId: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             playlistRepository.deletePlaylist(playlistId)
         }
     }
@@ -223,7 +224,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
         songs: List<Song>,
         onResult: (Boolean) -> Unit = {}
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             val result = playlistRepository.saveAlbumAsPlaylist(albumName, artistName, thumbnailUrl, songs)
             onResult(result != null)
         }
@@ -241,7 +242,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
         artistName: String,
         onResult: (Boolean) -> Unit = {}
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             val result = playlistRepository.unsaveAlbum(albumName, artistName)
             onResult(result)
         }
@@ -259,7 +260,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
         artistName: String,
         onResult: (Boolean) -> Unit
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             val result = playlistRepository.isAlbumSaved(albumName, artistName)
             onResult(result)
         }

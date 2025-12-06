@@ -9,10 +9,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,8 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
-import com.just_for_fun.synctax.presentation.components.card.OnlineHistoryCard
-import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
+import com.just_for_fun.synctax.presentation.components.card.OnlineSongCard
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
@@ -100,7 +97,6 @@ fun OnlineSongsScreen(
                 showShuffleButton = true,
                 showSortButton = false,
                 showRefreshButton = false,
-                showProfileButton = true,
                 onShuffleClick = onShuffleClick,
                 userPreferences = userPreferences,
                 userName = userName,
@@ -146,8 +142,7 @@ fun OnlineSongsScreen(
                     )
                 }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = 16.dp,
@@ -155,20 +150,19 @@ fun OnlineSongsScreen(
                         top = 8.dp,
                         bottom = 150.dp
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item(span = { GridItemSpan(2) }) {
+                    item {
                         Text(
                             text = "${uiState.history.size} online songs",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
 
                     items(uiState.history, key = { it.id }) { history ->
-                        OnlineHistoryCard(
+                        OnlineSongCard(
                             history = history,
                             onClick = {
                                 playerViewModel.playUrl(
@@ -187,23 +181,23 @@ fun OnlineSongsScreen(
                         )
                     }
 
-                    // Load more button spanning 2 columns
+                    // Load more button
                     if (uiState.hasMore && !uiState.isLoadingMore) {
-                        item(span = { GridItemSpan(2) }) {
+                        item {
                             OutlinedButton(
                                 onClick = { onlineSongsViewModel.loadMoreHistory() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 16.dp)
+                                    .padding(vertical = 8.dp)
                             ) {
                                 Text("Load More")
                             }
                         }
                     }
 
-                    // Loading more indicator spanning 2 columns
+                    // Loading more indicator
                     if (uiState.isLoadingMore) {
-                        item(span = { GridItemSpan(2) }) {
+                        item {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()

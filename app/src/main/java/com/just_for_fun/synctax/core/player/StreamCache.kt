@@ -17,7 +17,7 @@ import java.io.File
  */
 object StreamCache {
 
-    private const val CACHE_SIZE_BYTES = 100L * 1024 * 1024 // 100 MB cache
+    private const val CACHE_SIZE_BYTES = 200L * 1024 * 1024 // 200 MB cache for smoother streaming
     private const val CACHE_DIR_NAME = "exo_stream_cache"
 
     @Volatile

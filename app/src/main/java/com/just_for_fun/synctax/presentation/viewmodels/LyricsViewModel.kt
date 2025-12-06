@@ -3,6 +3,7 @@ package com.just_for_fun.synctax.presentation.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.model.LyricLine
 import com.just_for_fun.synctax.core.network.LrcLibResponse
@@ -107,7 +108,7 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
         // Don't fetch if already fetching
         if (_lyricsState.value.isFetching) return
         
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             try {
                 // Set loading state
                 _lyricsState.value = _lyricsState.value.copy(
@@ -163,7 +164,7 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
         // Don't fetch if already fetching
         if (_lyricsState.value.isFetching) return
         
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             try {
                 // Set loading state
                 _lyricsState.value = _lyricsState.value.copy(
@@ -208,7 +209,7 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
     }
     
     private fun searchLyricsForSong(song: Song) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             try {
                 val results = lyricsRepository.searchLyricsResults(song)
                 
@@ -246,7 +247,7 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
      * Search for lyrics options when exact match fails (with custom query)
      */
     private fun searchLyricsForSongWithCustomQuery(song: Song, customSongName: String, customArtistName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             try {
                 val results = lyricsRepository.searchLyricsResultsWithCustomQuery(song, customSongName, customArtistName)
                 
@@ -284,7 +285,7 @@ class LyricsViewModel(application: Application) : AndroidViewModel(application) 
      * Select and download specific lyrics from search results
      */
     fun selectLyrics(trackId: Int, song: Song) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             try {
                 _lyricsState.value = _lyricsState.value.copy(isFetching = true, error = null)
                 

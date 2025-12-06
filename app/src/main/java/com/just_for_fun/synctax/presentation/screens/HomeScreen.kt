@@ -237,10 +237,11 @@ fun HomeScreen(
                     }
 
                     else -> {
-                        // Show directory selection dialog when no songs are scanned
-                        LaunchedEffect(uiState.allSongs.isEmpty(), scanPaths.isEmpty()) {
-                            if (uiState.allSongs.isEmpty() && scanPaths.isEmpty() && !showDirectorySelectionDialog) {
+                        // Show directory selection dialog only once on first app launch
+                        LaunchedEffect(Unit) {
+                            if (!userPreferences.isDirectorySelectionShown() && uiState.allSongs.isEmpty() && scanPaths.isEmpty()) {
                                 showDirectorySelectionDialog = true
+                                userPreferences.setDirectorySelectionShown()
                             }
                         }
 
@@ -539,9 +540,10 @@ fun HomeScreen(
                         onDismiss = {
                             showGuide = false
                             userPreferences.setGuideShown(UserPreferences.GUIDE_HOME)
-                            // Show directory selection dialog if no directories are selected yet
-                            if (scanPaths.isEmpty()) {
+                            // Show directory selection dialog only if it hasn't been shown before
+                            if (!userPreferences.isDirectorySelectionShown() && scanPaths.isEmpty()) {
                                 showDirectorySelectionDialog = true
+                                userPreferences.setDirectorySelectionShown()
                             }
                         }
                     )

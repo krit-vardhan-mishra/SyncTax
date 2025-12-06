@@ -3,6 +3,7 @@ package com.just_for_fun.synctax.presentation.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +38,7 @@ class OnlineSongsViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun loadInitialHistory() {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 dao.getOnlineHistoryPaged(0, PAGE_SIZE).collect { history ->
@@ -60,7 +61,7 @@ class OnlineSongsViewModel(application: Application) : AndroidViewModel(applicat
     fun loadMoreHistory() {
         if (_uiState.value.isLoadingMore || !_uiState.value.hasMore) return
 
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             _uiState.value = _uiState.value.copy(isLoadingMore = true, error = null)
             try {
                 dao.getOnlineHistoryPaged(currentOffset, PAGE_SIZE).collect { newHistory ->
@@ -82,7 +83,7 @@ class OnlineSongsViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun deleteHistory(videoId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {
             try {
                 dao.deleteByVideoId(videoId)
                 // Refresh the list

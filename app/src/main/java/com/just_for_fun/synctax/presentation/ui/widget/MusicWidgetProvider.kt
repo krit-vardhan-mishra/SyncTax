@@ -45,7 +45,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val EXTRA_IS_ONLINE = "extra_is_online"
         const val EXTRA_LYRICS = "extra_lyrics"
 
-        private val widgetScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        private val widgetScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
         
         // Lyrics caching to prevent continuous refresh
         private var lastLyricsUpdate = 0L

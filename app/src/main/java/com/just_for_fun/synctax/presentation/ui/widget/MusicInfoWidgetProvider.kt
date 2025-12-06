@@ -25,7 +25,7 @@ import java.net.URL
 class MusicInfoWidgetProvider : AppWidgetProvider() {
 
     companion object {
-        private val widgetScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        private val widgetScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     }
 
     override fun onUpdate(

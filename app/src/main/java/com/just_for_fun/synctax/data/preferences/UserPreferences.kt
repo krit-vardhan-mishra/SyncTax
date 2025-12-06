@@ -157,12 +157,22 @@ class UserPreferences(context: Context) {
         return !isGuideShown(screen)
     }
 
+    // Directory selection dialog preference
+    fun isDirectorySelectionShown(): Boolean {
+        return prefs.getBoolean(KEY_DIRECTORY_SELECTION_SHOWN, false)
+    }
+
+    fun setDirectorySelectionShown(shown: Boolean = true) {
+        prefs.edit().putBoolean(KEY_DIRECTORY_SELECTION_SHOWN, shown).apply()
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
         private const val KEY_SHOW_QUICK_PICKS_GUIDE = "show_quick_picks_guide"
         private const val KEY_YOUTUBE_API_KEY = "youtube_api_key"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_DIRECTORY_SELECTION_SHOWN = "directory_selection_shown"
         const val KEY_THEME_MODE_SYSTEM = "system"
         const val KEY_THEME_MODE_LIGHT = "light"
         const val KEY_THEME_MODE_DARK = "dark"

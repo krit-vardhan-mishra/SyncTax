@@ -84,7 +84,7 @@ class MusicPlayer(context: Context) {
     private var positionUpdateRunnable: Runnable? = null
 
     private var lastEmittedPosition = 0L
-    private val positionUpdateThreshold = 100L // Update more frequently but throttle emissions
+    private val positionUpdateThreshold = 150L // Throttle emissions to reduce recompositions
     
     private fun startPositionUpdates() {
         stopPositionUpdates()
@@ -96,7 +96,7 @@ class MusicPlayer(context: Context) {
                     _currentPosition.value = currentPos
                     lastEmittedPosition = currentPos
                 }
-                mainHandler.postDelayed(this, 200) // Update every 200ms for smoother UI
+                mainHandler.postDelayed(this, 250) // Update every 250ms to reduce recompositions
             }
         }
         mainHandler.post(positionUpdateRunnable!!)

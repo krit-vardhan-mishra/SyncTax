@@ -196,7 +196,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // Cancel any existing search job before starting a new one
         currentSearchJob?.cancel()
 
-        currentSearchJob = viewModelScope.launch {
+        currentSearchJob = viewModelScope.launch(AppDispatchers.Network) {
             _uiState.value =
                 _uiState.value.copy(isSearchingOnline = true, onlineSearchResults = emptyList())
 

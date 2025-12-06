@@ -1,8 +1,13 @@
 package com.just_for_fun.synctax.presentation.components.state
 
+import androidx.compose.runtime.Stable
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.local.entities.Format
 
+/**
+ * UI state for the player, marked @Stable to reduce Compose recomposition overhead.
+ */
+@Stable
 data class PlayerUiState(
     val currentSong: Song? = null,
     val isPlaying: Boolean = false,

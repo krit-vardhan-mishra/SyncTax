@@ -37,7 +37,7 @@ import java.net.URL
 class MusicService : Service() {
 
     private val binder = MusicBinder()
-    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private lateinit var mediaSession: MediaSessionCompat
     private lateinit var notificationManager: MusicNotificationManager

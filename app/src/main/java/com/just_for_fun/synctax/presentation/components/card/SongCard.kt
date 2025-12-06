@@ -47,6 +47,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.graphics.painter.ColorPainter
 import com.just_for_fun.synctax.data.local.entities.Song
 import java.io.File
 
@@ -132,10 +134,18 @@ fun SongCard(
                     )
                 }
             } else {
+                // Optimized image loading with placeholder and crossfade
+                val placeholderColor = MaterialTheme.colorScheme.surfaceVariant
                 AsyncImage(
-                    model = song.albumArtUri,
+                    model = ImageRequest.Builder(context)
+                        .data(song.albumArtUri)
+                        .size(56, 56)  // Downsample to exact display size
+                        .crossfade(true)
+                        .build(),
                     contentDescription = "Album Art",
                     contentScale = ContentScale.Crop,
+                    placeholder = ColorPainter(placeholderColor),
+                    error = ColorPainter(placeholderColor),
                     modifier = Modifier.fillMaxSize()
                 )
             }

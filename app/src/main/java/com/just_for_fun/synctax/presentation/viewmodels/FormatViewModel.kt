@@ -3,6 +3,7 @@ package com.just_for_fun.synctax.presentation.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.local.entities.Format
 import com.just_for_fun.synctax.data.model.FormatRecyclerView
 import com.just_for_fun.synctax.core.utils.AudioProcessor
@@ -21,7 +22,7 @@ class FormatViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<FormatUiState> = _uiState.asStateFlow()
 
     fun loadFormats(url: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Network) {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             try {

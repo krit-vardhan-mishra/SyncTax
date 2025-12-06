@@ -45,7 +45,7 @@ fun EmptyMusicState(
         )
 
         Text(
-            text = "Scan your device to find music files\n",
+            text = "Scan your device to find music files\nOr go to Settings to add folders",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
