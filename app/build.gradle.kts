@@ -8,7 +8,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.0"
     id("com.google.devtools.ksp")
     id("com.chaquo.python") version "16.1.0"
-    id ("kotlin-parcelize")
+    id("kotlin-parcelize")
 }
 
 android {
@@ -30,12 +30,28 @@ android {
         if (localProperties.exists()) {
             properties.load(FileInputStream(localProperties))
         }
-        
+
         // Add API keys to BuildConfig (default to empty strings if not found)
-        buildConfigField("String", "MUSIC_API_KEY", "\"${properties.getProperty("MUSIC_API_KEY") ?: ""}\"")
-        buildConfigField("String", "PLAYER_API_KEY", "\"${properties.getProperty("PLAYER_API_KEY") ?: ""}\"")
-        buildConfigField("String", "YOUTUBE_API_KEY", "\"${properties.getProperty("YOUTUBE_API_KEY") ?: ""}\"")
-        buildConfigField("String", "YOUTUBE_CLIENT_ID", "\"${properties.getProperty("YOUTUBE_CLIENT_ID") ?: ""}\"")
+        buildConfigField(
+            "String",
+            "MUSIC_API_KEY",
+            "\"${properties.getProperty("MUSIC_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String",
+            "PLAYER_API_KEY",
+            "\"${properties.getProperty("PLAYER_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String",
+            "YOUTUBE_API_KEY",
+            "\"${properties.getProperty("YOUTUBE_API_KEY") ?: ""}\""
+        )
+        buildConfigField(
+            "String",
+            "YOUTUBE_CLIENT_ID",
+            "\"${properties.getProperty("YOUTUBE_CLIENT_ID") ?: ""}\""
+        )
 
         ndk {
             // Only include ARM architectures - covers 99%+ of Android devices
@@ -105,6 +121,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(libs.androidx.foundation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -170,6 +187,7 @@ dependencies {
 
     // Liquid library for shader effects
     implementation("io.github.fletchmckee.liquid:liquid:1.0.1")
+
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
 
     // Lottie for animations

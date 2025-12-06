@@ -3,7 +3,7 @@ package com.just_for_fun.synctax.core.utils
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
-import com.just_for_fun.synctax.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Format
 
 /**
  * Utility class for sorting and filtering audio/video formats based on user preferences

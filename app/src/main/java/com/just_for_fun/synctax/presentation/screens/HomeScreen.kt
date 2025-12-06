@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,8 +23,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -45,10 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.presentation.components.card.SongCard
+import com.just_for_fun.synctax.presentation.components.SnackbarUtils
+import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
+import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
+import com.just_for_fun.synctax.presentation.components.loading.SongCardShimmer
 import com.just_for_fun.synctax.presentation.components.onboarding.DirectorySelectionDialog
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
-import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.presentation.components.section.OnlineHistorySection
 import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSection
 import com.just_for_fun.synctax.presentation.components.section.SectionHeader
@@ -59,11 +60,10 @@ import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.dynamic.DynamicGreetingSection
 import com.just_for_fun.synctax.presentation.guide.GuideContent
 import com.just_for_fun.synctax.presentation.guide.GuideOverlay
+import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
-import com.just_for_fun.synctax.presentation.components.SnackbarUtils
-import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,28 +121,30 @@ fun HomeScreen(
             }
     }
 
-    // Sort songs based on current sort option
-    val sortedSongs = remember(uiState.allSongs, currentSortOption) {
-        when (currentSortOption) {
-            SortOption.TITLE_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
-            SortOption.TITLE_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
-            SortOption.ARTIST_ASC -> uiState.allSongs.sortedBy { it.artist.lowercase() }
-            SortOption.ARTIST_DESC -> uiState.allSongs.sortedByDescending { it.artist.lowercase() }
-            SortOption.RELEASE_YEAR_DESC -> uiState.allSongs.sortedByDescending {
-                it.releaseYear ?: 0
-            }
+    // Sort songs based on current sort option using derivedStateOf to prevent unnecessary recomposition
+    val sortedSongs by remember {
+        androidx.compose.runtime.derivedStateOf {
+            when (currentSortOption) {
+                SortOption.TITLE_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
+                SortOption.TITLE_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
+                SortOption.ARTIST_ASC -> uiState.allSongs.sortedBy { it.artist.lowercase() }
+                SortOption.ARTIST_DESC -> uiState.allSongs.sortedByDescending { it.artist.lowercase() }
+                SortOption.RELEASE_YEAR_DESC -> uiState.allSongs.sortedByDescending {
+                    it.releaseYear ?: 0
+                }
 
-            SortOption.RELEASE_YEAR_ASC -> uiState.allSongs.sortedBy { it.releaseYear ?: 0 }
-            SortOption.ADDED_TIMESTAMP_DESC -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
-            SortOption.ADDED_TIMESTAMP_ASC -> uiState.allSongs.sortedBy { it.addedTimestamp }
-            SortOption.DURATION_DESC -> uiState.allSongs.sortedByDescending { it.duration }
-            SortOption.DURATION_ASC -> uiState.allSongs.sortedBy { it.duration }
-            SortOption.NAME_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
-            SortOption.NAME_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
-            SortOption.ARTIST -> uiState.allSongs.sortedBy { it.artist.lowercase() }
-            SortOption.DATE_ADDED_OLDEST -> uiState.allSongs.sortedBy { it.addedTimestamp }
-            SortOption.DATE_ADDED_NEWEST -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
-            SortOption.CUSTOM -> uiState.allSongs
+                SortOption.RELEASE_YEAR_ASC -> uiState.allSongs.sortedBy { it.releaseYear ?: 0 }
+                SortOption.ADDED_TIMESTAMP_DESC -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
+                SortOption.ADDED_TIMESTAMP_ASC -> uiState.allSongs.sortedBy { it.addedTimestamp }
+                SortOption.DURATION_DESC -> uiState.allSongs.sortedByDescending { it.duration }
+                SortOption.DURATION_ASC -> uiState.allSongs.sortedBy { it.duration }
+                SortOption.NAME_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
+                SortOption.NAME_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
+                SortOption.ARTIST -> uiState.allSongs.sortedBy { it.artist.lowercase() }
+                SortOption.DATE_ADDED_OLDEST -> uiState.allSongs.sortedBy { it.addedTimestamp }
+                SortOption.DATE_ADDED_NEWEST -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
+                SortOption.CUSTOM -> uiState.allSongs
+            }
         }
     }
 
@@ -216,13 +218,13 @@ fun HomeScreen(
             ) {
                 when {
                     uiState.isLoading -> {
-                        Box(
+                        LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                            contentPadding = PaddingValues(vertical = 16.dp)
                         ) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            items(10) {
+                                SongCardShimmer()
+                            }
                         }
                     }
 
@@ -233,7 +235,7 @@ fun HomeScreen(
                                 showDirectorySelectionDialog = true
                             }
                         }
-                        
+
                         // Set visibility to true even when no local songs (for online history display)
                         LaunchedEffect(Unit) {
                             isVisible = true
@@ -250,7 +252,10 @@ fun HomeScreen(
                             ) {
                                 // Greeting Section with dynamic colors
                                 if (userName.isNotEmpty()) {
-                                    item {
+                                    item(
+                                        key = "header",
+                                        contentType = "header"
+                                    ) {
                                         DynamicGreetingSection(
                                             userName = userName,
                                             albumColors = albumColors,
@@ -342,7 +347,7 @@ fun HomeScreen(
                                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
                                                     pages[pageIndex].forEach { song ->
-                                                        SongCard(
+                                                        SimpleSongCard(
                                                             song = song,
                                                             onClick = {
                                                                 playerViewModel.playSong(
@@ -350,12 +355,7 @@ fun HomeScreen(
                                                                     uiState.allSongs
                                                                 )
                                                             },
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .animateItem(),
-                                                            backgroundColor = cardBackgroundColor,
-                                                            titleColor = sectionTitleColor,
-                                                            artistColor = sectionSubtitleColor
+                                                            onLongClick = {}
                                                         )
                                                     }
                                                 }
@@ -366,7 +366,10 @@ fun HomeScreen(
 
                                 // Speed Dial Section (only show if there are local songs)
                                 if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.speedDialSongs.isNotEmpty()) {
-                                    item {
+                                    item(
+                                        key = "speed_dial",
+                                        contentType = "section"
+                                    ) {
                                         SpeedDialSection(
                                             songs = uiState.speedDialSongs,
                                             onSongClick = { song ->
@@ -418,7 +421,10 @@ fun HomeScreen(
                                         QuickAccessGrid(
                                             songs = uiState.quickAccessSongs,
                                             onSongClick = { song ->
-                                                playerViewModel.playSong(song, uiState.quickAccessSongs)
+                                                playerViewModel.playSong(
+                                                    song,
+                                                    uiState.quickAccessSongs
+                                                )
                                             },
                                             currentSong = playerState.currentSong
                                         )
@@ -439,20 +445,20 @@ fun HomeScreen(
                                         Spacer(modifier = Modifier.height(10.dp))
                                     }
                                 }
-                                
+
                                 // Empty Music State - Show when no local songs available
                                 if (uiState.allSongs.isEmpty()) {
                                     item {
                                         Spacer(modifier = Modifier.height(20.dp))
                                     }
-                                    
+
                                     item {
                                         HorizontalDivider(
                                             modifier = Modifier.padding(horizontal = 16.dp),
                                             color = AppColors.divider
                                         )
                                     }
-                                    
+
                                     item {
                                         EmptyMusicState(
                                             onScanClick = {
@@ -550,7 +556,7 @@ fun HomeScreen(
                 }
             }
         }
-        
+
         // Snackbar positioned above mini player
         SnackbarHost(
             hostState = snackbarHostState,

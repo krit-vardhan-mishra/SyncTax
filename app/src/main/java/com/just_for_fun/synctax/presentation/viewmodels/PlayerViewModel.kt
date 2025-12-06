@@ -15,6 +15,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyAudioDownloader
+import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.core.download.NewPipeAudioDownloader
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
@@ -38,9 +39,9 @@ import kotlinx.coroutines.flow.first
 import com.just_for_fun.synctax.core.player.PreloadManager
 import com.just_for_fun.synctax.core.player.StreamUrlCache
 import com.just_for_fun.synctax.core.utils.RecommendedSong
+import com.just_for_fun.synctax.data.local.entities.Format
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Song
-import com.just_for_fun.synctax.data.model.Format
 import com.just_for_fun.synctax.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.data.repository.MusicRepository
 import com.just_for_fun.synctax.presentation.components.state.PlayerUiState
@@ -438,11 +439,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playSong(song: Song, playlist: List<Song> = listOf(song)) {
-        viewModelScope.launch {
-            // Clean up tmp file from previous stream if safe
-            chunkedStreamManager.cleanupTmpFile()
-            // Stop any streaming downloads and remove cached chunks of previous song
-            chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
+        viewModelScope.launch(Dispatchers.Main) {
+            // Clean up tmp file from previous stream if safe (on background thread)
+            withContext(AppDispatchers.AudioProcessing) {
+                chunkedStreamManager.cleanupTmpFile()
+                // Stop any streaming downloads and remove cached chunks of previous song
+                chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
+            }
+            
             // Stop current song
             if (_uiState.value.currentSong != null) {
                 playbackCollector.stopCollecting(skipped = true)
@@ -455,6 +459,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val songIndex = playlist.indexOf(song).coerceAtLeast(0)
             queueManager.initializeQueue(playlist, songIndex)
 
+            // ExoPlayer operations MUST run on main thread
             player.prepare(song.filePath, song.id)
             player.play()
 
@@ -1378,7 +1383,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     // Optionally: Pre-download first chunk (1MB) for instant playback
                     // This improves the user experience by reducing initial buffering
                     try {
-                        withContext(Dispatchers.IO) {
+                        withContext(AppDispatchers.Network) {
                             val cacheDir = getApplication<Application>().cacheDir
                             val prefetchFile = File(cacheDir, "prefetch_${videoId}.cache")
                             
@@ -2116,11 +2121,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             Log.w("PlayerViewModel", "📥 Format Download: No current song")
             return
         }
-
-//        Log.d(
-//            "PlayerViewModel",
-//            "📥 Format Download: Starting download with format: ${format.quality} (${format.bitrate})"
-//        )
         Log.d("PlayerViewModel", "📥 Format Download: Format ID: ${format.format_id}")
 
         // Hide dialog
@@ -2139,7 +2139,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Cancel existing download for this song if any
         activeDownloadJobs[currentSong.id]?.cancel()
 
-        val downloadJob = viewModelScope.launch {
+        val downloadJob = viewModelScope.launch(AppDispatchers.Network) {
             try {
                 // Fetch detailed metadata from yt-dlp first
                 Log.d("PlayerViewModel", "📥 Format Download: Fetching metadata from yt-dlp...")

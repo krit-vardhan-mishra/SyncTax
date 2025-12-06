@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.just_for_fun.synctax.R
-import com.just_for_fun.synctax.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Format
 import com.just_for_fun.synctax.data.model.FormatRecyclerView
 import com.google.android.material.card.MaterialCardView
 

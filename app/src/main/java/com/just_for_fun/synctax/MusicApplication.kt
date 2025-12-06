@@ -28,7 +28,7 @@ import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    
+
     // FFmpeg initialization status
     var isFFmpegInitialized = false
         private set
@@ -49,7 +49,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
         applicationScope.launch {
             initializePython()
         }
-        
+
         // Initialize YoutubeDL and SpotDL on background thread
         applicationScope.launch {
             initializeYoutubeDLAndFFmpeg()
@@ -74,16 +74,17 @@ class MusicApplication : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
+                    .maxSizePercent(0.30)  // Increase from 0.25 to 0.30
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.02)
+                    .maxSizeBytes(512L * 1024 * 1024)  // 512MB fixed size
                     .build()
             }
             .crossfade(true)
+            .respectCacheHeaders(false)  // Ignore server cache headers
             .build()
     }
 
@@ -92,7 +93,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
             if (!Python.isStarted()) {
                 Python.start(AndroidPlatform(this))
                 Log.d(TAG, "Python runtime initialized")
-                
+
                 // Initialize YTMusicRecommender for song-only recommendations
                 YTMusicRecommender.initialize()
                 Log.d(TAG, "YTMusicRecommender initialized")
@@ -101,14 +102,14 @@ class MusicApplication : Application(), ImageLoaderFactory {
             Log.e(TAG, "Failed to initialize Python runtime", e)
         }
     }
-    
+
     private fun initializeYoutubeDLAndFFmpeg() {
         try {
             // Initialize YoutubeDL
             Log.d(TAG, "🔧 Initializing YoutubeDL...")
             YoutubeDL.getInstance().init(this)
             Log.d(TAG, "✅ YoutubeDL initialized successfully")
-            
+
             // FFmpeg library removed to reduce APK size (~136MB savings)
             // We use Mutagen (Python) for metadata embedding instead
             isFFmpegInitialized = false
@@ -120,7 +121,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
 
     companion object {
         private const val TAG = "MusicApplication"
-            lateinit var instance: MusicApplication
+        lateinit var instance: MusicApplication
     }
 }
 

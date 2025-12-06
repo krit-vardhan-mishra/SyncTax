@@ -3,7 +3,7 @@ package com.just_for_fun.synctax.presentation.viewmodels
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.just_for_fun.synctax.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Format
 import com.just_for_fun.synctax.data.model.FormatRecyclerView
 import com.just_for_fun.synctax.core.utils.AudioProcessor
 import com.just_for_fun.synctax.core.utils.FormatUtil

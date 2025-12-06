@@ -12,7 +12,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
 import com.just_for_fun.synctax.R
-import com.just_for_fun.synctax.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Format
 import com.just_for_fun.synctax.presentation.ui.adapter.FormatAdapter
 import com.just_for_fun.synctax.presentation.viewmodels.FormatViewModel
 import kotlinx.coroutines.launch

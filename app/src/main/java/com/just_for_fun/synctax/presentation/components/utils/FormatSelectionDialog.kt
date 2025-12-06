@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.just_for_fun.synctax.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Format
 import com.just_for_fun.synctax.presentation.components.card.FormatCard
 import com.just_for_fun.synctax.core.utils.FormatUtil
 

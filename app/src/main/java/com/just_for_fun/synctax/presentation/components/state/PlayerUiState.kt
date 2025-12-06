@@ -1,7 +1,7 @@
 package com.just_for_fun.synctax.presentation.components.state
 
 import com.just_for_fun.synctax.data.local.entities.Song
-import com.just_for_fun.synctax.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Format
 
 data class PlayerUiState(
     val currentSong: Song? = null,

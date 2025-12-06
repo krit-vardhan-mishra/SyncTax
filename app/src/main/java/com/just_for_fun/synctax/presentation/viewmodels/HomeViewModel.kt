@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.cache.ListenAgainManager
 import com.just_for_fun.synctax.data.cache.QuickAccessManager
 import com.just_for_fun.synctax.data.cache.SpeedDialManager
@@ -22,6 +23,7 @@ import com.just_for_fun.synctax.core.utils.AlbumDetails
 import com.just_for_fun.synctax.core.utils.ArtistDetails
 import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -44,15 +47,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
-    
+
     private val onlineManager = OnlineSearchManager()
     private val listenAgainManager = ListenAgainManager(getApplication())
     private val speedDialManager = SpeedDialManager(repository)
     private val quickAccessManager = QuickAccessManager(repository)
-    
+
     private var lastQuickPicksRefresh = 0L
     private val quickPicksRefreshInterval = 15 * 60 * 1000L // 15 minutes in milliseconds
-    
+
     // Track current search job to cancel it when a new search starts
     private var currentSearchJob: Job? = null
 
@@ -115,32 +118,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadData() {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.Database) {  // ✅ Dedicated dispatcher
             _uiState.value = _uiState.value.copy(isLoading = true)
 
             try {
-                // Collect songs
                 repository.getAllSongs().collect { songs ->
-                    _uiState.value = _uiState.value.copy(
-                        allSongs = songs,
-                        isLoading = false
-                    )
+                    withContext(Dispatchers.Main) {  // Switch back to Main for UI updates
+                        _uiState.value = _uiState.value.copy(
+                            allSongs = songs,
+                            isLoading = false
+                        )
+                    }
 
-                    // Generate recommendations if songs available
+                    // Generate recommendations in ML dispatcher
                     if (songs.isNotEmpty()) {
-                        generateQuickPicks()
-                        // Refresh all sections
-                        refreshSections()
+                        launch(AppDispatchers.MachineLearning) {
+                            generateQuickPicks()
+                        }
                     }
                 }
-            } catch (e: CancellationException) {
-                // Coroutine cancellation is expected, don't show as error
-                throw e
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = e.message
-                )
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = e.message
+                    )
+                }
             }
         }
     }
@@ -153,28 +156,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 // Get selected scan paths from UserPreferences
                 val userPrefs = UserPreferences(getApplication())
                 val scanPaths = userPrefs.scanPaths.value
-                
+
                 // Force a complete rescan
                 val songs = repository.scanDeviceMusic(scanPaths)
-                
+
                 // Update the state with fresh data
                 _uiState.value = _uiState.value.copy(
                     allSongs = songs,
                     isScanning = false,
                     scanComplete = true
                 )
-                
+
                 // Notify listeners that songs have been refreshed
                 onSongsRefreshed?.invoke(songs)
-                
+
                 // Refresh album art for songs that might have new art files
                 refreshAlbumArtForSongs()
-                
+
                 // Regenerate quick picks with the updated song list
                 if (songs.isNotEmpty()) {
                     generateQuickPicks()
                 }
-                
+
                 // Refresh all sections after scanning
                 refreshSections()
             } catch (e: CancellationException) {
@@ -192,23 +195,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun searchOnline(query: String, filterType: SearchFilterType = SearchFilterType.ALL) {
         // Cancel any existing search job before starting a new one
         currentSearchJob?.cancel()
-        
+
         currentSearchJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSearchingOnline = true, onlineSearchResults = emptyList())
-            
+            _uiState.value =
+                _uiState.value.copy(isSearchingOnline = true, onlineSearchResults = emptyList())
+
             // Save search query to history
             if (query.isNotBlank()) {
                 addSearchHistory(query)
             }
-            
+
             try {
                 val results = mutableListOf<OnlineSearchResult>()
-                
+
                 // Use suspendCancellableCoroutine to properly await async results
                 // Search for songs if filter is ALL or SONGS
                 if (filterType == SearchFilterType.ALL ||
-                    filterType == SearchFilterType.SONGS) {
-                    
+                    filterType == SearchFilterType.SONGS
+                ) {
+
                     val songResults =
                         suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
                             YTMusicRecommender.searchSongs(
@@ -240,11 +245,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     results.addAll(songResults)
                 }
-                
+
                 // Search for albums if filter is ALL or ALBUMS
                 if (filterType == SearchFilterType.ALL ||
-                    filterType == SearchFilterType.ALBUMS) {
-                    
+                    filterType == SearchFilterType.ALBUMS
+                ) {
+
                     val albumResults =
                         suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
                             YTMusicRecommender.searchAlbums(
@@ -278,11 +284,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     results.addAll(albumResults)
                 }
-                
+
                 // Search for artists if filter is ALL or ARTISTS
                 if (filterType == SearchFilterType.ALL ||
-                    filterType == SearchFilterType.ARTISTS) {
-                    
+                    filterType == SearchFilterType.ARTISTS
+                ) {
+
                     val artistResults =
                         suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
                             YTMusicRecommender.searchArtists(
@@ -316,7 +323,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     results.addAll(artistResults)
                 }
-                
+
                 _uiState.value = _uiState.value.copy(
                     isSearchingOnline = false,
                     onlineSearchResults = results
@@ -333,7 +340,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     /**
      * Fetch album details with songs list
      */
@@ -357,7 +364,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
     }
-    
+
     /**
      * Fetch artist details with top songs list
      */
@@ -411,7 +418,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     recommendationScores = result.recommendations,
                     isGeneratingRecommendations = false
                 )
-                
+
                 // Update Speed Dial with top 9 recommendations
                 speedDialManager.updateRecommendations(recommendedSongs)
                 speedDialManager.setGenerating(false)
@@ -430,7 +437,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun scanMusic() {
-        viewModelScope.launch {
+        viewModelScope.launch(AppDispatchers.MusicScanning) {
             _uiState.value = _uiState.value.copy(isScanning = true)
 
             try {
@@ -511,7 +518,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadTrainingStatistics() {
         viewModelScope.launch {
             try {
-                val history = repository.getRecentHistory(1000).first() // Get more history for better stats
+                val history =
+                    repository.getRecentHistory(1000).first() // Get more history for better stats
                 val preferences = repository.getTopPreferences(200).first()
 
                 // Calculate statistics
@@ -636,10 +644,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 val endTime = System.currentTimeMillis()
                 logs.add("Training completed successfully in ${(endTime - startTime) / 1000}s")
-                phases.add(TrainingPhase("Collaborative Training", collabStart, pythonStart, true,
-                    "Trained on user listening patterns"))
-                phases.add(TrainingPhase("Python ML Training", pythonStart, endTime, true,
-                    "Trained on listening history"))
+                phases.add(
+                    TrainingPhase(
+                        "Collaborative Training", collabStart, pythonStart, true,
+                        "Trained on user listening patterns"
+                    )
+                )
+                phases.add(
+                    TrainingPhase(
+                        "Python ML Training", pythonStart, endTime, true,
+                        "Trained on listening history"
+                    )
+                )
 
                 // Update training history
                 val session = TrainingSession(
@@ -649,7 +665,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     phases = phases
                 )
 
-                val updatedHistory = (_uiState.value.trainingHistory + session).takeLast(10) // Keep last 10 sessions
+                val updatedHistory =
+                    (_uiState.value.trainingHistory + session).takeLast(10) // Keep last 10 sessions
 
                 _uiState.value = _uiState.value.copy(
                     isTraining = false,
@@ -675,7 +692,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 val endTime = System.currentTimeMillis()
                 logs.add("Training failed: ${e.message}")
-                phases.add(TrainingPhase("Training Failed", startTime, endTime, false, e.message ?: "Unknown error"))
+                phases.add(
+                    TrainingPhase(
+                        "Training Failed",
+                        startTime,
+                        endTime,
+                        false,
+                        e.message ?: "Unknown error"
+                    )
+                )
 
                 val session = TrainingSession(
                     timestamp = startTime,
@@ -750,10 +775,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             while (true) {
                 delay(quickPicksRefreshInterval)
-                
+
                 // Check for deleted songs and cleanup ML data
                 cleanupDeletedSongs()
-                
+
                 // Refresh Quick Picks if there's listening history
                 if (_uiState.value.allSongs.isNotEmpty()) {
                     generateQuickPicks()
@@ -761,20 +786,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     private fun cleanupDeletedSongs() {
         viewModelScope.launch {
             try {
                 // Get all song IDs from database
                 val dbSongIds = _uiState.value.allSongs.map { it.id }.toSet()
-                
+
                 // Get all song IDs from listening history and preferences
                 val historyIds = repository.getRecentHistory(1000).first().map { it.songId }.toSet()
-                val preferenceIds = repository.getTopPreferences(1000).first().map { it.songId }.toSet()
-                
+                val preferenceIds =
+                    repository.getTopPreferences(1000).first().map { it.songId }.toSet()
+
                 // Find deleted song IDs (in history/preferences but not in songs table)
                 val deletedIds = (historyIds + preferenceIds) - dbSongIds
-                
+
                 if (deletedIds.isNotEmpty()) {
                     // Remove deleted songs from listening history and preferences
                     repository.cleanupDeletedSongsData(deletedIds.toList())
@@ -790,35 +816,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // Get all songs from database
                 val allSongs = _uiState.value.allSongs
-                
+
                 // Find songs without album art (either null or MediaStore URI)
                 val songsWithoutArt = allSongs.filter { song ->
-                    song.albumArtUri.isNullOrEmpty() || 
-                    song.albumArtUri?.startsWith("content://media/external/audio/albumart") == true
+                    song.albumArtUri.isNullOrEmpty() ||
+                            song.albumArtUri?.startsWith("content://media/external/audio/albumart") == true
                 }
-                
+
                 if (songsWithoutArt.isNotEmpty()) {
                     // Check for local image files for these songs
                     val updatedSongs = mutableListOf<Song>()
-                    
+
                     songsWithoutArt.forEach { song ->
                         val audioFile = File(song.filePath)
                         if (audioFile.exists()) {
 
                             // Check for various album art file patterns
                             val albumArtUri = repository.checkForLocalAlbumArt(audioFile)
-                            
+
                             if (albumArtUri != null) {
                                 // Found album art file, update the song
                                 val updatedSong = song.copy(albumArtUri = albumArtUri)
                                 updatedSongs.add(updatedSong)
-                                
+
                                 // Update in database
                                 repository.insertSong(updatedSong)
                             }
                         }
                     }
-                    
+
                     if (updatedSongs.isNotEmpty()) {
                         // Update the UI state with songs that now have album art
                         val currentSongs = _uiState.value.allSongs.toMutableList()
@@ -828,9 +854,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                 currentSongs[index] = updatedSong
                             }
                         }
-                        
+
                         _uiState.value = _uiState.value.copy(allSongs = currentSongs)
-                        
+
                         // Regenerate quick picks with updated album art
                         if (currentSongs.isNotEmpty()) {
                             generateQuickPicks()
@@ -843,16 +869,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     /**
      * Find album art for a song by checking various file patterns
      */
     private fun findAlbumArtForSong(audioFile: File, directory: File): String? {
         val baseName = audioFile.nameWithoutExtension
-        
+
         // Common image extensions to check
         val imageExtensions = listOf("jpg", "jpeg", "png", "bmp", "gif")
-        
+
         // 1. Check for file with same base name as audio file
         for (ext in imageExtensions) {
             val albumArtFile = File(directory, "$baseName.$ext")
@@ -860,7 +886,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return albumArtFile.absolutePath
             }
         }
-        
+
         // 2. Check for common album art file names in the directory
         val commonAlbumArtNames = listOf("cover", "folder", "album", "artwork", "front")
         for (name in commonAlbumArtNames) {
@@ -871,7 +897,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-        
+
         return null
     }
 
@@ -887,34 +913,42 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         // Speed Dial now uses ML recommendations - updated separately
         quickAccessManager.refresh()
     }
-    
+
     /**
      * Update Speed Dial with ML recommendations
      */
     fun updateSpeedDialRecommendations(songs: List<Song>) {
         speedDialManager.updateRecommendations(songs)
     }
-    
+
     /**
      * Add an online song to the listening history
      */
-    fun addOnlineListeningHistory(videoId: String, title: String, artist: String, thumbnailUrl: String?, watchUrl: String) {
+    fun addOnlineListeningHistory(
+        videoId: String,
+        title: String,
+        artist: String,
+        thumbnailUrl: String?,
+        watchUrl: String
+    ) {
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
-                val onlineHistory = com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory(
-                    videoId = videoId,
-                    title = title,
-                    artist = artist,
-                    thumbnailUrl = thumbnailUrl,
-                    watchUrl = watchUrl
-                )
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val onlineHistory =
+                    com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory(
+                        videoId = videoId,
+                        title = title,
+                        artist = artist,
+                        thumbnailUrl = thumbnailUrl,
+                        watchUrl = watchUrl
+                    )
                 // Delete existing entry with same videoId to prevent duplicates
                 database.onlineListeningHistoryDao().deleteByVideoId(videoId)
                 // Insert new entry with updated timestamp
                 database.onlineListeningHistoryDao().insertOnlineListening(onlineHistory)
                 database.onlineListeningHistoryDao().trimOldRecords()
-                
+
                 // Refresh the online history in UI state
                 loadOnlineHistory()
             } catch (e: Exception) {
@@ -922,37 +956,40 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     /**
      * Load online listening history from database
      */
     private fun loadOnlineHistory() {
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 val userPreferences = UserPreferences(getApplication())
                 var isFirst = true
                 userPreferences.onlineHistoryCount.collect { limit ->
                     if (isFirst) {
                         isFirst = false
                     }
-                    database.onlineListeningHistoryDao().getRecentOnlineHistory(limit).collect { history ->
-                        _uiState.value = _uiState.value.copy(onlineHistory = history)
-                    }
+                    database.onlineListeningHistoryDao().getRecentOnlineHistory(limit)
+                        .collect { history ->
+                            _uiState.value = _uiState.value.copy(onlineHistory = history)
+                        }
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error loading online listening history", e)
             }
         }
     }
-    
+
     /**
      * Delete a song from online listening history
      */
     fun deleteOnlineHistory(videoId: String) {
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 database.onlineListeningHistoryDao().deleteByVideoId(videoId)
                 Log.d("HomeViewModel", "Online history deleted: $videoId")
             } catch (e: Exception) {
@@ -976,7 +1013,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     /**
      * Delete a song from the database and update UI
      */
@@ -985,22 +1022,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // Delete from database
                 repository.deleteSong(song.id)
-                
+
                 // Update UI state by removing the song from the list
                 val updatedSongs = _uiState.value.allSongs.filter { it.id != song.id }
                 _uiState.value = _uiState.value.copy(allSongs = updatedSongs)
-                
+
                 // Cleanup ML data for this song
                 repository.cleanupDeletedSongsData(listOf(song.id))
-                
+
                 // Refresh all sections
                 refreshSections()
-                
+
                 // Regenerate quick picks if songs still available
                 if (updatedSongs.isNotEmpty()) {
                     generateQuickPicks()
                 }
-                
+
                 Log.d("HomeViewModel", "Song deleted successfully: ${song.title}")
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error deleting song from database", e)
@@ -1017,12 +1054,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun updateSelectedFilter(filter: SearchFilterType) {
         _uiState.value = _uiState.value.copy(selectedFilter = filter)
     }
-    
+
     // Search history management
     fun loadSearchHistory() {
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 database.onlineSearchHistoryDao().getRecentSearches(20).collect { history ->
                     _uiState.value = _uiState.value.copy(searchHistory = history)
                 }
@@ -1031,12 +1069,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     fun addSearchHistory(query: String) {
         if (query.isBlank()) return
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 // Delete existing entry with same query to move it to top
                 database.onlineSearchHistoryDao().deleteByQuery(query.trim())
                 // Insert new entry
@@ -1052,36 +1091,38 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     fun deleteSearchHistoryItem(id: Long) {
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 database.onlineSearchHistoryDao().deleteById(id)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
-    
+
     fun clearSearchHistory() {
         viewModelScope.launch {
             try {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 database.onlineSearchHistoryDao().clearAll()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
-    
+
     // Search suggestions management
     fun fetchSearchSuggestions(query: String) {
         if (query.isBlank() || query.length < 2) {
             _uiState.value = _uiState.value.copy(searchSuggestions = emptyList())
             return
         }
-        
+
         viewModelScope.launch {
             YTMusicRecommender.getSearchSuggestions(
                 query = query,
@@ -1095,7 +1136,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
     }
-    
+
     fun clearSearchSuggestions() {
         _uiState.value = _uiState.value.copy(searchSuggestions = emptyList())
     }
