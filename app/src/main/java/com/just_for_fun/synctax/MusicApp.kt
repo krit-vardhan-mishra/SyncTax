@@ -57,6 +57,7 @@ import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
+import com.just_for_fun.synctax.presentation.screens.CreatePlaylistScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -237,6 +238,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 },
                                 onImportClick = {
                                     navController.navigate("import_playlist")
+                                },
+                                onCreatePlaylistClick = {
+                                    navController.navigate("create_playlist")
                                 }
                             )
                         }
@@ -246,6 +250,15 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 playlistViewModel = playlistViewModel,
                                 onBackClick = { navController.popBackStack() },
                                 onImportSuccess = { navController.popBackStack() }
+                            )
+                        }
+                        composable("create_playlist") {
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            CreatePlaylistScreen(
+                                playlistViewModel = playlistViewModel,
+                                homeViewModel = homeViewModel,
+                                onBackClick = { navController.popBackStack() },
+                                onSaveSuccess = { navController.popBackStack() }
                             )
                         }
                         composable(

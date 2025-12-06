@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -30,12 +28,15 @@ import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.card.PlaylistCard
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
+import com.just_for_fun.synctax.presentation.components.state.EmptyPlaylistsState
+import com.just_for_fun.synctax.presentation.components.utils.FABMenu
+import com.just_for_fun.synctax.presentation.components.utils.FabAction
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
-import com.just_for_fun.synctax.presentation.components.state.EmptyPlaylistsState
 
 private const val TAG = "PlaylistScreen"
 
@@ -49,7 +50,8 @@ fun PlaylistScreen(
     scaffoldState: BottomSheetScaffoldState,
     onOpenSettings: () -> Unit = {},
     onPlaylistClick: (Int) -> Unit = {},
-    onImportClick: () -> Unit = {}
+    onImportClick: () -> Unit = {},
+    onCreatePlaylistClick: () -> Unit = {}
 ) {
     val uiState by playlistViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -58,6 +60,20 @@ fun PlaylistScreen(
     val userInitial = userPreferences.getUserInitial()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val fabActions = remember {
+        listOf(
+            FabAction(
+                label = "Import YT Playlist",
+                icon = Icons.Default.PlayArrow,
+                onClick = onImportClick
+            ),
+            FabAction(
+                label = "Create Playlist",
+                icon = Icons.Default.Add,
+                onClick = onCreatePlaylistClick
+            )
+        )
+    }
 
     // Debug: Log when PlaylistScreen is composed
     LaunchedEffect(Unit) {
@@ -107,21 +123,7 @@ fun PlaylistScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    onImportClick()
-                },
-                icon = {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Import playlist"
-                    )
-                },
-                text = { Text("Import") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(bottom = 50.dp)
-            )
+            FABMenu(actions = fabActions)
         }
     ) { paddingValues ->
         DynamicAlbumBackground(
