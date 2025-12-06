@@ -36,8 +36,8 @@ interface OnlineListeningHistoryDao {
     suspend fun trimOldRecords()
     
     /**
-     * Clear all online listening history
+     * Get online history with pagination
      */
-    @Query("DELETE FROM online_listening_history")
-    suspend fun clearAll()
+    @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    fun getOnlineHistoryPaged(offset: Int, limit: Int): Flow<List<OnlineListeningHistory>>
 }

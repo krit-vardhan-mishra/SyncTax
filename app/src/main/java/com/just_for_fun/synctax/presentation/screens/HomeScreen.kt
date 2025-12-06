@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -48,6 +49,8 @@ import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
 import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.presentation.components.loading.SongCardShimmer
+import com.just_for_fun.synctax.presentation.components.loading.SkeletonHomeScreen
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import com.just_for_fun.synctax.presentation.components.onboarding.DirectorySelectionDialog
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
 import com.just_for_fun.synctax.presentation.components.section.OnlineHistorySection
@@ -75,7 +78,9 @@ fun HomeScreen(
     onTrainClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNavigateToLibrary: () -> Unit = {},
-    onNavigateToPlaylist: (Int) -> Unit = {}
+    onNavigateToPlaylist: (Int) -> Unit = {},
+    onNavigateToPlaylists: () -> Unit = {},
+    onNavigateToOnlineSongs: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -105,12 +110,17 @@ fun HomeScreen(
     val sectionSubtitleColor = AppColors.homeSectionSubtitle
     val greetingTextColor = AppColors.homeGreetingText
 
-    // Detect scroll to bottom
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo }
-            .collect { layoutInfo ->
-                val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                val totalItems = layoutInfo.totalItemsCount
+    // Detect scroll to bottom - use remember to avoid recreating on every recomposition
+    LaunchedEffect(Unit) { // Remove listState dependency to prevent constant relaunching
+        snapshotFlow { 
+            val layoutInfo = listState.layoutInfo
+            Pair(
+                layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0,
+                layoutInfo.totalItemsCount
+            )
+        }
+            .distinctUntilChanged() // Only emit when values actually change
+            .collect { (lastVisibleItemIndex, totalItems) ->
                 if (lastVisibleItemIndex >= totalItems - 1 && !hasScrolledToBottom && totalItems > 0) {
                     hasScrolledToBottom = true
                     // Refresh album art when user scrolls to bottom
@@ -151,13 +161,15 @@ fun HomeScreen(
     // Animation states
     var isVisible by remember { mutableStateOf(false) }
 
-    // FIXED: Update album colors when current song changes
-    LaunchedEffect(playerState.currentSong?.albumArtUri) {
-        dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
+    // Update album colors when current song changes
+    val currentAlbumArtUri = playerState.currentSong?.albumArtUri
+    LaunchedEffect(currentAlbumArtUri) {
+        // Only update if URI actually changed (LaunchedEffect already handles this, but explicit variable makes intent clear)
+        dynamicBgViewModel.updateAlbumArt(currentAlbumArtUri)
     }
 
-    // Set up callback for refreshing downloaded songs check
-    LaunchedEffect(homeViewModel, playerViewModel) {
+    // Set up callback for refreshing downloaded songs check (only once)
+    LaunchedEffect(Unit) {
         homeViewModel.onSongsRefreshed = { songs ->
             playerViewModel.refreshDownloadedSongsCheck(songs)
         }
@@ -218,14 +230,10 @@ fun HomeScreen(
             ) {
                 when {
                     uiState.isLoading -> {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = 16.dp)
-                        ) {
-                            items(10) {
-                                SongCardShimmer()
-                            }
-                        }
+                        // Show skeleton loading screen
+                        SkeletonHomeScreen(
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
 
                     else -> {
@@ -245,10 +253,9 @@ fun HomeScreen(
                             enter = fadeIn(animationSpec = tween(600)) +
                                     slideInVertically(animationSpec = tween(600)) { it / 4 }
                         ) {
-                            LazyColumn(
+                            OptimizedLazyColumn(
                                 state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                                modifier = Modifier.fillMaxSize()
                             ) {
                                 // Greeting Section with dynamic colors
                                 if (userName.isNotEmpty()) {
@@ -267,7 +274,10 @@ fun HomeScreen(
                                 }
 
                                 // Filter Chips
-                                item {
+                                item(
+                                    key = "filter_chips",
+                                    contentType = "filter"
+                                ) {
                                     FilterChipsRow(
                                         selectedChip = selectedFilter,
                                         onChipSelected = { chip -> selectedFilter = chip }
@@ -287,17 +297,7 @@ fun HomeScreen(
                                                     durationMs = 0L
                                                 )
                                             },
-                                            onPlayAll = {
-                                                uiState.onlineHistory.firstOrNull()
-                                                    ?.let { firstHistory ->
-                                                        playerViewModel.playUrl(
-                                                            url = firstHistory.watchUrl,
-                                                            title = firstHistory.title,
-                                                            artist = firstHistory.artist,
-                                                            durationMs = 0L
-                                                        )
-                                                    }
-                                            },
+                                            onViewAllClick = onNavigateToOnlineSongs,
                                             currentVideoId = if (playerState.currentSong?.id?.startsWith(
                                                     "online:"
                                                 ) == true
@@ -320,7 +320,10 @@ fun HomeScreen(
                                 // Listen Again Section (only show if there are local songs)
                                 if ((selectedFilter == "All" || selectedFilter == "Listen Again") && uiState.allSongs.isNotEmpty()) {
                                     @OptIn(ExperimentalFoundationApi::class)
-                                    item {
+                                    item(
+                                        key = "listen_again",
+                                        contentType = "section"
+                                    ) {
                                         SectionHeader(
                                             title = "Listen again",
                                             subtitle = null,
@@ -339,7 +342,10 @@ fun HomeScreen(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             contentPadding = PaddingValues(horizontal = 16.dp)
                                         ) {
-                                            items(pages.size) { pageIndex ->
+                                            items(
+                                                count = pages.size,
+                                                key = { pageIndex -> "listen_again_page_$pageIndex" }
+                                            ) { pageIndex ->
                                                 Column(
                                                     modifier = Modifier
                                                         .fillParentMaxWidth()
@@ -392,7 +398,7 @@ fun HomeScreen(
                                             onPlaylistClick = { playlist ->
                                                 onNavigateToPlaylist(playlist.playlistId)
                                             },
-                                            onViewAllClick = onNavigateToLibrary
+                                            onViewAllClick = onNavigateToPlaylists
                                         )
                                     }
                                 }

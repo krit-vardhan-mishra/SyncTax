@@ -74,17 +74,19 @@ class MusicApplication : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.30)  // Increase from 0.25 to 0.30
+                    .maxSizePercent(0.30)  // 30% of available memory
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(512L * 1024 * 1024)  // 512MB fixed size
+                    .maxSizeBytes(512L * 1024 * 1024)  // 512MB
                     .build()
             }
-            .crossfade(true)
-            .respectCacheHeaders(false)  // Ignore server cache headers
+            // Optimize for smoothness like OuterTune/SimpMusic
+            .crossfade(300) // Faster crossfade (300ms vs default 1000ms)
+            .respectCacheHeaders(false) // Ignore server cache headers
+            .allowHardware(false) // Disable hardware bitmaps for better thread safety
             .build()
     }
 

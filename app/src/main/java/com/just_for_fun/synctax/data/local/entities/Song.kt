@@ -1,9 +1,17 @@
 package com.just_for_fun.synctax.data.local.entities
 
+import androidx.compose.runtime.Stable
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Represents a song entity stored in the local database.
+ * 
+ * @Stable annotation prevents Compose from checking all properties on every recomposition,
+ * improving scroll performance in LazyColumn/LazyRow.
+ */
+@Stable
 @Entity(
     tableName = "songs",
     indices = [

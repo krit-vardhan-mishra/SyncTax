@@ -73,7 +73,7 @@ fun SavedPlaylistsSection(
                 }
             }
 
-            if (playlists.size > 5) {
+            if (playlists.size > 0) {
                 TextButton(onClick = onViewAllClick) {
                     Text(
                         text = "View all",

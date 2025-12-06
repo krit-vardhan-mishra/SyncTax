@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -44,7 +44,7 @@ fun TrainingScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
+        OptimizedLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -297,7 +297,7 @@ private fun TrainingLogsCard(logs: List<String>) {
                 style = MaterialTheme.typography.headlineSmall
             )
 
-            LazyColumn(
+            OptimizedLazyColumn(
                 modifier = Modifier.height(200.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {

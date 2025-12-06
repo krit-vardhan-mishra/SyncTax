@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,6 +32,9 @@ fun SimpleSongCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Remember placeholder color to avoid recomposition on color changes
+    val placeholderColor = MaterialTheme.colorScheme.surfaceVariant
+    
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -42,7 +46,7 @@ fun SimpleSongCard(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Album art with optimized loading
+        // Album art with optimized loading and placeholder
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(song.albumArtUri)
@@ -50,6 +54,8 @@ fun SimpleSongCard(
                 .crossfade(true)
                 .build(),
             contentDescription = null,
+            placeholder = ColorPainter(placeholderColor),
+            error = ColorPainter(placeholderColor),
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(4.dp))

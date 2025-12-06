@@ -4,8 +4,8 @@ import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -348,7 +348,7 @@ fun SearchScreen(
                     searchQuery.isEmpty() -> {
                         // Show search history or empty state
                         if (uiState.searchHistory.isNotEmpty()) {
-                            LazyColumn(
+                            OptimizedLazyColumn(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(vertical = 8.dp)
                             ) {
@@ -374,7 +374,7 @@ fun SearchScreen(
                                     }
                                 }
 
-                                items(uiState.searchHistory) { historyItem ->
+                                items(uiState.searchHistory, key = { it.id }) { historyItem ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -439,7 +439,7 @@ fun SearchScreen(
 
                     filteredSongs.isEmpty() -> {
                         // No local results - show scrollable container with no results message and online results
-                        LazyColumn(
+                        OptimizedLazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -493,7 +493,7 @@ fun SearchScreen(
                                         }
                                     }
 
-                                    items(uiState.onlineSearchResults) { result ->
+                                    items(uiState.onlineSearchResults, key = { it.id }) { result ->
                                         val coroutineScope = rememberCoroutineScope()
                                         OnlineResultCard(result) { res ->
                                             // Check result type and navigate accordingly
@@ -645,7 +645,7 @@ fun SearchScreen(
 
                     else -> {
                         // Show results
-                        LazyColumn(
+                        OptimizedLazyColumn(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -657,7 +657,7 @@ fun SearchScreen(
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
                             }
-                            items(filteredSongs) { song ->
+                            items(filteredSongs, key = { it.id }) { song ->
                                 SongCard(
                                     song = song,
                                     onClick = { playerViewModel.playSong(song, filteredSongs) },

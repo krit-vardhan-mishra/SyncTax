@@ -48,26 +48,43 @@ class MusicPlayer(context: Context) {
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val isBuffering = playbackState == Player.STATE_BUFFERING
+                val isEnded = playbackState == Player.STATE_ENDED
+                val isReady = playbackState == Player.STATE_READY
+                
                 _playerState.value = _playerState.value.copy(
-                    isBuffering = playbackState == Player.STATE_BUFFERING,
-                    isEnded = playbackState == Player.STATE_ENDED
+                    isBuffering = isBuffering,
+                    isEnded = isEnded
                 )
                 
                 // Update duration when player is ready
-                if (playbackState == Player.STATE_READY) {
+                if (isReady) {
                     val duration = exoPlayer.duration
-                    if (duration > 0) {
+                    if (duration > 0 && duration != _playerState.value.duration) {
                         _playerState.value = _playerState.value.copy(duration = duration)
                     }
                 }
+                
+                // Log state changes for debugging (not in hot path)
+                if (isEnded || isBuffering) {
+                    Log.d(TAG, "Playback state: ${playbackStateToString(playbackState)}")
+                }
             }
         })
+    }
+    
+    private fun playbackStateToString(state: Int): String = when (state) {
+        Player.STATE_IDLE -> "IDLE"
+        Player.STATE_BUFFERING -> "BUFFERING"
+        Player.STATE_READY -> "READY"
+        Player.STATE_ENDED -> "ENDED"
+        else -> "UNKNOWN"
     }
 
     private var positionUpdateRunnable: Runnable? = null
 
     private var lastEmittedPosition = 0L
-    private val positionUpdateThreshold = 1000L // Only update if position changed by 1 second
+    private val positionUpdateThreshold = 100L // Update more frequently but throttle emissions
     
     private fun startPositionUpdates() {
         stopPositionUpdates()
@@ -79,7 +96,7 @@ class MusicPlayer(context: Context) {
                     _currentPosition.value = currentPos
                     lastEmittedPosition = currentPos
                 }
-                mainHandler.postDelayed(this, 500) // Update every 500ms (reduced frequency)
+                mainHandler.postDelayed(this, 200) // Update every 200ms for smoother UI
             }
         }
         mainHandler.post(positionUpdateRunnable!!)

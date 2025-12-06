@@ -35,7 +35,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import com.just_for_fun.synctax.core.player.PreloadManager
 import com.just_for_fun.synctax.core.player.StreamUrlCache
 import com.just_for_fun.synctax.core.utils.RecommendedSong
@@ -212,53 +214,92 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             application.registerReceiver(serviceActionReceiver, filter)
         }
 
+        // Collect playing state changes
         viewModelScope.launch {
-            player.playerState.collect { playerState ->
-                _uiState.value = _uiState.value.copy(
-                    isPlaying = playerState.isPlaying,
-                    isBuffering = playerState.isBuffering,
-                    duration = playerState.duration
-                )
-
-                // Update notification when playback state changes
-                updateNotification()
-
-                // Handle song end
-                if (playerState.isEnded) {
-                    onSongEnded()
-                }
-            }
-        }
-
-        // Collect position updates from player
-        viewModelScope.launch {
-            player.currentPosition.collect { position ->
-                _uiState.value = _uiState.value.copy(
-                    position = position
-                )
-
-                // Update notification periodically (every second)
-                if (position % 1000 < 100) {
+            player.playerState
+                .map { it.isPlaying }
+                .distinctUntilChanged()
+                .collect { isPlaying ->
+                    _uiState.value = _uiState.value.copy(isPlaying = isPlaying)
                     updateNotification()
                 }
-
-                // Save current state periodically
-                _uiState.value.currentSong?.let { song ->
-                    if (position % 5000 < 100) { // Save every ~5 seconds
-                        playerPreferences.saveCurrentSong(
-                            songId = song.id,
-                            position = position,
-                            isPlaying = _uiState.value.isPlaying
-                        )
+        }
+        
+        // Collect buffering state changes
+        viewModelScope.launch {
+            player.playerState
+                .map { it.isBuffering }
+                .distinctUntilChanged()
+                .collect { isBuffering ->
+                    _uiState.value = _uiState.value.copy(isBuffering = isBuffering)
+                }
+        }
+        
+        // Collect duration changes
+        viewModelScope.launch {
+            player.playerState
+                .map { it.duration }
+                .distinctUntilChanged()
+                .collect { duration ->
+                    _uiState.value = _uiState.value.copy(duration = duration)
+                }
+        }
+        
+        // Collect song end events
+        viewModelScope.launch {
+            player.playerState
+                .map { it.isEnded }
+                .distinctUntilChanged()
+                .collect { isEnded ->
+                    if (isEnded) {
+                        onSongEnded()
                     }
                 }
+        }
 
-                // Prefetch next song when reaching 75% progress
-                val duration = _uiState.value.duration
-                if (duration > 0 && position >= (duration * 0.75)) {
-                    prefetchNextSongIfNeeded()
+        // Collect position updates from player with optimizations
+        viewModelScope.launch {
+            var lastNotificationUpdate = 0L
+            var lastStateSave = 0L
+            var hasPrefetched = false
+
+            player.currentPosition
+                // Prevent duplicate emissions
+                .collect { position ->
+                    _uiState.value = _uiState.value.copy(position = position)
+
+                    val currentTime = System.currentTimeMillis()
+                    
+                    // Update notification every 2 seconds (reduced frequency)
+                    if (currentTime - lastNotificationUpdate >= 2000) {
+                        updateNotification()
+                        lastNotificationUpdate = currentTime
+                    }
+
+                    // Save current state every 5 seconds
+                    _uiState.value.currentSong?.let { song ->
+                        if (currentTime - lastStateSave >= 5000) {
+                            playerPreferences.saveCurrentSong(
+                                songId = song.id,
+                                position = position,
+                                isPlaying = _uiState.value.isPlaying
+                            )
+                            lastStateSave = currentTime
+                        }
+                    }
+
+                    // Prefetch next song when reaching 75% progress (once per song)
+                    val duration = _uiState.value.duration
+                    if (!hasPrefetched && duration > 0 && position >= (duration * 0.75)) {
+                        prefetchNextSongIfNeeded()
+                        hasPrefetched = true
+                    }
+                    
+                    // Reset prefetch flag when song changes or restarts
+                    if (position < 1000) {
+                        hasPrefetched = false
+                    }
                 }
-            }
         }
 
         // Initialize volume from device and sync UI state

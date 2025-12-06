@@ -18,7 +18,7 @@ import com.just_for_fun.synctax.presentation.components.card.OnlineHistoryCard
 fun OnlineHistorySection(
     history: List<OnlineListeningHistory>,
     onHistoryClick: (OnlineListeningHistory) -> Unit,
-    onPlayAll: () -> Unit = {},
+    onViewAllClick: () -> Unit = {},
     currentVideoId: String? = null,
     onRemoveFromHistory: (OnlineListeningHistory) -> Unit = {}
 ) {
@@ -47,13 +47,17 @@ fun OnlineHistorySection(
                 )
             }
 
-            if (history.isNotEmpty()) {
-                TextButton(onClick = onPlayAll) {
-                    Text(
-                        "Play all",
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Medium
-                    )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (history.size > 0) {
+                    TextButton(onClick = onViewAllClick) {
+                        Text(
+                            "View all",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -83,7 +87,7 @@ fun OnlineHistorySection(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
-                items(history) { item ->
+                items(history.take(10)) { item ->
                     OnlineHistoryCard(
                         history = item,
                         onClick = { onHistoryClick(item) },

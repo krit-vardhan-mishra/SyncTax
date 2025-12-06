@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
@@ -34,7 +34,7 @@ fun AlbumsTab(
 ) {
     val albumsMap = songs.groupBy { it.album ?: "Unknown Album" }
 
-    LazyColumn(
+    OptimizedLazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 16.dp,
@@ -53,7 +53,7 @@ fun AlbumsTab(
             )
         }
 
-        items(albumsMap.entries.toList()) { (album, albumSongs) ->
+        items(albumsMap.entries.toList(), key = { (album, _) -> album }) { (album, albumSongs) ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {

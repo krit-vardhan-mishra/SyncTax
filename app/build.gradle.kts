@@ -195,6 +195,7 @@ dependencies {
 
     // Worker
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("io.github.kyant0:backdrop:1.0.0")
 
     // FFmpeg for audio processing - DISABLED: ~136MB savings
     // The youtubedl-android FFmpeg doesn't have a usable execute() method

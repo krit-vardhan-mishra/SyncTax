@@ -93,41 +93,8 @@ fun LibraryScreen(
     val tabSelectedTextColor = AppColors.libraryTabSelectedText
     val tabUnselectedTextColor = AppColors.libraryTabUnselected
     
-    // Storage permission launcher for Android 11+
-    val storagePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { _ ->
-        // Permission result handled
-    }
-    
-    // Regular storage permissions for Android 10 and below
-    val writePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            Log.w("LibraryScreen", "Write storage permission denied")
-        }
-    }
-    
-    // Request storage permissions on first composition
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+ - Request MANAGE_EXTERNAL_STORAGE
-            if (!Environment.isExternalStorageManager()) {
-                try {
-                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                    }
-                    storagePermissionLauncher.launch(intent)
-                } catch (e: Exception) {
-                    Log.e("LibraryScreen", "Error requesting storage permission", e)
-                }
-            }
-        } else {
-            // Android 10 and below - Request WRITE_EXTERNAL_STORAGE
-            writePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-    }
+    // Note: Storage permissions are now requested at app startup in MainActivity
+    // No need to request them again here
 
     // Update colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {

@@ -46,6 +46,7 @@ import com.just_for_fun.synctax.presentation.screens.ImportPlaylistScreen
 import com.just_for_fun.synctax.presentation.screens.LibraryScreen
 import com.just_for_fun.synctax.presentation.screens.PlaylistDetailScreen
 import com.just_for_fun.synctax.presentation.screens.PlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.OnlineSongsScreen
 import com.just_for_fun.synctax.presentation.screens.QuickPicksScreen
 import com.just_for_fun.synctax.presentation.screens.SearchScreen
 import com.just_for_fun.synctax.presentation.screens.SettingsScreen
@@ -53,6 +54,7 @@ import com.just_for_fun.synctax.presentation.screens.TrainingScreen
 import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 
@@ -183,7 +185,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 onOpenSettings = { navController.navigate("settings") },
                                 onNavigateToPlaylist = { playlistId ->
                                     navController.navigate("playlist_detail/$playlistId")
-                                }
+                                },
+                                onNavigateToPlaylists = { navController.navigate("playlists") },
+                                onNavigateToOnlineSongs = { navController.navigate("online_songs") }
                             )
                         }
                         composable("search") {
@@ -349,6 +353,30 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     }
                                 )
                             }
+                        }
+                        composable("online_songs") {
+                            val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
+                            OnlineSongsScreen(
+                                onlineSongsViewModel = onlineSongsViewModel,
+                                playerViewModel = playerViewModel,
+                                dynamicBgViewModel = dynamicBgViewModel,
+                                userPreferences = userPreferences,
+                                scaffoldState = scaffoldState,
+                                onOpenSettings = { navController.navigate("settings") },
+                                onShuffleClick = {
+                                    val history = onlineSongsViewModel.uiState.value.history
+                                    if (history.isNotEmpty()) {
+                                        val shuffledHistory = history.shuffled()
+                                        val firstSong = shuffledHistory.first()
+                                        playerViewModel.playUrl(
+                                            url = firstSong.watchUrl,
+                                            title = firstSong.title,
+                                            artist = firstSong.artist,
+                                            durationMs = 0L
+                                        )
+                                    }
+                                }
+                            )
                         }
                         composable(
                             route = "album/{albumName}",

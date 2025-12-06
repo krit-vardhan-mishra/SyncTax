@@ -27,9 +27,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -321,7 +321,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Permission state and launcher logic remains the same for correctness
+    // Check if READ_MEDIA_IMAGES permission is granted
     var hasImagePermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -335,6 +335,7 @@ fun SettingsScreen(
         )
     }
 
+    // Permission launcher for READ_MEDIA_IMAGES - only requested when user enables this feature
     val imagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -378,7 +379,7 @@ fun SettingsScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
-        LazyColumn(
+        OptimizedLazyColumn(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),

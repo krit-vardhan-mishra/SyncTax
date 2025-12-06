@@ -3,8 +3,8 @@ package com.just_for_fun.synctax.presentation.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -153,7 +153,7 @@ fun PlaylistDetailScreen(
                 }
             }
         } else {
-            LazyColumn(
+            OptimizedLazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
@@ -169,7 +169,7 @@ fun PlaylistDetailScreen(
                 }
                 
                 // Songs list
-                itemsIndexed(detailState.songs) { index, song ->
+                itemsIndexed(detailState.songs, key = { _, song -> song.id }) { index, song ->
                     PlaylistSongItem(
                         song = song,
                         index = index + 1,
