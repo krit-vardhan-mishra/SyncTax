@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +27,41 @@ import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 import kotlinx.coroutines.delay
 
+// 1. Define custom colors for the platforms
+private val YtMusicRed = Color(0xFFFF0000)
+private val SpotifyGreen = Color(0xFF1DB954)
+private val SuccessGreen = Color(0xFF4CAF50)
+
+/**
+ * A data class to hold platform-specific colors.
+ */
+private data class PlatformColors(
+    val primary: Color,
+    val onPrimary: Color,
+    val surfaceVariant: Color
+)
+
+@Composable
+private fun getPlatformColors(selectedPlatform: String): PlatformColors {
+    return when (selectedPlatform) {
+        "youtube" -> PlatformColors(
+            primary = YtMusicRed,
+            onPrimary = Color.White,
+            surfaceVariant = YtMusicRed.copy(alpha = 0.2f)
+        )
+        "spotify" -> PlatformColors(
+            primary = SpotifyGreen,
+            onPrimary = Color.Black, // Spotify typically uses black text on green
+            surfaceVariant = SpotifyGreen.copy(alpha = 0.2f)
+        )
+        else -> PlatformColors( // Fallback to MaterialTheme colors
+            primary = MaterialTheme.colorScheme.primary,
+            onPrimary = MaterialTheme.colorScheme.onPrimary,
+            surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
+}
+
 /**
  * Screen for importing playlists from YouTube/YouTube Music
  */
@@ -34,12 +70,17 @@ import kotlinx.coroutines.delay
 fun ImportPlaylistScreen(
     playlistViewModel: PlaylistViewModel,
     onBackClick: () -> Unit,
-    onImportSuccess: () -> Unit
+    onImportSuccess: () -> Unit,
+    initialPlatform: String = "youtube"
 ) {
     val importState by playlistViewModel.importState.collectAsState()
     var playlistUrl by remember { mutableStateOf("") }
+    var selectedPlatform by remember { mutableStateOf(initialPlatform) }
     val focusManager = LocalFocusManager.current
-    
+
+    // Get the dynamic colors based on the selected platform
+    val platformColors = getPlatformColors(selectedPlatform)
+
     // Handle import success
     LaunchedEffect(importState.importSuccess) {
         if (importState.importSuccess == true) {
@@ -49,7 +90,7 @@ fun ImportPlaylistScreen(
             onImportSuccess()
         }
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -79,45 +120,73 @@ fun ImportPlaylistScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header icon
+            // Header icon (tinted by platform color)
             Icon(
-                imageVector = Icons.Default.QueueMusic,
+                imageVector = Icons.AutoMirrored.Filled.QueueMusic,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = platformColors.primary // Use dynamic primary color
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
-                text = "Import from YouTube",
+                text = if (selectedPlatform == "youtube") "Import from YouTube" else "Import from Spotify",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
-                text = "Paste a YouTube or YouTube Music playlist link to import all songs",
+                text = if (selectedPlatform == "youtube") "Paste a YouTube or YouTube Music playlist link to import all songs" else "Paste a Spotify playlist link to import all songs",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp)
             )
-            
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Platform selection buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Button(
+                    onClick = { selectedPlatform = "youtube" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedPlatform == "youtube") platformColors.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (selectedPlatform == "youtube") platformColors.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text("YouTube")
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Button(
+                    onClick = { selectedPlatform = "spotify" },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedPlatform == "spotify") platformColors.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = if (selectedPlatform == "spotify") platformColors.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Text("Spotify")
+                }
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
-            
+
             // URL input field
             OutlinedTextField(
                 value = playlistUrl,
-                onValueChange = { 
+                onValueChange = {
                     playlistUrl = it
                     if (it.length > 10) {
                         playlistViewModel.validateUrl(it)
                     }
                 },
                 label = { Text("Playlist URL") },
-                placeholder = { Text("https://youtube.com/playlist?list=...") },
+                placeholder = { Text(if (selectedPlatform == "youtube") "https://youtube.com/playlist?list=..." else "https://open.spotify.com/playlist/...") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 leadingIcon = {
@@ -131,14 +200,15 @@ fun ImportPlaylistScreen(
                         importState.isValidating -> {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.dp,
+                                color = platformColors.primary // Tint loading with platform color
                             )
                         }
                         importState.isUrlValid == true -> {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Valid URL",
-                                tint = Color(0xFF4CAF50)
+                                tint = SuccessGreen
                             )
                         }
                         importState.isUrlValid == false && playlistUrl.isNotEmpty() -> {
@@ -164,7 +234,7 @@ fun ImportPlaylistScreen(
                         importState.isUrlValid == true && importState.platform != null -> {
                             Text(
                                 text = "✓ Valid ${importState.platform} playlist",
-                                color = Color(0xFF4CAF50)
+                                color = SuccessGreen
                             )
                         }
                         importState.isUrlValid == false && playlistUrl.isNotEmpty() -> {
@@ -189,10 +259,10 @@ fun ImportPlaylistScreen(
                 ),
                 enabled = !importState.isImporting
             )
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
-            // Import button
+
+            // Import button (tinted by platform color)
             Button(
                 onClick = {
                     focusManager.clearFocus()
@@ -201,12 +271,16 @@ fun ImportPlaylistScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = importState.isUrlValid == true && !importState.isImporting
+                enabled = importState.isUrlValid == true && !importState.isImporting,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = platformColors.primary,
+                    contentColor = platformColors.onPrimary
+                )
             ) {
                 if (importState.isImporting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = platformColors.onPrimary,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -220,9 +294,9 @@ fun ImportPlaylistScreen(
                     Text("Import Playlist")
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             // Success message
             AnimatedVisibility(
                 visible = importState.importSuccess == true,
@@ -231,7 +305,7 @@ fun ImportPlaylistScreen(
             ) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF4CAF50).copy(alpha = 0.1f)
+                        containerColor = SuccessGreen.copy(alpha = 0.1f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -244,7 +318,7 @@ fun ImportPlaylistScreen(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = Color(0xFF4CAF50),
+                            tint = SuccessGreen,
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
@@ -253,7 +327,7 @@ fun ImportPlaylistScreen(
                                 text = "Import Successful!",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF4CAF50)
+                                color = SuccessGreen
                             )
                             importState.importedPlaylist?.let { playlist ->
                                 Text(
@@ -270,7 +344,7 @@ fun ImportPlaylistScreen(
                     }
                 }
             }
-            
+
             // Error message
             AnimatedVisibility(
                 visible = importState.importSuccess == false && importState.errorMessage != null,
@@ -312,13 +386,13 @@ fun ImportPlaylistScreen(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
-            
+
             // Help section
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    containerColor = platformColors.surfaceVariant // Tint help section background with platform color
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -331,7 +405,7 @@ fun ImportPlaylistScreen(
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = platformColors.primary // Tint info icon with platform color
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -340,20 +414,16 @@ fun ImportPlaylistScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    
+
                     HelpItem(
-                        icon = Icons.Default.PlayCircle,
-                        text = "YouTube playlists (youtube.com)"
+                        icon = if (selectedPlatform == "youtube") Icons.Default.PlayCircle else Icons.Default.MusicNote,
+                        text = if (selectedPlatform == "youtube") "YouTube playlists (youtube.com)" else "Spotify playlists (open.spotify.com)"
                     )
-                    HelpItem(
-                        icon = Icons.Default.MusicNote,
-                        text = "YouTube Music playlists (music.youtube.com)"
-                    )
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     Text(
                         text = "Note: Only public playlists can be imported. Private playlists require login which is not supported.",
                         style = MaterialTheme.typography.bodySmall,

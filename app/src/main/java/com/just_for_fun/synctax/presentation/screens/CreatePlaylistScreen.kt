@@ -33,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +54,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -86,49 +88,81 @@ fun CreatePlaylistScreen(
     val homeState by homeViewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    
+
     // Playlist creation state
     var playlistName by remember { mutableStateOf("") }
     var playlistType by remember { mutableStateOf<PlaylistType?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedQuery by remember { mutableStateOf("") }
     var showSearchResults by remember { mutableStateOf(false) }
-    var searchJob by remember { mutableStateOf<Job?>(null) }
-    
+
+    // Debounce jobs
+    var offlineSearchJob by remember { mutableStateOf<Job?>(null) }
+    var onlineSearchDebounceJob by remember { mutableStateOf<Job?>(null) }
+
     // Selected songs lists
     val selectedOfflineSongs = remember { mutableStateListOf<Song>() }
     val selectedOnlineSongs = remember { mutableStateListOf<OnlineSong>() }
-    
-    // Search with debounce
+
+    // Debounce search query for general filtering (500ms)
     LaunchedEffect(searchQuery) {
-        showSearchResults = searchQuery.isNotEmpty()
-        searchJob?.cancel()
-        
-        if (searchQuery.isNotEmpty() && playlistType == PlaylistType.ONLINE) {
-            searchJob = coroutineScope.launch {
-                delay(500)
-                homeViewModel.searchOnline(searchQuery)
+        // Cancel any pending OFFLINE search job
+        offlineSearchJob?.cancel()
+
+        if (searchQuery.length >= 1) { // Start debouncing after at least 1 character
+            offlineSearchJob = coroutineScope.launch {
+                delay(500) // Wait 500ms after user stops typing for local filter
+                debouncedQuery = searchQuery
+                showSearchResults = searchQuery.isNotEmpty()
             }
+        } else {
+            debouncedQuery = ""
+            showSearchResults = false
         }
     }
-    
-    // Filter search results based on playlist type
-    val searchResults = remember(searchQuery, homeState.allSongs, homeState.onlineSearchResults, playlistType) {
-        if (searchQuery.isEmpty()) {
-            emptyList()
-        } else when (playlistType) {
-            PlaylistType.OFFLINE -> {
-                homeState.allSongs.filter { song ->
-                    song.title.contains(searchQuery, ignoreCase = true) ||
-                    song.artist.contains(searchQuery, ignoreCase = true) ||
-                    song.album?.contains(searchQuery, ignoreCase = true) == true
+
+    // Debounce online search query for API call (800ms)
+    LaunchedEffect(searchQuery, playlistType) {
+        // Cancel any pending ONLINE search job
+        onlineSearchDebounceJob?.cancel()
+
+        // Only search online if type is selected and query is not empty
+        if (searchQuery.isNotEmpty() && playlistType == PlaylistType.ONLINE) {
+            onlineSearchDebounceJob = coroutineScope.launch {
+                delay(800) // Wait 800ms after user stops typing for online search
+                // Only trigger the API call if the current searchQuery still matches the latest input
+                if (searchQuery.isNotEmpty()) {
+                    homeViewModel.searchOnline(searchQuery)
                 }
             }
-            PlaylistType.ONLINE -> {
-                homeState.onlineSearchResults
-            }
-            null -> emptyList()
         }
     }
+
+    // Filter search results based on playlist type and debounced query
+    val searchResults =
+        remember(debouncedQuery, homeState.allSongs, homeState.onlineSearchResults, playlistType) {
+            if (debouncedQuery.isEmpty()) {
+                emptyList()
+            } else when (playlistType) {
+                PlaylistType.OFFLINE -> {
+                    homeState.allSongs.filter { song ->
+                        song.title.contains(debouncedQuery, ignoreCase = true) ||
+                                song.artist.contains(debouncedQuery, ignoreCase = true) ||
+                                song.album?.contains(debouncedQuery, ignoreCase = true) == true
+                    }
+                }
+
+                PlaylistType.ONLINE -> {
+                    // Filter online search results to ensure they match the debounced text
+                    homeState.onlineSearchResults.filter {
+                        it.title.contains(debouncedQuery, ignoreCase = true) ||
+                                it.author?.contains(debouncedQuery, ignoreCase = true) == true
+                    }
+                }
+
+                null -> emptyList()
+            }
+        }
 
     Scaffold(
         topBar = {
@@ -148,21 +182,27 @@ fun CreatePlaylistScreen(
             )
         },
         floatingActionButton = {
-            val isEnabled = playlistName.isNotBlank() && 
-                            (selectedOfflineSongs.isNotEmpty() || selectedOnlineSongs.isNotEmpty())
+            val isEnabled = playlistName.isNotBlank() &&
+                    (selectedOfflineSongs.isNotEmpty() || selectedOnlineSongs.isNotEmpty())
             ExtendedFloatingActionButton(
                 text = { Text("Create") },
                 icon = { Icon(Icons.Filled.Save, contentDescription = "Create Playlist") },
                 onClick = {
                     if (isEnabled) {
-                        // TODO: Implement save to database
-                        // playlistViewModel.createPlaylist(playlistName, selectedSongs, playlistType)
-                        onSaveSuccess()
+                        playlistViewModel.createPlaylist(
+                            name = playlistName,
+                            offlineSongs = selectedOfflineSongs.toList(),
+                            onlineSongs = selectedOnlineSongs.toList()
+                        ) { success ->
+                             if (success) {
+                                 onSaveSuccess()
+                             }
+                        }
                     }
                 },
                 containerColor = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = if (isEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(bottom = 75.dp, end = 16.dp),
             )
         }
     ) { paddingValues ->
@@ -191,7 +231,7 @@ fun CreatePlaylistScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                     )
                 }
-                
+
                 // Playlist Type Selection
                 item {
                     Column {
@@ -207,28 +247,50 @@ fun CreatePlaylistScreen(
                         ) {
                             FilterChip(
                                 selected = playlistType == PlaylistType.OFFLINE,
-                                onClick = { 
+                                onClick = {
                                     playlistType = PlaylistType.OFFLINE
                                     selectedOnlineSongs.clear()
                                     searchQuery = ""
                                 },
                                 label = { Text("Offline Songs") },
                                 leadingIcon = if (playlistType == PlaylistType.OFFLINE) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 } else null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFF44336), // Proper red color
+                                    selectedLabelColor = Color.White,
+                                    selectedLeadingIconColor = Color.White
+                                ),
                                 modifier = Modifier.weight(1f)
                             )
                             FilterChip(
                                 selected = playlistType == PlaylistType.ONLINE,
-                                onClick = { 
+                                onClick = {
                                     playlistType = PlaylistType.ONLINE
                                     selectedOfflineSongs.clear()
                                     searchQuery = ""
                                 },
                                 label = { Text("Online Songs") },
                                 leadingIcon = if (playlistType == PlaylistType.ONLINE) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                    {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 } else null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFF44336), // Proper red color
+                                    selectedLabelColor = Color.White,
+                                    selectedLeadingIconColor = Color.White
+                                ),
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -242,7 +304,7 @@ fun CreatePlaylistScreen(
                         }
                     }
                 }
-                
+
                 // Search Section (only show if type is selected)
                 if (playlistType != null) {
                     item {
@@ -255,13 +317,18 @@ fun CreatePlaylistScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = searchQuery,
-                                onValueChange = { 
+                                onValueChange = {
                                     searchQuery = it
-                                    focusManager.clearFocus()
+                                    // Removed focusManager.clearFocus() to allow continuous typing
                                 },
                                 label = { Text(if (playlistType == PlaylistType.OFFLINE) "Search offline songs" else "Search online") },
                                 placeholder = { Text("Type to search...") },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = null
+                                    )
+                                },
                                 trailingIcon = {
                                     if (searchQuery.isNotEmpty()) {
                                         IconButton(onClick = { searchQuery = "" }) {
@@ -275,7 +342,7 @@ fun CreatePlaylistScreen(
                             )
                         }
                     }
-                    
+
                     // Search Results
                     if (showSearchResults && searchResults.isNotEmpty()) {
                         item {
@@ -285,7 +352,7 @@ fun CreatePlaylistScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        
+
                         items(searchResults.take(10)) { result ->
                             when (playlistType) {
                                 PlaylistType.OFFLINE -> {
@@ -299,11 +366,12 @@ fun CreatePlaylistScreen(
                                                 selectedOfflineSongs.removeAll { it.id == song.id }
                                             } else {
                                                 selectedOfflineSongs.add(song)
-                                                searchQuery = ""
+                                                searchQuery = "" // Clear search after selection
                                             }
                                         }
                                     )
                                 }
+
                                 PlaylistType.ONLINE -> {
                                     val searchResult = result as OnlineSearchResult
                                     OnlineSearchItem(
@@ -320,15 +388,16 @@ fun CreatePlaylistScreen(
                                                 sourcePlatform = "YouTube"
                                             )
                                             selectedOnlineSongs.add(onlineSong)
-                                            searchQuery = ""
+                                            searchQuery = "" // Clear search after selection
                                         }
                                     )
                                 }
+
                                 null -> {}
                             }
                         }
                     }
-                    
+
                     // Selected Songs Section
                     if (selectedOfflineSongs.isNotEmpty() || selectedOnlineSongs.isNotEmpty()) {
                         item {
@@ -338,7 +407,7 @@ fun CreatePlaylistScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        
+
                         items(selectedOfflineSongs) { song ->
                             SelectedSongItem(
                                 title = song.title,
@@ -346,7 +415,7 @@ fun CreatePlaylistScreen(
                                 onRemove = { selectedOfflineSongs.remove(song) }
                             )
                         }
-                        
+
                         items(selectedOnlineSongs) { song ->
                             SelectedSongItem(
                                 title = song.title,
@@ -356,7 +425,7 @@ fun CreatePlaylistScreen(
                         }
                     }
                 }
-                
+
                 // Empty state
                 if (playlistType != null && selectedOfflineSongs.isEmpty() && selectedOnlineSongs.isEmpty() && !showSearchResults) {
                     item {
@@ -374,7 +443,7 @@ fun CreatePlaylistScreen(
                         }
                     }
                 }
-                
+
                 // Bottom padding for FAB
                 item {
                     Spacer(modifier = Modifier.height(80.dp))

@@ -265,4 +265,21 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             onResult(result)
         }
     }
+    /**
+     * Create a manually created playlist
+     */
+    fun createPlaylist(
+        name: String,
+        offlineSongs: List<Song>,
+        onlineSongs: List<OnlineSong>,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch(AppDispatchers.Database) {
+            val result = playlistRepository.createPlaylist(name, offlineSongs, onlineSongs)
+            if (result != null) {
+                loadPlaylists()
+            }
+            onResult(result != null)
+        }
+    }
 }

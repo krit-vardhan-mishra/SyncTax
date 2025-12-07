@@ -56,7 +56,7 @@ android {
         ndk {
             // Only include ARM architectures - covers 99%+ of Android devices
             // x86/x86_64 removed: Only needed for emulators, saves ~117 MB
-            // This is required by Chaquopy
+            // Required by Chaquopy
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
@@ -112,7 +112,6 @@ chaquopy {
             install("requests")
             install("urllib3")
             install("ytmusicapi")
-            // Removed: ffmpeg, ffprobe, pillow (not needed - using Mutagen for metadata)
         }
     }
 }
@@ -125,6 +124,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation(libs.androidx.compose.material3)
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
