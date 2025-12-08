@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.presentation.components.player.PlayerSheetConstants
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
 
 private const val TAG = "UnifiedPlayer"
