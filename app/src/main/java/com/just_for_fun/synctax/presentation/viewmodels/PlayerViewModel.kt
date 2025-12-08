@@ -47,6 +47,7 @@ import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.data.repository.MusicRepository
 import com.just_for_fun.synctax.presentation.components.state.PlayerUiState
+import com.just_for_fun.synctax.presentation.components.state.PlayerSheetState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -2679,7 +2680,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun expandPlayerSheet() {
         _uiState.value = _uiState.value.copy(
-            playerSheetState = com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.EXPANDED
+            playerSheetState = PlayerSheetState.EXPANDED
         )
     }
 
@@ -2688,7 +2689,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun collapsePlayerSheet() {
         _uiState.value = _uiState.value.copy(
-            playerSheetState = com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.COLLAPSED
+            playerSheetState = PlayerSheetState.COLLAPSED
         )
     }
 
@@ -2696,10 +2697,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * Toggle the player sheet between collapsed and expanded states
      */
     fun togglePlayerSheet() {
-        val newState = if (_uiState.value.playerSheetState == com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.COLLAPSED) {
-            com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.EXPANDED
+        val newState = if (_uiState.value.playerSheetState == PlayerSheetState.COLLAPSED) {
+            PlayerSheetState.EXPANDED
         } else {
-            com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.COLLAPSED
+            PlayerSheetState.COLLAPSED
         }
         _uiState.value = _uiState.value.copy(playerSheetState = newState)
     }
