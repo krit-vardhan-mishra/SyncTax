@@ -61,7 +61,6 @@ fun UnifiedPlayer(
 
     // Track drag offset for enhanced gesture handling
     var dragOffset by remember { mutableFloatStateOf(0f) }
-    val dragThreshold = 200f // pixels to drag to trigger state change
 
     // Enhanced expansion animation with spring for bouncy feedback
     val expansionProgress by animateFloatAsState(
@@ -77,7 +76,11 @@ fun UnifiedPlayer(
 
     // Album art scale with overshoot for bouncy feedback
     val albumArtMiniScale by animateFloatAsState(
-        targetValue = if (isExpanded) 1.0f else 0.85f,
+        targetValue = if (isExpanded) {
+            PlayerSheetConstants.ALBUM_ART_EXPANDED_SCALE
+        } else {
+            PlayerSheetConstants.ALBUM_ART_MINI_SCALE
+        },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -88,13 +91,20 @@ fun UnifiedPlayer(
     // Alpha blending for content transitions
     val miniPlayerAlpha by animateFloatAsState(
         targetValue = if (isExpanded) 0f else 1f,
-        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        animationSpec = tween(
+            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
+            easing = FastOutSlowInEasing
+        ),
         label = "mini_alpha"
     )
 
     val expandedAlpha by animateFloatAsState(
         targetValue = if (isExpanded) 1f else 0f,
-        animationSpec = tween(durationMillis = 200, delayMillis = 100, easing = FastOutSlowInEasing),
+        animationSpec = tween(
+            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
+            delayMillis = PlayerSheetConstants.FADE_IN_DELAY_MS,
+            easing = FastOutSlowInEasing
+        ),
         label = "expanded_alpha"
     )
 
@@ -113,7 +123,10 @@ fun UnifiedPlayer(
         modifier = Modifier
             .fillMaxWidth()
             // Dynamic height with smooth interpolation
-            .height((80 + (expansionProgress * 920)).dp)
+            .height(
+                (PlayerSheetConstants.MINI_PLAYER_HEIGHT_DP +
+                        (expansionProgress * PlayerSheetConstants.MAX_EXPANSION_HEIGHT_DP)).dp
+            )
             .pointerInput(isExpanded) {
                 detectVerticalDragGestures(
                     onDragStart = {
@@ -121,7 +134,7 @@ fun UnifiedPlayer(
                     },
                     onDragEnd = {
                         val absOffset = kotlin.math.abs(dragOffset)
-                        if (absOffset > dragThreshold) {
+                        if (absOffset > PlayerSheetConstants.DRAG_THRESHOLD_PX) {
                             // Trigger state change based on drag direction
                             if (dragOffset < 0 && !isExpanded) {
                                 // Swipe up to expand
@@ -147,7 +160,8 @@ fun UnifiedPlayer(
         // --- 1. ENHANCED ANIMATED BACKGROUND LAYER ---
         if (!song.albumArtUri.isNullOrEmpty()) {
             // Dynamic blur radius interpolates smoothly based on expansion
-            val blurRadius = (20 + (expansionProgress * 30)).dp
+            val blurRadius = (PlayerSheetConstants.MIN_BLUR_RADIUS_DP +
+                    (expansionProgress * PlayerSheetConstants.BLUR_RADIUS_EXPANSION_DP)).dp
 
             AsyncImage(
                 model = song.albumArtUri,
@@ -156,8 +170,14 @@ fun UnifiedPlayer(
                 modifier = Modifier
                     .fillMaxSize()
                     .blur(blurRadius)
-                    .alpha(0.5f + (expansionProgress * 0.2f)) // Gradually increase opacity
-                    .scale(1f + (expansionProgress * 0.05f)) // Subtle zoom effect
+                    .alpha(
+                        PlayerSheetConstants.MIN_BACKGROUND_OPACITY +
+                                (expansionProgress * PlayerSheetConstants.BACKGROUND_OPACITY_EXPANSION)
+                    )
+                    .scale(
+                        PlayerSheetConstants.MIN_BACKGROUND_SCALE +
+                                (expansionProgress * PlayerSheetConstants.BACKGROUND_SCALE_EXPANSION)
+                    )
             )
 
             // Animated gradient overlay for smooth contrast transitions
@@ -167,8 +187,14 @@ fun UnifiedPlayer(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.2f + (expansionProgress * 0.1f)),
-                                Color.Black.copy(alpha = 0.6f + (expansionProgress * 0.2f))
+                                Color.Black.copy(
+                                    alpha = PlayerSheetConstants.MIN_GRADIENT_TOP_ALPHA +
+                                            (expansionProgress * PlayerSheetConstants.GRADIENT_TOP_ALPHA_EXPANSION)
+                                ),
+                                Color.Black.copy(
+                                    alpha = PlayerSheetConstants.MIN_GRADIENT_BOTTOM_ALPHA +
+                                            (expansionProgress * PlayerSheetConstants.GRADIENT_BOTTOM_ALPHA_EXPANSION)
+                                )
                             )
                         )
                     )
@@ -184,7 +210,7 @@ fun UnifiedPlayer(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Mini player content with fade-out animation
-                if (miniPlayerAlpha > 0.01f) {
+                if (miniPlayerAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -222,7 +248,7 @@ fun UnifiedPlayer(
                 }
 
                 // Expanded player content with fade-in animation
-                if (expandedAlpha > 0.01f) {
+                if (expandedAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
