@@ -1,13 +1,14 @@
 package com.just_for_fun.synctax.presentation.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
-import androidx.compose.material3.SliderDefaults
+import android.os.Process
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -29,10 +30,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -51,6 +52,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -65,29 +70,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import android.app.Activity
-import android.os.Process
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
-import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.presentation.components.app.TooltipIconButton
 import com.just_for_fun.synctax.core.utils.AppConfig
 import com.just_for_fun.synctax.core.utils.AppIconManager
+import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
+import com.just_for_fun.synctax.presentation.components.app.TooltipIconButton
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.core.net.toUri
 
 /**
  * Data class representing an app icon option
@@ -679,6 +680,51 @@ fun SettingsScreen(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Remove path $displayName",
                             tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+
+            // --- Official Repository Link ---
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW,
+                                "https://github.com/krit-vardhan-mishra/SyncTax".toUri())
+                            context.startActivity(intent)
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder, // Or use a GitHub icon if available
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Official Repository",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "View the source code and contribute to SyncTax",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Open link",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.rotate(180f) // Point right
                         )
                     }
                 }

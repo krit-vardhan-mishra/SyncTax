@@ -1,16 +1,18 @@
 package com.just_for_fun.synctax.presentation.components.player
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.local.entities.Song
-import kotlinx.coroutines.launch
+
+private const val TAG = "PlayerBottomSheet"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerBottomSheet(
-    scaffoldState: BottomSheetScaffoldState, // Accept the hoisted state
+    scaffoldState: BottomSheetScaffoldState, // For the visual animation only
     song: Song?,
     isPlaying: Boolean,
     isBuffering: Boolean,
@@ -33,26 +35,35 @@ fun PlayerBottomSheet(
     onReorderQueue: (Int, Int) -> Unit = { _, _ -> },
     onSetVolume: (Float) -> Unit = {},
     downloadPercent: Int = 0,
+    // NEW: Hoisted expansion state - completely controlled by MusicApp
+    isExpanded: Boolean = false,
+    onExpandedChange: (Boolean) -> Unit = {},
     content: @Composable (PaddingValues) -> Unit
 ) {
-    val coroutineScope = rememberCoroutineScope()
-
     val miniPlayerHeight = 80.dp
-    val isExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
+    
+    // Log state for debugging
+    Log.d(TAG, "=== PlayerBottomSheet Recomposition ===")
+    Log.d(TAG, "isExpanded (hoisted): $isExpanded, song: ${song?.title}")
 
     val currentPeekHeight = if (song != null) miniPlayerHeight else 0.dp
     
-    // Force scaffold to show miniplayer when song starts playing
-    LaunchedEffect(song) {
-        if (song != null && !isExpanded) {
-            // Ensure the bottom sheet shows the peek height
+    // Track previous song to detect when song goes from null to non-null
+    var previousSongId by remember { mutableStateOf<String?>(null) }
+    
+    // Ensure mini-player is visible when a song is first set (only on initial song set)
+    LaunchedEffect(song?.id) {
+        if (song != null && previousSongId == null) {
+            Log.d(TAG, ">>> Song set for first time - calling partialExpand() to show mini-player")
             scaffoldState.bottomSheetState.partialExpand()
         }
+        previousSongId = song?.id
     }
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
         sheetContent = {
+            Log.d(TAG, "sheetContent composing - song: ${song?.title}, isExpanded: $isExpanded")
             if (song != null) {
                 UnifiedPlayer(
                     song = song,
@@ -65,15 +76,10 @@ fun PlayerBottomSheet(
                     volume = volume,
                     upNext = upNext,
                     playHistory = playHistory,
-                    isExpanded = isExpanded,
+                    isExpanded = isExpanded, // Use the hoisted state directly
                     onExpandedChange = { expand ->
-                        coroutineScope.launch {
-                            if (expand) {
-                                scaffoldState.bottomSheetState.expand()
-                            } else {
-                                scaffoldState.bottomSheetState.partialExpand()
-                            }
-                        }
+                        Log.d(TAG, ">>> onExpandedChange called with expand: $expand (user action)")
+                        onExpandedChange(expand) // Just call the hoisted callback
                     },
                     onSelectSong = onSelectSong,
                     onPlaceNext = onPlaceNext,

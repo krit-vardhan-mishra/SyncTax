@@ -22,6 +22,8 @@ data class PlaylistUiState(
     val error: String? = null
 )
 
+data class UrlValidationResult(val isValid: Boolean, val platform: String?)
+
 /**
  * UI state for playlist import
  */
@@ -50,17 +52,17 @@ data class PlaylistDetailState(
  * ViewModel for managing playlists, importing from YouTube, and playlist details
  */
 class PlaylistViewModel(application: Application) : AndroidViewModel(application) {
-    
+
     private val playlistRepository = AppModule.providePlaylistRepository(application)
-    
+
     // Playlist list state
     private val _uiState = MutableStateFlow(PlaylistUiState())
     val uiState: StateFlow<PlaylistUiState> = _uiState.asStateFlow()
-    
+
     // Import state
     private val _importState = MutableStateFlow(PlaylistImportState())
     val importState: StateFlow<PlaylistImportState> = _importState.asStateFlow()
-    
+
     // Detail state
     private val _detailState = MutableStateFlow(PlaylistDetailState())
     val detailState: StateFlow<PlaylistDetailState> = _detailState.asStateFlow()
@@ -75,7 +77,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
     private fun loadPlaylists() {
         viewModelScope.launch(AppDispatchers.Database) {
             _uiState.value = _uiState.value.copy(isLoading = true)
-            
+
             playlistRepository.getAllPlaylists().collectLatest { playlists ->
                 _uiState.value = PlaylistUiState(
                     playlists = playlists,
@@ -104,17 +106,30 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             )
             return
         }
-        
+
         viewModelScope.launch(AppDispatchers.Network) {
             _importState.value = _importState.value.copy(isValidating = true)
-            
+
             val result = playlistRepository.validatePlaylistUrl(url)
-            
+
             _importState.value = _importState.value.copy(
                 isValidating = false,
                 isUrlValid = result.isValid,
                 platform = result.platform
             )
+        }
+    }
+
+    suspend fun validatePlaylistUrl(url: String): UrlValidationResult {
+        return when {
+            url.contains("open.spotify.com/playlist/") || url.contains("spotify.link") -> {
+                UrlValidationResult(isValid = true, platform = "spotify")
+            }
+            url.contains("youtube.com/playlist") || url.contains("music.youtube.com/playlist") -> {
+                UrlValidationResult(isValid = true, platform = "youtube")
+            }
+            // your existing YouTube checks...
+            else -> UrlValidationResult(isValid = false, platform = null)
         }
     }
 
@@ -128,14 +143,14 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             )
             return
         }
-        
+
         viewModelScope.launch(AppDispatchers.Network) {
             _importState.value = _importState.value.copy(
                 isImporting = true,
                 importSuccess = null,
                 errorMessage = null
             )
-            
+
             when (val result = playlistRepository.importPlaylist(url)) {
                 is PlaylistRepository.ImportResult.Success -> {
                     _importState.value = _importState.value.copy(
@@ -170,9 +185,9 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
     fun loadPlaylistDetail(playlistId: Int) {
         viewModelScope.launch(AppDispatchers.Database) {
             _detailState.value = _detailState.value.copy(isLoading = true)
-            
+
             val playlist = playlistRepository.getPlaylistById(playlistId)
-            
+
             if (playlist == null) {
                 _detailState.value = PlaylistDetailState(
                     isLoading = false,
@@ -180,7 +195,7 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
                 )
                 return@launch
             }
-            
+
             playlistRepository.getSongsForPlaylist(playlistId).collectLatest { songs ->
                 _detailState.value = PlaylistDetailState(
                     playlist = playlist,
@@ -207,10 +222,10 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
     fun clearDetailState() {
         _detailState.value = PlaylistDetailState()
     }
-    
+
     /**
      * Save an album as a playlist
-     * 
+     *
      * @param albumName The name of the album
      * @param artistName The artist name
      * @param thumbnailUrl The album thumbnail URL
@@ -229,10 +244,10 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             onResult(result != null)
         }
     }
-    
+
     /**
      * Remove a saved album
-     * 
+     *
      * @param albumName The name of the album
      * @param artistName The artist name
      * @param onResult Callback with result (true if removed, false if failed)
@@ -247,10 +262,10 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             onResult(result)
         }
     }
-    
+
     /**
      * Check if an album is saved
-     * 
+     *
      * @param albumName The name of the album
      * @param artistName The artist name
      * @param onResult Callback with result (true if saved, false otherwise)

@@ -114,7 +114,7 @@ fun SimpleDynamicMusicTopAppBar(
             }
 
             // Sort button
-            if (showSortButton && onSortClick != null && currentTab == 0) {
+            if (showSortButton && onSortOptionChange != null && currentTab == 0) {
                 TooltipBox(tooltip = "Sort songs") {
                     IconButton(onClick = { showSortMenu = true }) {
                         Icon(

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,17 +63,12 @@ fun PlaylistScreen(
     val fabActions = remember {
         listOf(
             FabAction(
-                label = "Import Spotify Playlist",
-                icon = Icons.Default.MusicNote,
-                onClick = { onImportClick("spotify") }
-            ),
-            FabAction(
                 label = "Create Playlist",
                 icon = Icons.Default.Add,
                 onClick = onCreatePlaylistClick
             ),
             FabAction(
-                label = "Import YT Playlist",
+                label = "Import Playlist",
                 icon = Icons.Default.PlayArrow,
                 onClick = { onImportClick("youtube") }
             )
@@ -173,7 +167,7 @@ fun PlaylistScreen(
                                     "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})"
                                 )
                                 onPlaylistClick(playlist.playlistId)
-                            }
+                            },
                         )
                     }
                 }

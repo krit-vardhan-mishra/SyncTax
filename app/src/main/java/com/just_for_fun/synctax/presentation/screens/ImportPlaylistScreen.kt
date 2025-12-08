@@ -49,11 +49,13 @@ private fun getPlatformColors(selectedPlatform: String): PlatformColors {
             onPrimary = Color.White,
             surfaceVariant = YtMusicRed.copy(alpha = 0.2f)
         )
+
         "spotify" -> PlatformColors(
             primary = SpotifyGreen,
             onPrimary = Color.Black, // Spotify typically uses black text on green
             surfaceVariant = SpotifyGreen.copy(alpha = 0.2f)
         )
+
         else -> PlatformColors( // Fallback to MaterialTheme colors
             primary = MaterialTheme.colorScheme.primary,
             onPrimary = MaterialTheme.colorScheme.onPrimary,
@@ -204,6 +206,7 @@ fun ImportPlaylistScreen(
                                 color = platformColors.primary // Tint loading with platform color
                             )
                         }
+
                         importState.isUrlValid == true -> {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
@@ -211,6 +214,7 @@ fun ImportPlaylistScreen(
                                 tint = SuccessGreen
                             )
                         }
+
                         importState.isUrlValid == false && playlistUrl.isNotEmpty() -> {
                             Icon(
                                 imageVector = Icons.Default.Error,
@@ -218,6 +222,7 @@ fun ImportPlaylistScreen(
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
+
                         playlistUrl.isNotEmpty() -> {
                             IconButton(onClick = { playlistUrl = "" }) {
                                 Icon(
@@ -237,6 +242,7 @@ fun ImportPlaylistScreen(
                                 color = SuccessGreen
                             )
                         }
+
                         importState.isUrlValid == false && playlistUrl.isNotEmpty() -> {
                             Text(
                                 text = "Invalid playlist URL",
@@ -431,6 +437,8 @@ fun ImportPlaylistScreen(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }

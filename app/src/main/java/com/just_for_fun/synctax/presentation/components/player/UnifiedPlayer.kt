@@ -1,5 +1,6 @@
 package com.just_for_fun.synctax.presentation.components.player
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -19,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
+
+private const val TAG = "UnifiedPlayer"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +51,8 @@ fun UnifiedPlayer(
     onSeek: (Long) -> Unit,
     downloadPercent: Int = 0,
 ) {
+    Log.d(TAG, "=== UnifiedPlayer Recomposition === isExpanded: $isExpanded, song: ${song.title}")
+    
     val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
 
@@ -67,7 +72,13 @@ fun UnifiedPlayer(
     )
 
     BackHandler(enabled = isExpanded) {
+        Log.d(TAG, ">>> BackHandler triggered - calling onExpandedChange(false)")
         onExpandedChange(false)
+    }
+    
+    // Log when isExpanded changes
+    LaunchedEffect(isExpanded) {
+        Log.d(TAG, ">>> LaunchedEffect: isExpanded changed to: $isExpanded")
     }
 
     // Main Container
@@ -116,6 +127,7 @@ fun UnifiedPlayer(
             modifier = Modifier.fillMaxSize()
         ) {
             if (!isExpanded) {
+                Log.d(TAG, ">>> Rendering MiniPlayerContent (isExpanded: $isExpanded)")
                 MiniPlayerContent(
                     song = song,
                     isPlaying = isPlaying,
@@ -133,10 +145,17 @@ fun UnifiedPlayer(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onPreviousClick()
                     },
-                    onClick = { onExpandedChange(true) },
-                    onSwipeUp = { onExpandedChange(true) }
+                    onClick = { 
+                        Log.d(TAG, ">>> MiniPlayerContent onClick - calling onExpandedChange(true)")
+                        onExpandedChange(true) 
+                    },
+                    onSwipeUp = { 
+                        Log.d(TAG, ">>> MiniPlayerContent onSwipeUp - calling onExpandedChange(true)")
+                        onExpandedChange(true) 
+                    }
                 )
             } else {
+                Log.d(TAG, ">>> Rendering FullScreenPlayerContent (isExpanded: $isExpanded)")
                 FullScreenPlayerContent(
                     song = song,
                     isPlaying = isPlaying,

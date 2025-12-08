@@ -83,21 +83,34 @@ fun MusicApp(userPreferences: UserPreferences) {
         viewModel()
 
     // --- HOISTED STATE ---
-    // Hoist the scaffold state here to control nav bar visibility
+    // Manual expansion state - ONLY controlled by user actions (click/swipe on mini-player)
+    // This is completely independent from BottomSheetScaffold's internal state
+    var isPlayerExpanded by remember { mutableStateOf(false) }
+    
+    // Simple scaffold state without confirmValueChange - we control expansion manually
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
             initialValue = SheetValue.PartiallyExpanded,
             skipHiddenState = true
         )
     )
-    val isPlayerExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
+    
+    // Sync BottomSheet visual state with our manual state
+    // This only controls the animation, not the content rendering
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(isPlayerExpanded) {
+        if (isPlayerExpanded) {
+            scaffoldState.bottomSheetState.expand()
+        } else {
+            scaffoldState.bottomSheetState.partialExpand()
+        }
+    }
     // --- END HOISTED STATE ---
 
     val playerState by playerViewModel.uiState.collectAsState()
     val homeState by homeViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     var searchResetTrigger by remember { mutableStateOf(0) }
 
     // Update album colors when current song changes
@@ -145,7 +158,7 @@ fun MusicApp(userPreferences: UserPreferences) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f)) {
                 PlayerBottomSheet(
-                    scaffoldState = scaffoldState, // Pass the hoisted state down
+                    scaffoldState = scaffoldState, // For visual animation only
                     song = playerState.currentSong,
                     isPlaying = playerState.isPlaying,
                     isBuffering = playerState.isBuffering,
@@ -165,7 +178,10 @@ fun MusicApp(userPreferences: UserPreferences) {
                     onSelectSong = { song -> playerViewModel.playFromQueue(song) },
                     onPlaceNext = { song -> playerViewModel.placeNext(song) },
                     onRemoveFromQueue = { song -> playerViewModel.removeFromQueue(song) },
-                    downloadPercent = playerState.downloadPercent
+                    downloadPercent = playerState.downloadPercent,
+                    // Manual expansion control - only user actions can change this
+                    isExpanded = isPlayerExpanded,
+                    onExpandedChange = { isPlayerExpanded = it }
                 ) { innerPadding ->
                     NavHost(
                         navController = navController,
@@ -301,28 +317,12 @@ fun MusicApp(userPreferences: UserPreferences) {
                             )
                         }
                         composable("train") {
-                            // Collapse player only when entering training screen (not on back navigation)
-                            val isFirstComposition = remember { mutableStateOf(true) }
-                            LaunchedEffect(Unit) {
-                                if (isFirstComposition.value && scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
-                                    scaffoldState.bottomSheetState.partialExpand()
-                                }
-                                isFirstComposition.value = false
-                            }
                             TrainingScreen(
                                 homeViewModel = homeViewModel,
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
                         composable("settings") {
-                            // Collapse player only when entering settings screen (not on back navigation)
-                            val isFirstComposition = remember { mutableStateOf(true) }
-                            LaunchedEffect(Unit) {
-                                if (isFirstComposition.value && scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
-                                    scaffoldState.bottomSheetState.partialExpand()
-                                }
-                                isFirstComposition.value = false
-                            }
                             SettingsScreen(
                                 userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() },

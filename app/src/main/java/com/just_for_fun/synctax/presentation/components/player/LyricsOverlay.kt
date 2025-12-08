@@ -553,19 +553,6 @@ private fun LyricsContentSection(
                         .fillMaxWidth()
                         .padding(vertical = 16.dp)
                 ) {
-                    // Add subtle glass glow for current line
-                    if (isCurrentLine) {
-                        Box(
-                            modifier = Modifier
-                                .matchParentSize()
-                                .blur(20.dp)
-                                .background(
-                                    Color.White.copy(alpha = 0.15f),
-                                    RoundedCornerShape(16.dp)
-                                )
-                        )
-                    }
-
                     Text(
                         text = lyric.text,
                         style = if (isCurrentLine)
