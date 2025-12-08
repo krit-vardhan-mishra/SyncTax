@@ -526,4 +526,74 @@ class PlaylistRepository(private val context: Context) {
                 false
             }
         }
+
+    /**
+     * Add a song to an existing playlist
+     *
+     * @param playlistId The ID of the playlist to add to
+     * @param song The song to add
+     * @return true if successful, false otherwise
+     */
+    suspend fun addSongToPlaylist(playlistId: Int, song: Song): Boolean =
+        withContext(AppDispatchers.Database) {
+            try {
+                val playlist = playlistDao.getPlaylistById(playlistId) ?: return@withContext false
+                
+                // Check if song is online or offline based on ID prefix
+                val isOnline = song.id.startsWith("youtube:") || song.id.startsWith("online:")
+                
+                // Verify playlist type matches song type
+                if ((playlist.platform == "Local" && isOnline) || (playlist.platform != "Local" && !isOnline)) {
+                    Log.w(TAG, "Cannot add ${if (isOnline) "online" else "offline"} song to ${playlist.platform} playlist")
+                    return@withContext false
+                }
+                
+                // Get current max position
+                val currentSongs = playlistSongDao.getSongsForPlaylist(playlistId)
+                val maxPosition = playlistSongDao.getMaxPosition(playlistId) ?: -1
+                
+                if (isOnline) {
+                    // For online songs
+                    val videoId = song.id.removePrefix("youtube:").removePrefix("online:")
+                    
+                    val onlineSong = OnlineSong(
+                        videoId = videoId,
+                        title = song.title,
+                        artist = song.artist,
+                        album = song.album,
+                        thumbnailUrl = song.albumArtUri,
+                        duration = (song.duration / 1000).toInt(),
+                        sourcePlatform = "YouTube"
+                    )
+                    
+                    val songId = onlineSongDao.getOrInsertByVideoId(onlineSong)
+                    
+                    playlistSongDao.insertPlaylistSong(
+                        PlaylistSong(
+                            playlistId = playlistId,
+                            onlineSongId = songId,
+                            position = maxPosition + 1
+                        )
+                    )
+                } else {
+                    // For offline songs - we'd need to add support for offline song junction table
+                    // Currently the schema only supports online songs in playlists
+                    Log.w(TAG, "Adding offline songs to playlists is not yet supported")
+                    return@withContext false
+                }
+                
+                // Update playlist song count and timestamp
+                val updatedPlaylist = playlist.copy(
+                    songCount = playlist.songCount + 1,
+                    updatedAt = System.currentTimeMillis()
+                )
+                playlistDao.updatePlaylist(updatedPlaylist)
+                
+                Log.d(TAG, "Successfully added song ${song.title} to playlist ${playlist.name}")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add song to playlist", e)
+                false
+            }
+        }
 }

@@ -73,7 +73,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val audioProcessor = AudioProcessor(application)
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
     private val onlineManager = OnlineSearchManager()
-    
+
     // Preload manager for instant song switching
     private val preloadManager = PreloadManager(application)
 
@@ -98,21 +98,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Track if we're currently handling song end to prevent multiple triggers
     private var isHandlingSongEnd = false
     private var currentLyrics: String? = null
-    
+
     // Prefetching state (legacy - kept for compatibility)
     private var prefetchedSongId: String? = null
     private var isPrefetching = false
     private var prefetchJob: Job? = null
-    
+
     // Stable recommendations - keep original list and only refetch when empty
     private var originalRecommendationVideoId: String? = null
-    
+
     // Track played recommendations for previous navigation
     private val playedRecommendationsHistory = mutableListOf<Song>()
 
     private fun logSongDetails(song: Song) {
         // Simplified playback log; detailed metadata is logged when fetched via yt-dlp
-        Log.d("PlayerViewModel", "🎵 Playing: ${song.title} — ${song.artist} (${song.album ?: "Unknown"})")
+        Log.d(
+            "PlayerViewModel",
+            "🎵 Playing: ${song.title} — ${song.artist} (${song.album ?: "Unknown"})"
+        )
     }
 
     private val _uiState = MutableStateFlow(PlayerUiState())
@@ -224,7 +227,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     updateNotification()
                 }
         }
-        
+
         // Collect buffering state changes
         viewModelScope.launch {
             player.playerState
@@ -234,7 +237,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.value = _uiState.value.copy(isBuffering = isBuffering)
                 }
         }
-        
+
         // Collect duration changes
         viewModelScope.launch {
             player.playerState
@@ -244,7 +247,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.value = _uiState.value.copy(duration = duration)
                 }
         }
-        
+
         // Collect song end events
         viewModelScope.launch {
             player.playerState
@@ -269,7 +272,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.value = _uiState.value.copy(position = position)
 
                     val currentTime = System.currentTimeMillis()
-                    
+
                     // Update notification every 2 seconds (reduced frequency)
                     if (currentTime - lastNotificationUpdate >= 2000) {
                         updateNotification()
@@ -294,7 +297,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         prefetchNextSongIfNeeded()
                         hasPrefetched = true
                     }
-                    
+
                     // Reset prefetch flag when song changes or restarts
                     if (position < 1000) {
                         hasPrefetched = false
@@ -325,7 +328,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             restoreOnlineSong()
             return
         }
-        
+
         val lastSongId = playerPreferences.getCurrentSongId() ?: return
         val lastPosition = playerPreferences.getLastPosition()
         val playlistIds = playerPreferences.getCurrentPlaylist()
@@ -336,7 +339,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (song != null) {
                 // Clear any online song state since we're restoring a local song
                 playerPreferences.clearOnlineSongState()
-                
+
                 // Restore playlist if available
                 if (playlistIds.isNotEmpty()) {
                     val playlist = playlistIds.mapNotNull { id -> repository.getSongById(id) }
@@ -377,16 +380,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             e.printStackTrace()
         }
     }
-    
+
     /**
      * Restore online song state when app reopens
      */
     private suspend fun restoreOnlineSong() {
         val onlineState = playerPreferences.getOnlineSongState() ?: return
-        
+
         try {
             Log.d("PlayerViewModel", "🔄 Restoring online song: ${onlineState.title}")
-            
+
             // Create a Song object for the online song
             val onlineSong = Song(
                 id = "online:${onlineState.videoId}",
@@ -399,36 +402,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 releaseYear = null,
                 albumArtUri = onlineState.thumbnailUrl
             )
-            
+
             // Initialize queue with the online song
             queueManager.initializeQueue(listOf(onlineSong), 0)
-            
+
             // Set the UI state with the restored song (don't auto-play)
             _uiState.value = _uiState.value.copy(
                 currentSong = onlineSong,
                 position = onlineState.position,
                 isPlaying = false // Don't auto-play on restore
             )
-            
+
             // Update notification
             updateNotification()
-            
+
             // Preload the current song's stream URL for instant playback when user presses play
             Log.d("PlayerViewModel", "🚀 Preloading stream for restored song: ${onlineSong.title}")
             preloadManager.preloadSong(onlineSong)
-            
+
             // Fetch recommendations for the restored song
             if (onlineState.videoId.isNotEmpty()) {
                 fetchRecommendationsForVideoId(onlineState.videoId)
             }
-            
+
             Log.d("PlayerViewModel", "✅ Online song restored: ${onlineState.title}")
         } catch (e: Exception) {
             Log.e("PlayerViewModel", "❌ Failed to restore online song: ${e.message}")
             e.printStackTrace()
         }
     }
-    
+
     /**
      * Fetch recommendations for a video ID
      */
@@ -436,12 +439,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (_uiState.value.upNextRecommendations.isEmpty() && playedRecommendationsHistory.isEmpty()) {
             _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
             originalRecommendationVideoId = videoId
-            
+
             YTMusicRecommender.getRecommendations(
                 videoId = videoId,
                 limit = 50,
                 onResult = { recommendations ->
-                    Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations for restored song")
+                    Log.d(
+                        "PlayerViewModel",
+                        "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
+                    )
                     // Convert RecommendedSong to Song
                     val recommendedSongs = recommendations.map { rec ->
                         Song(
@@ -487,12 +493,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 // Stop any streaming downloads and remove cached chunks of previous song
                 chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
             }
-            
+
             // Stop current song
             if (_uiState.value.currentSong != null) {
                 playbackCollector.stopCollecting(skipped = true)
             }
-            
+
             // Clear online song state when switching to local songs
             playerPreferences.clearOnlineSongState()
 
@@ -553,38 +559,50 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playSong(shuffledPlaylist.first(), shuffledPlaylist)
     }
 
-    fun playUrl(url: String, title: String, artist: String? = null, durationMs: Long = 0L, thumbnailUrl: String? = null, skipRecommendationFetch: Boolean = false) {
+    fun playUrl(
+        url: String,
+        title: String,
+        artist: String? = null,
+        durationMs: Long = 0L,
+        thumbnailUrl: String? = null,
+        skipRecommendationFetch: Boolean = false
+    ) {
         viewModelScope.launch {
             // Extract video ID from YouTube URL
-            val videoId = url.substringAfter("v=").substringBefore("&").substringAfter("youtu.be/").substringBefore("?")
-            
+            val videoId = url.substringAfter("v=").substringBefore("&").substringAfter("youtu.be/")
+                .substringBefore("?")
+
             // Record online listening history for YouTube songs
             if (url.contains("youtube.com") || url.contains("youtu.be")) {
-                val database = com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
-                val finalThumbnailUrl = thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
-                val onlineHistory = com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory(
-                    videoId = videoId,
-                    title = title,
-                    artist = artist ?: "Unknown Artist",
-                    thumbnailUrl = finalThumbnailUrl,
-                    watchUrl = url
-                )
+                val database =
+                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                val finalThumbnailUrl =
+                    thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
+                val onlineHistory =
+                    com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory(
+                        videoId = videoId,
+                        title = title,
+                        artist = artist ?: "Unknown Artist",
+                        thumbnailUrl = finalThumbnailUrl,
+                        watchUrl = url
+                    )
                 // Delete existing entry with same videoId to prevent duplicates
                 database.onlineListeningHistoryDao().deleteByVideoId(videoId)
                 // Insert new entry with updated timestamp
                 database.onlineListeningHistoryDao().insertOnlineListening(onlineHistory)
                 database.onlineListeningHistoryDao().trimOldRecords()
             }
-            
+
             // Check if this is a YouTube URL that needs stream extraction
             if (url.contains("youtube.com") || url.contains("youtu.be")) {
                 Log.d("PlayerViewModel", "🔄 Extracting stream URL for YouTube video: $videoId")
-                
+
                 // Check if stream URL is already cached (from preloading)
                 val cachedUrl = StreamUrlCache.get(videoId)
                 if (cachedUrl != null) {
                     Log.d("PlayerViewModel", "✅ Using cached stream URL for instant playback")
-                    val finalThumbnailUrl = thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
+                    val finalThumbnailUrl =
+                        thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
                     playChunkedStream(
                         videoId = videoId,
                         streamUrl = cachedUrl,
@@ -596,19 +614,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     return@launch
                 }
-                
+
                 // Set loading state for online songs
                 _uiState.value = _uiState.value.copy(isLoadingSong = true)
-                
+
                 // Fetch the actual stream URL
                 val streamUrl = onlineManager.getStreamUrl(videoId)
-                
+
                 if (streamUrl != null) {
                     Log.d("PlayerViewModel", "✅ Stream URL extracted, using chunked playback")
                     // Clear loading state when stream is ready
                     _uiState.value = _uiState.value.copy(isLoadingSong = false)
                     // Generate thumbnail URL from video ID if not provided
-                    val finalThumbnailUrl = thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
+                    val finalThumbnailUrl =
+                        thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
                     // Use chunked stream playback with the extracted URL
                     playChunkedStream(
                         videoId = videoId,
@@ -627,7 +646,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 return@launch
             }
-            
+
             // For non-YouTube URLs, play directly
             chunkedStreamManager.stopAndCleanup(removeFinalCache = true)
             // Create a temporary Song object for playback UI
@@ -666,57 +685,81 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Fetch richer metadata via yt-dlp and update the UI song fields
             viewModelScope.launch {
                 try {
-                    val videoId = title.substringAfter("online:", "") // best-effort; if not available, fallback
-                    val resolvedUrl = if (url.startsWith("http")) url else "https://www.youtube.com/watch?v=$videoId"
+                    val videoId = title.substringAfter(
+                        "online:",
+                        ""
+                    ) // best-effort; if not available, fallback
+                    val resolvedUrl =
+                        if (url.startsWith("http")) url else "https://www.youtube.com/watch?v=$videoId"
                     val info = try {
                         chaquopyDownloader.getVideoInfo(resolvedUrl, null)
-                    } catch (e: Exception) { null }
+                    } catch (e: Exception) {
+                        null
+                    }
 
                     if (info != null) {
-                        val fetchedTitle = info.title.takeIf { it.isNotEmpty() && !it.contains("recommended", ignoreCase = true) && it != "video" } ?: onlineSong.title
-                        val fetchedArtist = info.artist.takeIf { it.isNotEmpty() && it != "Unknown" } ?: onlineSong.artist
+                        val fetchedTitle = info.title.takeIf {
+                            it.isNotEmpty() && !it.contains(
+                                "recommended",
+                                ignoreCase = true
+                            ) && it != "video"
+                        } ?: onlineSong.title
+                        val fetchedArtist =
+                            info.artist.takeIf { it.isNotEmpty() && it != "Unknown" }
+                                ?: onlineSong.artist
                         val fetchedAlbum = info.album.takeIf { it.isNotEmpty() } ?: onlineSong.album
-                        
+
                         val updated = onlineSong.copy(
                             title = fetchedTitle,
                             artist = fetchedArtist,
                             album = fetchedAlbum
                         )
                         _uiState.value = _uiState.value.copy(currentSong = updated)
-                        Log.d("PlayerViewModel", "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}")
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}"
+                        )
                         updateNotification()
                     }
                 } catch (e: Exception) {
                     Log.w("PlayerViewModel", "📥 Metadata fetch failed for playUrl: ${e.message}")
                 }
             }
-            
+
             // Fetch YouTube Music recommendations based on current song (songs only, no videos/playlists)
             // Skip if explicitly requested (e.g., playing from existing recommendation list)
             if (!skipRecommendationFetch && (url.contains("youtube.com") || url.contains("youtu.be"))) {
                 // Extract video ID from URL
-                val videoId = url.substringAfter("v=").substringBefore("&").substringAfter("youtu.be/").substringBefore("?")
-                
+                val videoId =
+                    url.substringAfter("v=").substringBefore("&").substringAfter("youtu.be/")
+                        .substringBefore("?")
+
                 // Only fetch if recommendations list is empty (all songs played) AND played history is also empty (fresh start)
                 // This ensures recommendations stay stable during continuous playback
-                val shouldFetchRecommendations = _uiState.value.upNextRecommendations.isEmpty() && 
-                                                playedRecommendationsHistory.isEmpty() &&
-                                                originalRecommendationVideoId != videoId
-                
+                val shouldFetchRecommendations = _uiState.value.upNextRecommendations.isEmpty() &&
+                        playedRecommendationsHistory.isEmpty() &&
+                        originalRecommendationVideoId != videoId
+
                 if (shouldFetchRecommendations) {
                     // Clear history when fetching fresh recommendations (new search)
                     playedRecommendationsHistory.clear()
                     _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
                     originalRecommendationVideoId = videoId
-                    
+
                     YTMusicRecommender.getRecommendations(
                         videoId = videoId,
                         limit = 50,
                         onResult = { recommendations ->
-                            Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations")
+                            Log.d(
+                                "PlayerViewModel",
+                                "🎵 Got ${recommendations.size} YouTube recommendations"
+                            )
                             if (recommendations.isEmpty()) {
                                 // No recommendations available - enable repeat mode to loop the current song
-                                Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
+                                Log.d(
+                                    "PlayerViewModel",
+                                    "🔁 No recommendations available, enabling repeat mode for continuous playback"
+                                )
                                 _uiState.value = _uiState.value.copy(
                                     repeatEnabled = true,
                                     upNextRecommendations = emptyList(),
@@ -739,7 +782,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                             albumArtUri = rec.thumbnail
                                         )
                                     }
-                                Log.d("PlayerViewModel", "🎵 Filtered recommendations: ${recommendedSongs.size} songs (excluded current)")
+                                Log.d(
+                                    "PlayerViewModel",
+                                    "🎵 Filtered recommendations: ${recommendedSongs.size} songs (excluded current)"
+                                )
                                 _uiState.value = _uiState.value.copy(
                                     upNextRecommendations = recommendedSongs,
                                     isLoadingRecommendations = false,
@@ -750,7 +796,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         onError = { error ->
                             Log.e("PlayerViewModel", "❌ YouTube recommendations failed: $error")
                             // On error, also enable repeat mode to loop the current song
-                            Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
+                            Log.d(
+                                "PlayerViewModel",
+                                "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback"
+                            )
                             _uiState.value = _uiState.value.copy(
                                 upNextRecommendations = emptyList(),
                                 isLoadingRecommendations = false,
@@ -764,7 +813,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
-    
+
     // Function to play a recommended song from UpNext
     fun playRecommendedSong(song: Song) {
         viewModelScope.launch {
@@ -778,25 +827,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
             }
-            
+
             // Check if song is preloaded in ExoPlayer cache
             val videoId = song.id.removePrefix("online:").removePrefix("youtube:")
             val cachedStreamUrl = preloadManager.getCachedStreamUrl(song)
             val isPreloaded = preloadManager.isPreloaded(song)
-            
+
             if (isPreloaded && cachedStreamUrl != null) {
                 // Use cached playback for instant switching
-                Log.d("PlayerViewModel", "🚀 Using preloaded cache for instant playback: ${song.title}")
+                Log.d(
+                    "PlayerViewModel",
+                    "🚀 Using preloaded cache for instant playback: ${song.title}"
+                )
                 playWithCachedStream(song, videoId, cachedStreamUrl)
             } else {
                 // Fall back to regular playback (will use ChunkedStreamManager)
                 val youtubeUrl = song.filePath
-                playUrl(url = youtubeUrl, title = song.title, artist = song.artist, durationMs = song.duration, 
-                       thumbnailUrl = song.albumArtUri, skipRecommendationFetch = true)
+                playUrl(
+                    url = youtubeUrl,
+                    title = song.title,
+                    artist = song.artist,
+                    durationMs = song.duration,
+                    thumbnailUrl = song.albumArtUri,
+                    skipRecommendationFetch = true
+                )
             }
         }
     }
-    
+
     /**
      * Play a song using ExoPlayer's cached stream for instant playback.
      * This is used for preloaded songs that have data in the cache.
@@ -806,21 +864,37 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         chunkedStreamManager.cleanupTmpFile()
         // Stop any active chunked download but DON'T delete cache files that player might need
         chunkedStreamManager.stopAndCleanup(removeFinalCache = false)
-        
+
         // Stop current song
         playbackCollector.stopCollecting(skipped = true)
-        
+
         // Upgrade thumbnail URL to high quality
         val highQualityThumbnail = song.albumArtUri?.let { url ->
             when {
-                url.contains("lh3.googleusercontent.com") -> url.replace(Regex("=w\\d+-h\\d+"), "=w544-h544")
-                url.contains("ytimg.com") && url.contains("/default.jpg") -> url.replace("/default.jpg", "/maxresdefault.jpg")
-                url.contains("ytimg.com") && url.contains("/mqdefault.jpg") -> url.replace("/mqdefault.jpg", "/maxresdefault.jpg")
-                url.contains("ytimg.com") && url.contains("/hqdefault.jpg") -> url.replace("/hqdefault.jpg", "/maxresdefault.jpg")
+                url.contains("lh3.googleusercontent.com") -> url.replace(
+                    Regex("=w\\d+-h\\d+"),
+                    "=w544-h544"
+                )
+
+                url.contains("ytimg.com") && url.contains("/default.jpg") -> url.replace(
+                    "/default.jpg",
+                    "/maxresdefault.jpg"
+                )
+
+                url.contains("ytimg.com") && url.contains("/mqdefault.jpg") -> url.replace(
+                    "/mqdefault.jpg",
+                    "/maxresdefault.jpg"
+                )
+
+                url.contains("ytimg.com") && url.contains("/hqdefault.jpg") -> url.replace(
+                    "/hqdefault.jpg",
+                    "/maxresdefault.jpg"
+                )
+
                 else -> url
             }
         } ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
-        
+
         val onlineSong = Song(
             id = "online:$videoId",
             title = song.title,
@@ -832,55 +906,69 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             releaseYear = null,
             albumArtUri = highQualityThumbnail
         )
-        
+
         // Initialize queue with this song
         queueManager.initializeQueue(listOf(onlineSong), 0)
-        
+
         // Use prepareWithCacheKey to leverage ExoPlayer's cached data
         player.prepareWithCacheKey(streamUrl, onlineSong.id, videoId)
         player.play()
-        
+
         playbackCollector.startCollecting(onlineSong.id)
-        
+
         // Start preloading next songs
         triggerPreloading(onlineSong)
-        
+
         logSongDetails(onlineSong)
-        
+
         _uiState.value = _uiState.value.copy(
             currentSong = onlineSong,
             isPlaying = true,
             isBuffering = false // Preloaded, no buffering needed
         )
-        
+
         checkIfSongDownloaded(onlineSong)
         savePlaylistState()
         updateNotification()
-        
+
         // Fetch richer metadata
         viewModelScope.launch {
             try {
                 val url = "https://www.youtube.com/watch?v=$videoId"
                 val info = try {
                     chaquopyDownloader.getVideoInfo(url, null)
-                } catch (e: Exception) { null }
+                } catch (e: Exception) {
+                    null
+                }
 
                 if (info != null) {
-                    val fetchedTitle = info.title.takeIf { it.isNotEmpty() && !it.contains("recommended", ignoreCase = true) && it != "video" } ?: onlineSong.title
-                    val fetchedArtist = info.artist.takeIf { it.isNotEmpty() && it != "Unknown" } ?: onlineSong.artist
+                    val fetchedTitle = info.title.takeIf {
+                        it.isNotEmpty() && !it.contains(
+                            "recommended",
+                            ignoreCase = true
+                        ) && it != "video"
+                    } ?: onlineSong.title
+                    val fetchedArtist = info.artist.takeIf { it.isNotEmpty() && it != "Unknown" }
+                        ?: onlineSong.artist
                     val fetchedAlbum = info.album.takeIf { it.isNotEmpty() } ?: onlineSong.album
-                    
+
                     val updated = onlineSong.copy(
                         title = fetchedTitle,
                         artist = fetchedArtist,
                         album = fetchedAlbum
                     )
                     _uiState.value = _uiState.value.copy(currentSong = updated)
-                    Log.d("PlayerViewModel", "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}")
+                    Log.d(
+                        "PlayerViewModel",
+                        "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}"
+                    )
                     updateNotification()
                 }
             } catch (e: Exception) {
-                Log.w("PlayerViewModel", "📥 Metadata fetch failed for cached playback: ${e.message}")
+                Log.w(
+                    "PlayerViewModel",
+                    "📥 Metadata fetch failed for cached playback: ${e.message}"
+                )
             }
         }
     }
@@ -892,16 +980,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun playOnlinePlaylist(songs: List<Song>, startIndex: Int = 0) {
         viewModelScope.launch {
             if (songs.isEmpty()) return@launch
-            
+
             // Clear any existing online recommendations and history
             playedRecommendationsHistory.clear()
-            
+
             // Set the remaining songs as the up next queue (excluding the first song)
             val upNextSongs = songs.drop(startIndex + 1)
             _uiState.value = _uiState.value.copy(
                 upNextRecommendations = upNextSongs
             )
-            
+
             // Play the first song
             val firstSong = songs[startIndex]
             playUrl(
@@ -970,7 +1058,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Clear existing queue and recommendations
             playedRecommendationsHistory.clear()
             _uiState.value = _uiState.value.copy(upNextRecommendations = emptyList())
-            
+
             // Play the song - this will fetch recommendations automatically
             playUrl(
                 url = "https://music.youtube.com/watch?v=$videoId",
@@ -1115,7 +1203,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             player.play()
 
             playbackCollector.startCollecting(onlineSong.id)
-            
+
             // Start preloading adjacent songs for instant switching
             triggerPreloading(onlineSong)
 
@@ -1130,7 +1218,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // Check if song is already downloaded
             checkIfSongDownloaded(onlineSong)
-            
+
             // Save online song state for restoration when app reopens
             playerPreferences.saveOnlineSongState(
                 videoId = videoId,
@@ -1175,7 +1263,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         break
                     }
                     delay(1000)
-                    
+
                     // Update saved position periodically for online songs
                     _uiState.value.currentSong?.let { song ->
                         if (song.id.startsWith("online:")) {
@@ -1205,55 +1293,76 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val url = "https://www.youtube.com/watch?v=$videoId"
                     val info = try {
                         chaquopyDownloader.getVideoInfo(url, null)
-                    } catch (e: Exception) { null }
+                    } catch (e: Exception) {
+                        null
+                    }
 
                     if (info != null) {
-                        val fetchedTitle = info.title.takeIf { it.isNotEmpty() && !it.contains("recommended", ignoreCase = true) && it != "video" } ?: onlineSong.title
-                        val fetchedArtist = info.artist.takeIf { it.isNotEmpty() && it != "Unknown" } ?: onlineSong.artist
+                        val fetchedTitle = info.title.takeIf {
+                            it.isNotEmpty() && !it.contains(
+                                "recommended",
+                                ignoreCase = true
+                            ) && it != "video"
+                        } ?: onlineSong.title
+                        val fetchedArtist =
+                            info.artist.takeIf { it.isNotEmpty() && it != "Unknown" }
+                                ?: onlineSong.artist
                         val fetchedAlbum = info.album.takeIf { it.isNotEmpty() } ?: onlineSong.album
-                        
+
                         val updated = onlineSong.copy(
                             title = fetchedTitle,
                             artist = fetchedArtist,
                             album = fetchedAlbum
                         )
                         _uiState.value = _uiState.value.copy(currentSong = updated)
-                        Log.d("PlayerViewModel", "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}")
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}"
+                        )
                         updateNotification()
                     }
                 } catch (e: Exception) {
                     Log.w("PlayerViewModel", "📥 Metadata fetch failed for stream: ${e.message}")
                 }
             }
-            
+
             // Skip recommendation fetching if playing from a playlist/album (Play All or Shuffle)
             if (skipRecommendationFetch) {
                 Log.d("PlayerViewModel", "🎵 Skipping recommendation fetch (playlist/album mode)")
                 // Don't clear upNextRecommendations - they were already set by playOnlinePlaylist
                 return@launch
             }
-            
+
             // Fetch YouTube Music recommendations after stream extraction completes (songs only)
             // Clear existing recommendations when starting a new song to get fresh ones
             _uiState.value = _uiState.value.copy(upNextRecommendations = emptyList())
             playedRecommendationsHistory.clear()
-            
+
             // Only fetch if recommendations list is completely empty (all songs played) and history is empty
             val shouldFetchRecommendations = originalRecommendationVideoId != videoId
-            
+
             if (shouldFetchRecommendations) {
-                Log.d("PlayerViewModel", "🎵 Stream extraction complete, fetching YouTube Music recommendations for videoId=$videoId")
+                Log.d(
+                    "PlayerViewModel",
+                    "🎵 Stream extraction complete, fetching YouTube Music recommendations for videoId=$videoId"
+                )
                 _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
                 originalRecommendationVideoId = videoId
-                
+
                 YTMusicRecommender.getRecommendations(
                     videoId = videoId,
                     limit = 50,
                     onResult = { recommendations ->
-                        Log.d("PlayerViewModel", "🎵 Got ${recommendations.size} YouTube recommendations for chunked stream")
+                        Log.d(
+                            "PlayerViewModel",
+                            "🎵 Got ${recommendations.size} YouTube recommendations for chunked stream"
+                        )
                         if (recommendations.isEmpty()) {
                             // No recommendations available - enable repeat mode to loop the current song
-                            Log.d("PlayerViewModel", "🔁 No recommendations available, enabling repeat mode for continuous playback")
+                            Log.d(
+                                "PlayerViewModel",
+                                "🔁 No recommendations available, enabling repeat mode for continuous playback"
+                            )
                             _uiState.value = _uiState.value.copy(
                                 repeatEnabled = true,
                                 upNextRecommendations = emptyList(),
@@ -1276,7 +1385,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                         albumArtUri = rec.thumbnail
                                     )
                                 }
-                            Log.d("PlayerViewModel", "🎵 Filtered chunked stream recommendations: ${recommendedSongs.size} songs (excluded current)")
+                            Log.d(
+                                "PlayerViewModel",
+                                "🎵 Filtered chunked stream recommendations: ${recommendedSongs.size} songs (excluded current)"
+                            )
                             _uiState.value = _uiState.value.copy(
                                 upNextRecommendations = recommendedSongs,
                                 isLoadingRecommendations = false,
@@ -1285,9 +1397,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     },
                     onError = { error ->
-                        Log.e("PlayerViewModel", "❌ YouTube recommendations failed for chunked stream: $error")
+                        Log.e(
+                            "PlayerViewModel",
+                            "❌ YouTube recommendations failed for chunked stream: $error"
+                        )
                         // On error, also enable repeat mode to loop the current song
-                        Log.d("PlayerViewModel", "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback")
+                        Log.d(
+                            "PlayerViewModel",
+                            "🔁 Recommendation fetch failed, enabling repeat mode for continuous playback"
+                        )
                         _uiState.value = _uiState.value.copy(
                             upNextRecommendations = emptyList(),
                             isLoadingRecommendations = false,
@@ -1323,20 +1441,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 PlaybackEventBus.emit(PlaybackEvent.PlaybackStateChanged(false))
             } else {
                 val currentSong = _uiState.value.currentSong
-                
+
                 // Check if this is a restored online song that needs stream URL preparation
-                if (currentSong != null && 
-                    currentSong.id.startsWith("online:") && 
-                    !player.isSourcePrepared()) {
-                    
+                if (currentSong != null &&
+                    currentSong.id.startsWith("online:") &&
+                    !player.isSourcePrepared()
+                ) {
+
                     Log.d("PlayerViewModel", "🔄 Restored online song needs stream URL preparation")
-                    
+
                     // Extract video ID and play using playUrl which handles stream extraction
                     val videoId = currentSong.id.removePrefix("online:")
-                    val watchUrl = currentSong.filePath.ifEmpty { 
-                        "https://www.youtube.com/watch?v=$videoId" 
+                    val watchUrl = currentSong.filePath.ifEmpty {
+                        "https://www.youtube.com/watch?v=$videoId"
                     }
-                    
+
                     playUrl(
                         url = watchUrl,
                         title = currentSong.title,
@@ -1347,7 +1466,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     )
                     return@launch
                 }
-                
+
                 player.play()
 
                 _uiState.value.currentSong?.let { song ->
@@ -1381,81 +1500,94 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
     private fun prefetchNextSongIfNeeded() {
         val currentSong = _uiState.value.currentSong ?: return
-        
+
         // For online songs, check recommendations first, then queue
         var nextSong: Song? = null
-        if ((currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) 
-            && _uiState.value.upNextRecommendations.isNotEmpty()) {
+        if ((currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:"))
+            && _uiState.value.upNextRecommendations.isNotEmpty()
+        ) {
             // Use first recommendation as next song
             nextSong = _uiState.value.upNextRecommendations.firstOrNull()
         } else {
             // Use queue manager for regular songs
             nextSong = queueManager.peekNext()
         }
-        
+
         if (nextSong == null) return
-        
+
         // Only prefetch if this is a different song and we're not already prefetching
         if (nextSong.id == prefetchedSongId || isPrefetching) {
             return
         }
-        
+
         // Only prefetch online songs that need stream URL extraction
         if (!nextSong.id.startsWith("online:") && !nextSong.id.startsWith("youtube:")) {
             return
         }
-        
+
         isPrefetching = true
         prefetchJob?.cancel()
-        
+
         prefetchJob = viewModelScope.launch {
             try {
                 Log.d("PlayerViewModel", "🔄 Prefetching next song: ${nextSong.title}")
-                
+
                 val videoId = nextSong.id.removePrefix("online:").removePrefix("youtube:")
-                
+
                 // Fetch stream URL for next song (this will cache it in OnlineManager)
                 val streamUrl = onlineManager.getStreamUrl(videoId)
-                
+
                 if (streamUrl != null) {
-                    Log.d("PlayerViewModel", "✅ Prefetched and cached stream URL for: ${nextSong.title}")
+                    Log.d(
+                        "PlayerViewModel",
+                        "✅ Prefetched and cached stream URL for: ${nextSong.title}"
+                    )
                     prefetchedSongId = nextSong.id
-                    
+
                     // Optionally: Pre-download first chunk (1MB) for instant playback
                     // This improves the user experience by reducing initial buffering
                     try {
                         withContext(AppDispatchers.Network) {
                             val cacheDir = getApplication<Application>().cacheDir
                             val prefetchFile = File(cacheDir, "prefetch_${videoId}.cache")
-                            
+
                             // Only prefetch if file doesn't already exist
                             if (!prefetchFile.exists()) {
-                                val connection = URL(streamUrl).openConnection() as HttpURLConnection
-                                connection.setRequestProperty("Range", "bytes=0-1048575") // First 1MB
+                                val connection =
+                                    URL(streamUrl).openConnection() as HttpURLConnection
+                                connection.setRequestProperty(
+                                    "Range",
+                                    "bytes=0-1048575"
+                                ) // First 1MB
                                 connection.connectTimeout = 10000
                                 connection.readTimeout = 10000
                                 connection.connect()
-                                
+
                                 if (connection.responseCode in 200..299 || connection.responseCode == 206) {
                                     prefetchFile.parentFile?.mkdirs()
                                     val inputStream = connection.inputStream
                                     val outputStream = FileOutputStream(prefetchFile)
-                                    
+
                                     val buffer = ByteArray(8192)
                                     var bytesRead: Int
                                     var totalBytes = 0
-                                    
+
                                     // Limit to 1MB max
-                                    while (inputStream.read(buffer).also { bytesRead = it } != -1 && totalBytes < 1048576) {
+                                    while (inputStream.read(buffer)
+                                            .also { bytesRead = it } != -1 && totalBytes < 1048576
+                                    ) {
                                         outputStream.write(buffer, 0, bytesRead)
                                         totalBytes += bytesRead
                                     }
-                                    
+
                                     inputStream.close()
                                     outputStream.close()
                                     connection.disconnect()
-                                    
-                                    Log.d("PlayerViewModel", "✅ Pre-cached ${totalBytes / 1024}KB for instant playback: ${nextSong.title}")
+
+                                    Log.d(
+                                        "PlayerViewModel",
+                                        "✅ Pre-cached ${totalBytes / 1024}KB for instant playback: ${nextSong.title}"
+                                    )
                                 }
                             }
                         }
@@ -1464,7 +1596,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         // Not critical, continue without pre-caching
                     }
                 } else {
-                    Log.w("PlayerViewModel", "⚠️ Failed to prefetch stream URL for: ${nextSong.title}")
+                    Log.w(
+                        "PlayerViewModel",
+                        "⚠️ Failed to prefetch stream URL for: ${nextSong.title}"
+                    )
                 }
             } catch (e: Exception) {
                 Log.e("PlayerViewModel", "❌ Error prefetching next song: ${e.message}")
@@ -1483,24 +1618,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             prefetchJob?.cancel()
 
             val currentSong = _uiState.value.currentSong
-            
+
             // For online songs with recommendations, play from recommendation list
-            if (currentSong != null && 
-                (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) && 
-                _uiState.value.upNextRecommendations.isNotEmpty()) {
-                
+            if (currentSong != null &&
+                (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) &&
+                _uiState.value.upNextRecommendations.isNotEmpty()
+            ) {
+
                 val nextRecommendation = _uiState.value.upNextRecommendations.first()
-                
+
                 // Check if next song is preloaded for instant playback
                 val isPreloaded = preloadManager.isPreloaded(nextRecommendation)
-                Log.d("PlayerViewModel", "⏭️ Playing next recommendation: ${nextRecommendation.title} (preloaded: $isPreloaded)")
-                
+                Log.d(
+                    "PlayerViewModel",
+                    "⏭️ Playing next recommendation: ${nextRecommendation.title} (preloaded: $isPreloaded)"
+                )
+
                 // Remove the played recommendation from the list
                 val remainingRecommendations = _uiState.value.upNextRecommendations.drop(1)
                 _uiState.value = _uiState.value.copy(
                     upNextRecommendations = remainingRecommendations
                 )
-                
+
                 // Play the recommended song (will use cache if preloaded)
                 playRecommendedSong(nextRecommendation)
                 return@launch
@@ -1536,38 +1675,52 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             playbackCollector.stopCollecting(skipped = true)
 
             val currentSong = _uiState.value.currentSong
-            
+
             // For online songs with played history, go back to previous recommendation
-            if (currentSong != null && 
-                (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) && 
-                playedRecommendationsHistory.isNotEmpty()) {
-                
+            if (currentSong != null &&
+                (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) &&
+                playedRecommendationsHistory.isNotEmpty()
+            ) {
+
                 val previousRecommendation = playedRecommendationsHistory.last()
-                Log.d("PlayerViewModel", "⏮️ Playing previous recommendation: ${previousRecommendation.title}")
-                
+                Log.d(
+                    "PlayerViewModel",
+                    "⏮️ Playing previous recommendation: ${previousRecommendation.title}"
+                )
+
                 // Remove from history
                 playedRecommendationsHistory.removeAt(playedRecommendationsHistory.size - 1)
-                
+
                 // Add current song back to the front of recommendations list
-                val updatedRecommendations = listOf(currentSong) + _uiState.value.upNextRecommendations
+                val updatedRecommendations =
+                    listOf(currentSong) + _uiState.value.upNextRecommendations
                 _uiState.value = _uiState.value.copy(
                     upNextRecommendations = updatedRecommendations
                 )
-                
+
                 // Check if previous song is preloaded for instant playback
-                val videoId = previousRecommendation.id.removePrefix("online:").removePrefix("youtube:")
+                val videoId =
+                    previousRecommendation.id.removePrefix("online:").removePrefix("youtube:")
                 val cachedStreamUrl = preloadManager.getCachedStreamUrl(previousRecommendation)
                 val isPreloaded = preloadManager.isPreloaded(previousRecommendation)
-                
+
                 if (isPreloaded && cachedStreamUrl != null) {
-                    Log.d("PlayerViewModel", "🚀 Using preloaded cache for previous song: ${previousRecommendation.title}")
+                    Log.d(
+                        "PlayerViewModel",
+                        "🚀 Using preloaded cache for previous song: ${previousRecommendation.title}"
+                    )
                     playWithCachedStream(previousRecommendation, videoId, cachedStreamUrl)
                 } else {
                     // Fall back to regular playback
                     val youtubeUrl = previousRecommendation.filePath
-                    playUrl(url = youtubeUrl, title = previousRecommendation.title, 
-                           artist = previousRecommendation.artist, durationMs = previousRecommendation.duration, 
-                           thumbnailUrl = previousRecommendation.albumArtUri, skipRecommendationFetch = true)
+                    playUrl(
+                        url = youtubeUrl,
+                        title = previousRecommendation.title,
+                        artist = previousRecommendation.artist,
+                        durationMs = previousRecommendation.duration,
+                        thumbnailUrl = previousRecommendation.albumArtUri,
+                        skipRecommendationFetch = true
+                    )
                 }
                 return@launch
             }
@@ -1630,14 +1783,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     // For online songs with recommendations, auto-play the first recommendation
                     if (currentSong.id.startsWith("online:") && _uiState.value.upNextRecommendations.isNotEmpty()) {
                         val nextRecommendation = _uiState.value.upNextRecommendations.first()
-                        Log.d("PlayerViewModel", "🎵 Auto-playing next recommendation: ${nextRecommendation.title}")
-                        
+                        Log.d(
+                            "PlayerViewModel",
+                            "🎵 Auto-playing next recommendation: ${nextRecommendation.title}"
+                        )
+
                         // Remove the played recommendation from the list
                         val remainingRecommendations = _uiState.value.upNextRecommendations.drop(1)
                         _uiState.value = _uiState.value.copy(
                             upNextRecommendations = remainingRecommendations
                         )
-                        
+
                         // Play the recommended song
                         playRecommendedSong(nextRecommendation)
                     } else {
@@ -1866,7 +2022,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                 val safeArtist =
                     song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
-                
+
                 // Check for WebM (primary) or Opus (fallback)
                 val webmFile = File(musicDir, "$safeArtist - $safeTitle.webm")
                 val opusFile = File(musicDir, "$safeTitle - $safeArtist.opus")
@@ -1876,7 +2032,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     else -> null
                 }
 
-                if (audioFile != null && audioFile.exists() && !_uiState.value.downloadedSongs.contains(song.id)) {
+                if (audioFile != null && audioFile.exists() && !_uiState.value.downloadedSongs.contains(
+                        song.id
+                    )
+                ) {
                     _uiState.value = _uiState.value.copy(
                         downloadedSongs = _uiState.value.downloadedSongs + song.id
                     )
@@ -1903,7 +2062,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val safeTitle = song.title.replace(Regex("[^a-zA-Z0-9\\s-]"), "").trim()
                     val safeArtist =
                         song.artist?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.trim() ?: "Unknown"
-                    
+
                     // Check for WebM (primary from NewPipe) or Opus (legacy)
                     val webmFile = File(musicDir, "$safeArtist - $safeTitle.webm")
                     val opusFile = File(musicDir, "$safeTitle - $safeArtist.opus")
@@ -1995,14 +2154,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (audioFormats.isNotEmpty()) {
                         // AUTO-SELECT BEST FORMAT: Prefer M4A for metadata embedding support
                         // M4A (AAC) supports metadata embedding via Mutagen without FFmpeg
-                        val bestFormat = audioFormats.find { 
+                        val bestFormat = audioFormats.find {
                             it.container.equals("m4a", ignoreCase = true) ||
-                            it.acodec.contains("aac", ignoreCase = true) ||
-                            it.acodec.contains("mp4a", ignoreCase = true)
+                                    it.acodec.contains("aac", ignoreCase = true) ||
+                                    it.acodec.contains("mp4a", ignoreCase = true)
                         } ?: audioFormats.first() // Fall back to best available
-                        
-                        Log.d("PlayerViewModel", "📥 Download: Auto-selected format: ${bestFormat.format_id} (${bestFormat.container})")
-                        
+
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Download: Auto-selected format: ${bestFormat.format_id} (${bestFormat.container})"
+                        )
+
                         // Download directly with best format (skip format selection dialog)
                         downloadWithFormat(bestFormat)
                     } else {
@@ -2187,14 +2349,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val videoInfo = try {
                     chaquopyDownloader.getVideoInfo(url, null)
                 } catch (e: Exception) {
-                    Log.w("PlayerViewModel", "📥 Format Download: yt-dlp metadata fetch failed: ${e.message}")
+                    Log.w(
+                        "PlayerViewModel",
+                        "📥 Format Download: yt-dlp metadata fetch failed: ${e.message}"
+                    )
                     null
                 }
-                
-                val metadataTitle = videoInfo?.title?.takeIf { it.isNotEmpty() } ?: currentSong.title
-                val metadataArtist = videoInfo?.artist?.takeIf { it.isNotEmpty() } ?: currentSong.artist
+
+                val metadataTitle =
+                    videoInfo?.title?.takeIf { it.isNotEmpty() } ?: currentSong.title
+                val metadataArtist =
+                    videoInfo?.artist?.takeIf { it.isNotEmpty() } ?: currentSong.artist
                 val metadataAlbum = videoInfo?.album?.takeIf { it.isNotEmpty() } ?: "YouTube Audio"
-                
+
                 Log.d("PlayerViewModel", "📥 Format Download: Metadata from yt-dlp:")
                 Log.d("PlayerViewModel", "📥 Format Download: - Title: $metadataTitle")
                 Log.d("PlayerViewModel", "📥 Format Download: - Artist: $metadataArtist")
@@ -2208,7 +2375,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     downloadMessage = "Downloading $metadataTitle (${format.format_note})..."
                 )
 
-                Log.d("PlayerViewModel", "📥 Format Download: Using NewPipe direct download (primary method)...")
+                Log.d(
+                    "PlayerViewModel",
+                    "📥 Format Download: Using NewPipe direct download (primary method)..."
+                )
 
                 // Use public Download directory for user access
                 val downloadDir = File(
@@ -2241,11 +2411,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                         downloadProgress = _uiState.value.downloadProgress + (currentSong.id to (pct / 100.0f))
                                     )
                                 }
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) {
+                            }
                         },
                         thumbnailProgressCallback = { tPct ->
                             // Optional: log thumbnail progress (could be used to show a separate UI)
-                            Log.d("PlayerViewModel", "📷 Thumbnail download progress: $tPct% for ${currentSong.id}")
+                            Log.d(
+                                "PlayerViewModel",
+                                "📷 Thumbnail download progress: $tPct% for ${currentSong.id}"
+                            )
                         },
                         progressStep = 2 // reduce update frequency to 2% steps
                     )
@@ -2264,7 +2438,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 // FALLBACK: If NewPipe fails, try yt-dlp (commented out by default)
                 val (finalSuccess, finalFilePath, finalMessage) = if (!newPipeResult.success) {
-                    Log.d("PlayerViewModel", "📥 Format Download: NewPipe failed, trying yt-dlp fallback...")
+                    Log.d(
+                        "PlayerViewModel",
+                        "📥 Format Download: NewPipe failed, trying yt-dlp fallback..."
+                    )
                     try {
                         val result = chaquopyDownloader.downloadAudio(
                             url,
@@ -2272,20 +2449,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             format.format_id,
                             null
                         )
-                        
+
                         if (result.success) {
-                            Log.d("PlayerViewModel", "📥 Format Download: ✅ yt-dlp fallback successful!")
+                            Log.d(
+                                "PlayerViewModel",
+                                "📥 Format Download: ✅ yt-dlp fallback successful!"
+                            )
                             Triple(true, result.filePath, result.message)
                         } else {
-                            Triple(newPipeResult.success, newPipeResult.filePath ?: "", newPipeResult.message)
+                            Triple(
+                                newPipeResult.success,
+                                newPipeResult.filePath ?: "",
+                                newPipeResult.message
+                            )
                         }
                     } catch (e: Exception) {
                         Log.e("PlayerViewModel", "📥 Format Download: yt-dlp also failed", e)
-                        Triple(newPipeResult.success, newPipeResult.filePath ?: "", newPipeResult.message)
+                        Triple(
+                            newPipeResult.success,
+                            newPipeResult.filePath ?: "",
+                            newPipeResult.message
+                        )
                     }
                 } else {
                     Log.d("PlayerViewModel", "📥 Format Download: ✅ NewPipe download successful!")
-                    Triple(newPipeResult.success, newPipeResult.filePath ?: "", newPipeResult.message)
+                    Triple(
+                        newPipeResult.success,
+                        newPipeResult.filePath ?: "",
+                        newPipeResult.message
+                    )
                 }
 
                 if (finalSuccess && finalFilePath.isNotEmpty()) {
@@ -2303,12 +2495,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                         // Create downloaded song entry using the EXACT metadata embedded in the audio file
                         // This ensures database metadata matches what's physically in the file
-                        val embeddedTitle = newPipeResult.title.takeIf { it.isNotEmpty() } ?: currentSong.title
-                        val embeddedArtist = newPipeResult.artist.takeIf { it.isNotEmpty() } ?: currentSong.artist
-                        val embeddedAlbum = newPipeResult.album.takeIf { it.isNotEmpty() } ?: "YouTube Audio"
-                        
-                        Log.d("PlayerViewModel", "📥 Format Download: Using embedded metadata from file - Title: $embeddedTitle, Artist: $embeddedArtist, Album: $embeddedAlbum")
-                        
+                        val embeddedTitle =
+                            newPipeResult.title.takeIf { it.isNotEmpty() } ?: currentSong.title
+                        val embeddedArtist =
+                            newPipeResult.artist.takeIf { it.isNotEmpty() } ?: currentSong.artist
+                        val embeddedAlbum =
+                            newPipeResult.album.takeIf { it.isNotEmpty() } ?: "YouTube Audio"
+
+                        Log.d(
+                            "PlayerViewModel",
+                            "📥 Format Download: Using embedded metadata from file - Title: $embeddedTitle, Artist: $embeddedArtist, Album: $embeddedAlbum"
+                        )
+
                         val downloadedSong = Song(
                             id = downloadedFile.absolutePath,
                             title = embeddedTitle,
@@ -2318,7 +2516,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             filePath = downloadedFile.absolutePath,
                             genre = currentSong.genre,
                             releaseYear = currentSong.releaseYear,
-                            albumArtUri = newPipeResult.thumbnailUrl.takeIf { it.isNotEmpty() } ?: currentSong.albumArtUri
+                            albumArtUri = newPipeResult.thumbnailUrl.takeIf { it.isNotEmpty() }
+                                ?: currentSong.albumArtUri
                         )
 
                         // Insert into database if not already present
@@ -2384,7 +2583,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 activeDownloadJobs.remove(currentSong.id)
             }
         }
-        
+
         // Store the job for potential cancellation
         activeDownloadJobs[currentSong.id] = downloadJob
     }
@@ -2397,7 +2596,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             Log.d("PlayerViewModel", "🛑 Cancelling download for song: $songId")
             job.cancel()
             activeDownloadJobs.remove(songId)
-            
+
             // Update UI state
             _uiState.value = _uiState.value.copy(
                 downloadingSongs = _uiState.value.downloadingSongs - songId,
@@ -2457,13 +2656,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun triggerPreloading(currentSong: Song) {
         viewModelScope.launch {
             delay(1500) // Wait 1.5 seconds after current song starts to avoid competing for bandwidth
-            
+
             val nextSongs = _uiState.value.upNextRecommendations.take(3)
             val previousSong = if (playedRecommendationsHistory.isNotEmpty()) {
                 playedRecommendationsHistory.lastOrNull()
             } else null
-            
-            Log.d("PlayerViewModel", "🔄 Triggering preload: ${nextSongs.size} next songs, previous=${previousSong?.title}")
+
+            Log.d(
+                "PlayerViewModel",
+                "🔄 Triggering preload: ${nextSongs.size} next songs, previous=${previousSong?.title}"
+            )
             preloadManager.preloadAround(currentSong, nextSongs, previousSong)
         }
     }

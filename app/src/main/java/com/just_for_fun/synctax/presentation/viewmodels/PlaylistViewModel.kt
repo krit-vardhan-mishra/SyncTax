@@ -282,4 +282,18 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
             onResult(result != null)
         }
     }
+
+    /**
+     * Add a song to an existing playlist
+     */
+    fun addSongToPlaylist(
+        playlistId: Int,
+        song: Song,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch(AppDispatchers.Database) {
+            val result = playlistRepository.addSongToPlaylist(playlistId, song)
+            onResult(result)
+        }
+    }
 }

@@ -116,7 +116,7 @@ class MusicNotificationManager(
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(song?.title ?: "SyncTax")
             .setContentText(song?.artist ?: "No song playing")
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(R.drawable.ic_media_play_covered)
             .setContentIntent(contentIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(isPlaying)

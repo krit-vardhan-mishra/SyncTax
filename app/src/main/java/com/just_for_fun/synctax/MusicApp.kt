@@ -301,12 +301,28 @@ fun MusicApp(userPreferences: UserPreferences) {
                             )
                         }
                         composable("train") {
+                            // Collapse player only when entering training screen (not on back navigation)
+                            val isFirstComposition = remember { mutableStateOf(true) }
+                            LaunchedEffect(Unit) {
+                                if (isFirstComposition.value && scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
+                                    scaffoldState.bottomSheetState.partialExpand()
+                                }
+                                isFirstComposition.value = false
+                            }
                             TrainingScreen(
                                 homeViewModel = homeViewModel,
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
                         composable("settings") {
+                            // Collapse player only when entering settings screen (not on back navigation)
+                            val isFirstComposition = remember { mutableStateOf(true) }
+                            LaunchedEffect(Unit) {
+                                if (isFirstComposition.value && scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
+                                    scaffoldState.bottomSheetState.partialExpand()
+                                }
+                                isFirstComposition.value = false
+                            }
                             SettingsScreen(
                                 userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() },

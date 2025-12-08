@@ -205,4 +205,7 @@ dependencies {
     // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
 
     implementation("com.afollestad.material-dialogs:core:3.3.0")
+
+    // For flow operators
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 }

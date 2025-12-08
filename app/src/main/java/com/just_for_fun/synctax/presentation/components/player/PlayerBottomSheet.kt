@@ -41,6 +41,14 @@ fun PlayerBottomSheet(
     val isExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
 
     val currentPeekHeight = if (song != null) miniPlayerHeight else 0.dp
+    
+    // Force scaffold to show miniplayer when song starts playing
+    LaunchedEffect(song) {
+        if (song != null && !isExpanded) {
+            // Ensure the bottom sheet shows the peek height
+            scaffoldState.bottomSheetState.partialExpand()
+        }
+    }
 
     BottomSheetScaffold(
         scaffoldState = scaffoldState,

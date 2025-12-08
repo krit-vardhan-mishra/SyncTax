@@ -44,4 +44,7 @@ interface PlaylistSongDao {
     
     @Query("UPDATE playlist_songs SET position = :newPosition WHERE playlistId = :playlistId AND onlineSongId = :songId")
     suspend fun updateSongPosition(playlistId: Int, songId: Int, newPosition: Int)
+    
+    @Query("SELECT MAX(position) FROM playlist_songs WHERE playlistId = :playlistId")
+    suspend fun getMaxPosition(playlistId: Int): Int?
 }
