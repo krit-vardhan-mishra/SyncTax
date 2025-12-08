@@ -2673,4 +2673,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setCurrentLyrics(lyrics: String?) {
         currentLyrics = lyrics
     }
+
+    /**
+     * Expand the player sheet to fullscreen mode
+     */
+    fun expandPlayerSheet() {
+        _uiState.value = _uiState.value.copy(
+            playerSheetState = com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.EXPANDED
+        )
+    }
+
+    /**
+     * Collapse the player sheet to miniplayer mode
+     */
+    fun collapsePlayerSheet() {
+        _uiState.value = _uiState.value.copy(
+            playerSheetState = com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.COLLAPSED
+        )
+    }
+
+    /**
+     * Toggle the player sheet between collapsed and expanded states
+     */
+    fun togglePlayerSheet() {
+        val newState = if (_uiState.value.playerSheetState == com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.COLLAPSED) {
+            com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.EXPANDED
+        } else {
+            com.just_for_fun.synctax.presentation.components.state.PlayerSheetState.COLLAPSED
+        }
+        _uiState.value = _uiState.value.copy(playerSheetState = newState)
+    }
 }
