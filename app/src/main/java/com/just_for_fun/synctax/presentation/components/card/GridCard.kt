@@ -38,7 +38,7 @@ fun GridCard(
             .fillMaxWidth()
             // Set a fixed height to make it look like a card.
             // You can adjust this (e.g., 200.dp) or use aspect ratio modifiers if preferred.
-            .height(200.dp)
+            .height(180.dp)
             .padding(4.dp) // Outer padding for spacing between grid items
             .clip(RoundedCornerShape(20.dp)) // Heavily rounded corners like the screenshot
             .clickable(onClick = onClick)

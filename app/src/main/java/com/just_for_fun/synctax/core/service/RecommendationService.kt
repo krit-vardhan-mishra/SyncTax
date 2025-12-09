@@ -119,13 +119,11 @@ class RecommendationService(
     
     /**
      * Filters results to only include songs (not videos, episodes, etc.).
-     * Songs typically have a duration and don't have typical video/episode indicators.
+     * Songs typically don't have typical video/episode indicators in the title.
+     * Duration filter is only applied if duration is available.
      */
     private fun filterSongsOnly(results: List<OnlineSearchResult>): List<OnlineSearchResult> {
-        return results.filter { result ->
-            // Must have a duration (indicates it's playable content)
-            val hasDuration = result.duration != null && result.duration > 0
-            
+        val filtered = results.filter { result ->
             // Filter out common non-song indicators in title
             val title = result.title.lowercase()
             val isLikelyNotSong = title.contains("episode") ||
@@ -140,11 +138,20 @@ class RecommendationService(
                     title.contains("how to")
             
             // Duration check - songs are typically between 1-15 minutes
-            val durationInMinutes = (result.duration ?: 0) / 60
-            val hasReasonableDuration = durationInMinutes in 1..15
+            // Only apply this filter if duration is available
+            val hasReasonableDuration = if (result.duration != null && result.duration > 0) {
+                val durationInMinutes = result.duration / 60
+                durationInMinutes in 1..15
+            } else {
+                // If duration is not available, don't filter out (YouTube Music API already filters)
+                true
+            }
             
-            hasDuration && !isLikelyNotSong && hasReasonableDuration
+            !isLikelyNotSong && hasReasonableDuration
         }
+        
+        Log.d(TAG, "Filtered ${results.size} results to ${filtered.size} songs")
+        return filtered
     }
     
     /**

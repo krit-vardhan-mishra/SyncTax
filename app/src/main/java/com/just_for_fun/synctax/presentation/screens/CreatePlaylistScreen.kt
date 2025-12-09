@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Title
@@ -54,12 +54,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.network.OnlineSearchResult
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Song
@@ -194,9 +196,9 @@ fun CreatePlaylistScreen(
                             offlineSongs = selectedOfflineSongs.toList(),
                             onlineSongs = selectedOnlineSongs.toList()
                         ) { success ->
-                             if (success) {
-                                 onSaveSuccess()
-                             }
+                            if (success) {
+                                onSaveSuccess()
+                            }
                         }
                     }
                 },
@@ -412,6 +414,7 @@ fun CreatePlaylistScreen(
                             SelectedSongItem(
                                 title = song.title,
                                 artist = song.artist,
+                                thumbnailUrl = song.albumArtUri,
                                 onRemove = { selectedOfflineSongs.remove(song) }
                             )
                         }
@@ -420,6 +423,7 @@ fun CreatePlaylistScreen(
                             SelectedSongItem(
                                 title = song.title,
                                 artist = song.artist,
+                                thumbnailUrl = song.thumbnailUrl,
                                 onRemove = { selectedOnlineSongs.remove(song) }
                             )
                         }
@@ -471,12 +475,22 @@ private fun OfflineSongItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.MusicNote,
-                contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(40.dp)
-            )
+            if (song.albumArtUri != null && song.albumArtUri.isNotEmpty()) {
+                AsyncImage(
+                    model = song.albumArtUri,
+                    contentDescription = "Album art",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                )
+            } else {
+                Icon(
+                    imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -494,6 +508,11 @@ private fun OfflineSongItem(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Add to playlist",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
@@ -515,12 +534,22 @@ private fun OnlineSearchItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(40.dp)
-            )
+            if (result.thumbnailUrl != null && result.thumbnailUrl.isNotEmpty()) {
+                AsyncImage(
+                    model = result.thumbnailUrl,
+                    contentDescription = "Song thumbnail",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -551,6 +580,7 @@ private fun OnlineSearchItem(
 private fun SelectedSongItem(
     title: String,
     artist: String,
+    thumbnailUrl: String? = null,
     onRemove: () -> Unit
 ) {
     Card(
@@ -565,12 +595,22 @@ private fun SelectedSongItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
+            if (thumbnailUrl != null && thumbnailUrl.isNotEmpty()) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = "Song thumbnail",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(

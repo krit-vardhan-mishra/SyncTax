@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,7 +32,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Playlist
 import java.text.SimpleDateFormat
@@ -39,10 +39,11 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun PlaylistCard(
+fun PlaylistCardLarger(
     playlist: Playlist,
     onClick: () -> Unit
 ) {
+//    2x4 height x width
     val roundedShape = RoundedCornerShape(12.dp)
     val cardHeight = 250.dp // Define a fixed height for the card
 
@@ -167,6 +168,154 @@ fun PlaylistCard(
 
                 // 3. Playlist Description Bar (at the bottom)
                 PlaylistDescriptionBar(playlist)
+            }
+        }
+    }
+}
+
+
+@Composable
+fun PlaylistCardMedium(
+    playlist: Playlist,
+    onClick: () -> Unit
+) {
+    val roundedShape = RoundedCornerShape(12.dp)
+
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxSize()
+            .aspectRatio(1f)
+            .clip(roundedShape)
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Thumbnail Background
+            if (playlist.thumbnailUrl != null) {
+                AsyncImage(
+                    model = playlist.thumbnailUrl,
+                    contentDescription = "Playlist cover art",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF202020)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "No cover art icon",
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
+            // Overlay for text visibility
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+            )
+
+            // Playlist name at the bottom
+            Text(
+                text = playlist.name,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+            )
+        }
+    }
+}
+
+
+@Composable
+fun PlaylistCardSmall(
+    playlist: Playlist,
+    onClick: () -> Unit
+) {
+    val roundedShape = RoundedCornerShape(12.dp)
+    val cardHeight = 120.dp // Smaller height for compact view
+
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(cardHeight)
+            .clip(roundedShape)
+    ) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Left side: Thumbnail
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            ) {
+                if (playlist.thumbnailUrl != null) {
+                    AsyncImage(
+                        model = playlist.thumbnailUrl,
+                        contentDescription = "Playlist cover art",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF202020)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = "No cover art icon",
+                            modifier = Modifier.size(32.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+
+            // Right side: Details
+            Column(
+                modifier = Modifier
+                    .weight(2f)
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = playlist.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                val description = if (!playlist.description.isNullOrEmpty()) {
+                    playlist.description
+                } else {
+                    val dateString = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(playlist.createdAt))
+                    "${playlist.songCount} songs • ${playlist.platform} • Created $dateString"
+                }
+
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
     }

@@ -5,10 +5,12 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
+import com.just_for_fun.synctax.core.network.OnlineResultType
 import com.just_for_fun.synctax.core.network.OnlineSearchResult
 import com.just_for_fun.synctax.core.network.YouTubeInnerTubeClient
 import com.just_for_fun.synctax.core.service.ListeningAnalyticsService
 import com.just_for_fun.synctax.core.service.RecommendationService
+import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.RecommendationInteraction
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -268,5 +270,96 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
             result.trending.any { it.id == song.id } -> "Trending now"
             else -> "Recommended for you"
         }
+    }
+
+    /**
+     * Search for songs with debouncing
+     */
+    fun searchSongs(query: String, onResult: (List<OnlineSearchResult>) -> Unit) {
+        if (query.length < 2) {
+            onResult(emptyList())
+            return
+        }
+
+        viewModelScope.launch(AppDispatchers.Network) {
+            try {
+                val results = ytClient.search(query, limit = 8)
+                val songs = results.filter { it.type == OnlineResultType.SONG }
+                onResult(songs)
+            } catch (e: Exception) {
+                Log.e(TAG, "Song search failed: $e")
+                onResult(emptyList())
+            }
+        }
+    }
+
+    /**
+     * Search for artists using YTMusicRecommender for proper artist results
+     */
+    fun searchArtists(query: String, onResult: (List<OnlineSearchResult>) -> Unit) {
+        if (query.length < 2) {
+            onResult(emptyList())
+            return
+        }
+
+        YTMusicRecommender.searchArtists(
+            query = query,
+            limit = 8,
+            onResult = { artists ->
+                val mapped = artists.map { artist ->
+                    OnlineSearchResult(
+                        id = artist.browseId,
+                        title = artist.name,
+                        author = artist.subscribers,
+                        duration = null,
+                        thumbnailUrl = artist.thumbnail,
+                        streamUrl = null,
+                        type = OnlineResultType.ARTIST,
+                        year = null,
+                        browseId = artist.browseId
+                    )
+                }
+                onResult(mapped)
+            },
+            onError = { error ->
+                Log.e(TAG, "Artist search failed: $error")
+                onResult(emptyList())
+            }
+        )
+    }
+
+    /**
+     * Search for albums using YTMusicRecommender for proper album results
+     */
+    fun searchAlbums(query: String, onResult: (List<OnlineSearchResult>) -> Unit) {
+        if (query.length < 2) {
+            onResult(emptyList())
+            return
+        }
+
+        YTMusicRecommender.searchAlbums(
+            query = query,
+            limit = 8,
+            onResult = { albums ->
+                val mapped = albums.map { album ->
+                    OnlineSearchResult(
+                        id = album.browseId,
+                        title = album.title,
+                        author = album.artist,
+                        duration = null,
+                        thumbnailUrl = album.thumbnail,
+                        streamUrl = null,
+                        type = OnlineResultType.ALBUM,
+                        year = album.year,
+                        browseId = album.browseId
+                    )
+                }
+                onResult(mapped)
+            },
+            onError = { error ->
+                Log.e(TAG, "Album search failed: $error")
+                onResult(emptyList())
+            }
+        )
     }
 }
