@@ -47,7 +47,6 @@ import kotlin.math.max
  * 3. Better visual hierarchy with frosted glass containers
  * 4. Smooth animations and transitions
  *
- * To achieve the full SimpMusic-style liquid glass effect, consider adding:
  * - AndroidLiquidGlass library (io.github.kyant0:backdrop) for advanced shader effects
  * - Real-time backdrop blur with proper refractive properties
  */
@@ -93,6 +92,7 @@ fun LyricsOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .blur(30.dp)
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(

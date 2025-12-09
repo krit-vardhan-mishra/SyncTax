@@ -133,16 +133,20 @@ import re
 import requests
 import base64
 from urllib.parse import urlparse, parse_qs
+import os
 
 # Use a public Piped instance (you can change this)
 PIPED_API = "https://pipedapi.kavin.rocks"
 
 # Spotify API credentials (replace with your own from Spotify Developer Dashboard)
-SPOTIFY_CLIENT_ID = "49f66c7904a84a9b85ef496d65719366"
-SPOTIFY_CLIENT_SECRET = "fc9e43c2cfd64b54854aaee5d90706eb"
+SPOTIFY_CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
 
 def get_spotify_access_token():
     """Get access token using client credentials flow"""
+    if not SPOTIFY_CLIENT_ID or not SPOTIFY_CLIENT_SECRET:
+        raise Exception("Spotify API credentials not set. Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET environment variables.")
+    
     try:
         auth_url = "https://accounts.spotify.com/api/token"
         auth_data = {

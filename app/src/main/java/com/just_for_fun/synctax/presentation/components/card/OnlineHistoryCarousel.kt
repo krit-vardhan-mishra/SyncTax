@@ -37,6 +37,34 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.DialogOption
+import androidx.compose.material.icons.rounded.Delete
+
+fun createOnlineHistoryOptions(
+    history: OnlineListeningHistory,
+    onRemove: () -> Unit
+): List<DialogOption> {
+    return listOf(
+        DialogOption(
+            id = "remove",
+            title = "Remove from History",
+            subtitle = "Remove this song from online history",
+            icon = {
+                Icon(
+                    Icons.Rounded.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            destructive = true,
+            onClick = onRemove
+        )
+    )
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +75,9 @@ fun OnlineHistoryCarousel(
     onRemoveFromHistory: ((OnlineListeningHistory) -> Unit)? = null
 ) {
     if (history.isEmpty()) return
+
+    val selectedHistory = remember { mutableStateOf<OnlineListeningHistory?>(null) }
+    val showDialog = remember { mutableStateOf(false) }
 
     HorizontalMultiBrowseCarousel(
         state = rememberCarouselState { history.size },
@@ -69,7 +100,8 @@ fun OnlineHistoryCarousel(
                     onClick = { onHistoryClick(item) },
                     onLongClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onRemoveFromHistory?.invoke(item)
+                        selectedHistory.value = item
+                        showDialog.value = true
                     }
                 )
         ) {
@@ -123,5 +155,20 @@ fun OnlineHistoryCarousel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+
+    if (selectedHistory.value != null) {
+        BottomOptionsDialog(
+            song = null,
+            isVisible = showDialog.value,
+            onDismiss = { showDialog.value = false },
+            options = createOnlineHistoryOptions(
+                history = selectedHistory.value!!,
+                onRemove = {
+                    onRemoveFromHistory?.invoke(selectedHistory.value!!)
+                    showDialog.value = false
+                }
+            )
+        )
     }
 }

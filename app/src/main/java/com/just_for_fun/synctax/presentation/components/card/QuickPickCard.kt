@@ -22,11 +22,8 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,7 +44,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.components.player.AnimatedWaveform
-import kotlinx.coroutines.launch
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.createSongOptions
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -60,9 +58,7 @@ fun QuickPickCard(
 ) {
     val haptic = LocalHapticFeedback.current
     var isPressed by remember { mutableStateOf(false) }
-    var showBottomSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
+    var showOptionsDialog by remember { mutableStateOf(false) }
     
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
@@ -84,6 +80,28 @@ fun QuickPickCard(
         label = "waveScale"
     )
 
+    // Create options for the dialog
+    val dialogOptions = remember(song, onAddToQueue) {
+        mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
+            onAddToQueue?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "add_to_queue",
+                    title = "Add to Queue",
+                    subtitle = "Add to current playlist",
+                    icon = {
+                        Icon(
+                            Icons.Default.PlaylistAdd,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+        }
+    }
+
     // Determine the active color (Primary if playing, otherwise transparent/default)
     val activeColor = MaterialTheme.colorScheme.primary
     val activeShape = RoundedCornerShape(8.dp)
@@ -96,7 +114,7 @@ fun QuickPickCard(
                 onClick = onClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showBottomSheet = true
+                    showOptionsDialog = true
                 }
             )
             .padding(4.dp),
@@ -187,42 +205,11 @@ fun QuickPickCard(
         }
     }
     
-    // Bottom sheet menu
-    if (showBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            sheetState = sheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
-                    label = { Text("Add to Queue") },
-                    selected = false,
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            showBottomSheet = false
-                        }
-                        onAddToQueue?.invoke(song)
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-                
-                // More options can be added here later
-            }
-        }
-    }
+    // Bottom options dialog
+    BottomOptionsDialog(
+        song = song,
+        isVisible = showOptionsDialog,
+        onDismiss = { showOptionsDialog = false },
+        options = dialogOptions
+    )
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.just_for_fun.synctax.BuildConfig
 import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
@@ -315,6 +316,8 @@ class PlaylistRepository(private val context: Context) {
      */
     private fun initPythonIfNeeded() {
         if (!Python.isStarted()) {
+            // Chaquopy only supports passing the platform - env vars should be set via
+            // python code or other mechanisms
             Python.start(AndroidPlatform(context))
         }
     }

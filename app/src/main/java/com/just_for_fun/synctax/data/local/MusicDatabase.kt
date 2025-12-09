@@ -10,6 +10,8 @@ import com.just_for_fun.synctax.data.local.dao.OnlineSearchHistoryDao
 import com.just_for_fun.synctax.data.local.dao.OnlineSongDao
 import com.just_for_fun.synctax.data.local.dao.PlaylistDao
 import com.just_for_fun.synctax.data.local.dao.PlaylistSongDao
+import com.just_for_fun.synctax.data.local.dao.RecommendationCacheDao
+import com.just_for_fun.synctax.data.local.dao.RecommendationInteractionDao
 import com.just_for_fun.synctax.data.local.dao.SongDao
 import com.just_for_fun.synctax.data.local.dao.UserPreferenceDao
 import com.just_for_fun.synctax.data.local.entities.ListeningHistory
@@ -18,6 +20,8 @@ import com.just_for_fun.synctax.data.local.entities.OnlineSearchHistory
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Playlist
 import com.just_for_fun.synctax.data.local.entities.PlaylistSong
+import com.just_for_fun.synctax.data.local.entities.RecommendationCache
+import com.just_for_fun.synctax.data.local.entities.RecommendationInteraction
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.local.entities.UserPreference
 
@@ -30,9 +34,11 @@ import com.just_for_fun.synctax.data.local.entities.UserPreference
         OnlineSearchHistory::class,
         Playlist::class,
         OnlineSong::class,
-        PlaylistSong::class
+        PlaylistSong::class,
+        RecommendationCache::class,
+        RecommendationInteraction::class
     ],
-    version = 6,  // Incremented for adding Playlist, OnlineSong, PlaylistSong
+    version = 7,  // Incremented for adding Recommendation entities
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
@@ -44,6 +50,8 @@ abstract class MusicDatabase : RoomDatabase() {
     abstract fun playlistDao(): PlaylistDao
     abstract fun onlineSongDao(): OnlineSongDao
     abstract fun playlistSongDao(): PlaylistSongDao
+    abstract fun recommendationCacheDao(): RecommendationCacheDao
+    abstract fun recommendationInteractionDao(): RecommendationInteractionDao
 
     companion object {
         @Volatile

@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.createSongOptions
 import kotlinx.coroutines.launch
 
 /**
@@ -91,9 +93,7 @@ private fun SpeedDialItem(
     onAddToQueue: ((Song) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
-    var showBottomSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
+    var showOptionsDialog by remember { mutableStateOf(false) }
     
     // Use ElevatedCard for a nice pop off the background
     ElevatedCard(
@@ -109,7 +109,7 @@ private fun SpeedDialItem(
                 onClick = onClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showBottomSheet = true
+                    showOptionsDialog = true
                 }
             )
             .then(
@@ -200,44 +200,35 @@ private fun SpeedDialItem(
         }
     }
     
-    // Bottom sheet menu
-    if (showBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            sheetState = sheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 32.dp)
-            ) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
-                    label = { Text("Add to Queue") },
-                    selected = false,
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            showBottomSheet = false
-                        }
-                        onAddToQueue?.invoke(song)
+    // Create options for the dialog
+    val dialogOptions = remember(song, onAddToQueue) {
+        mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
+            onAddToQueue?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "add_to_queue",
+                    title = "Add to Queue",
+                    subtitle = "Add to current playlist",
+                    icon = {
+                        Icon(
+                            Icons.Default.PlaylistAdd,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-                
-                // More options can be added here later
+                    onClick = { it(song) }
+                ))
             }
         }
     }
+    
+    // Bottom options dialog
+    BottomOptionsDialog(
+        song = song,
+        isVisible = showOptionsDialog,
+        onDismiss = { showOptionsDialog = false },
+        options = dialogOptions
+    )
 }
 
 @Composable

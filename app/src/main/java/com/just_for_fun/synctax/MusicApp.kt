@@ -18,7 +18,9 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +41,8 @@ import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.app.AppNavigationBar
 import com.just_for_fun.synctax.presentation.components.player.PlayerBottomSheet
+import com.just_for_fun.synctax.presentation.utils.BottomPaddingDefaults
+import com.just_for_fun.synctax.presentation.utils.LocalBottomPadding
 import com.just_for_fun.synctax.presentation.screens.AlbumDetailScreen
 import com.just_for_fun.synctax.presentation.screens.ArtistDetailScreen
 import com.just_for_fun.synctax.presentation.screens.HomeScreen
@@ -57,7 +61,9 @@ import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
 import com.just_for_fun.synctax.presentation.screens.CreatePlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.RecommendationsDetailScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +87,7 @@ fun MusicApp(userPreferences: UserPreferences) {
     val homeViewModel: HomeViewModel = viewModel()
     val dynamicBgViewModel: DynamicBackgroundViewModel =
         viewModel()
+    val recommendationViewModel: RecommendationViewModel = viewModel()
 
     // --- HOISTED STATE ---
     // Use ViewModel-managed player sheet state for better state management
@@ -113,6 +120,17 @@ fun MusicApp(userPreferences: UserPreferences) {
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var searchResetTrigger by remember { mutableStateOf(0) }
+    
+    // Calculate bottom padding - accounts for mini player + nav bar
+    val bottomPadding by remember(playerState.currentSong) {
+        derivedStateOf {
+            if (playerState.currentSong != null) {
+                BottomPaddingDefaults.TotalPadding
+            } else {
+                BottomPaddingDefaults.NavBarOnlyPadding
+            }
+        }
+    }
 
     // Update album colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -184,20 +202,23 @@ fun MusicApp(userPreferences: UserPreferences) {
                     isExpanded = isPlayerExpanded,
                     onExpandedChange = { isPlayerExpanded = it }
                 ) { innerPadding ->
-                    NavHost(
-                        navController = navController,
-                        startDestination = "home",
-                        modifier = Modifier.padding(
-                            top = innerPadding.calculateTopPadding(),
-                            start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
-                            end = innerPadding.calculateEndPadding(LayoutDirection.Ltr),
-                            bottom = if (playerState.currentSong != null) 0.dp else innerPadding.calculateBottomPadding()
-                        )
-                    ) {
+                    // Provide bottom padding to all screens via CompositionLocal
+                    CompositionLocalProvider(LocalBottomPadding provides bottomPadding) {
+                        NavHost(
+                            navController = navController,
+                            startDestination = "home",
+                            modifier = Modifier.padding(
+                                top = innerPadding.calculateTopPadding(),
+                                start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
+                                end = innerPadding.calculateEndPadding(LayoutDirection.Ltr),
+                                bottom = 0.dp // Screens handle their own bottom padding via LocalBottomPadding
+                            )
+                        ) {
                         composable("home") {
                             HomeScreen(
                                 homeViewModel = homeViewModel,
                                 playerViewModel = playerViewModel,
+                                recommendationViewModel = recommendationViewModel,
                                 userPreferences = userPreferences,
                                 onTrainClick = { navController.navigate("train") },
                                 onOpenSettings = { navController.navigate("settings") },
@@ -205,7 +226,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     navController.navigate("playlist_detail/$playlistId")
                                 },
                                 onNavigateToPlaylists = { navController.navigate("playlists") },
-                                onNavigateToOnlineSongs = { navController.navigate("online_songs") }
+                                onNavigateToOnlineSongs = { navController.navigate("online_songs") },
+                                onNavigateToRecommendations = { navController.navigate("recommendations_detail") }
                             )
                         }
                         composable("search") {
@@ -328,6 +350,20 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() },
                                 onScanTrigger = { homeViewModel.forceRefreshLibrary() }
+                            )
+                        }
+                        composable("recommendations_detail") {
+                            RecommendationsDetailScreen(
+                                recommendationViewModel = recommendationViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onPlaySong = { song ->
+                                    playerViewModel.playOnlineSongWithRecommendations(
+                                        videoId = song.id,
+                                        title = song.title,
+                                        artist = song.author ?: "Unknown Artist",
+                                        thumbnailUrl = song.thumbnailUrl
+                                    )
+                                }
                             )
                         }
                         composable(
@@ -506,6 +542,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                             }
                         }
                     }
+                    } // end CompositionLocalProvider
                 }
             }
 

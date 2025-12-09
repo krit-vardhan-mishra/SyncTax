@@ -49,7 +49,10 @@ import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.presentation.components.onboarding.DirectorySelectionDialog
 import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
+import com.just_for_fun.synctax.presentation.components.section.EmptyRecommendationsPrompt
 import com.just_for_fun.synctax.presentation.components.section.OnlineHistorySection
+import com.just_for_fun.synctax.presentation.components.section.RecommendationsSection
+import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
 import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSection
 import com.just_for_fun.synctax.presentation.components.section.SectionHeader
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
@@ -63,6 +66,7 @@ import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,13 +75,15 @@ fun HomeScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
+    recommendationViewModel: RecommendationViewModel = viewModel(),
     userPreferences: UserPreferences,
     onTrainClick: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onNavigateToLibrary: () -> Unit = {},
     onNavigateToPlaylist: (Int) -> Unit = {},
     onNavigateToPlaylists: () -> Unit = {},
-    onNavigateToOnlineSongs: () -> Unit = {}
+    onNavigateToOnlineSongs: () -> Unit = {},
+    onNavigateToRecommendations: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -85,6 +91,11 @@ fun HomeScreen(
     val userInitial = userPreferences.getUserInitial()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val scanPaths by userPreferences.scanPaths.collectAsState()
+    
+    // Recommendation state
+    val recommendations by recommendationViewModel.recommendations.collectAsState()
+    val isLoadingRecommendations by recommendationViewModel.isLoading.collectAsState()
+    val hasEnoughHistory by recommendationViewModel.hasEnoughHistory.collectAsState()
 
     // Directory selection dialog state
     var showDirectorySelectionDialog by remember { mutableStateOf(false) }
@@ -300,6 +311,55 @@ fun HomeScreen(
                             }
                         }
 
+                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                            item {
+                                Spacer(modifier = Modifier.height(15.dp))
+                            }
+                        }
+                        
+                        // Online Recommendations Section
+                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                            item(
+                                key = "recommendations",
+                                contentType = "recommendations"
+                            ) {
+                                when {
+                                    isLoadingRecommendations -> {
+                                        RecommendationSkeleton()
+                                    }
+                                    recommendations != null -> {
+                                        RecommendationsSection(
+                                            recommendations = recommendations!!,
+                                            onSongClick = { song ->
+                                                playerViewModel.playOnlineSongWithRecommendations(
+                                                    videoId = song.id,
+                                                    title = song.title,
+                                                    artist = song.author ?: "Unknown Artist",
+                                                    thumbnailUrl = song.thumbnailUrl
+                                                )
+                                                recommendationViewModel.trackInteraction(
+                                                    song.id,
+                                                    "played",
+                                                    recommendationViewModel.getRecommendationReason(song)
+                                                )
+                                            },
+                                            onViewAllClick = onNavigateToRecommendations,
+                                            getRecommendationReason = { song ->
+                                                recommendationViewModel.getRecommendationReason(song)
+                                            }
+                                        )
+                                    }
+                                    hasEnoughHistory -> {
+                                        // Has history but no recommendations loaded yet
+                                        EmptyRecommendationsPrompt(
+                                            onExploreClick = { recommendationViewModel.loadRecommendations() }
+                                        )
+                                    }
+                                    // Don't show anything if no listening history
+                                }
+                            }
+                        }
+                        
                         if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
                             item {
                                 Spacer(modifier = Modifier.height(15.dp))

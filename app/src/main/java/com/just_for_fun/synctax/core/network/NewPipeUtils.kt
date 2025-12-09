@@ -23,10 +23,13 @@ object NewPipeUtils {
     private var initialized = false
 
     /**
-     * Simple OkHttp-based downloader for NewPipe
+     * Simple OkHttp-based downloader for NewPipe with enhanced headers to bypass bot detection
      */
     private class SimpleDownloader(clientBuilder: OkHttpClient.Builder) : Downloader() {
-        private val client = clientBuilder.build()
+        private val client = clientBuilder
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
 
         override fun execute(request: NPRequest): NPResponse {
             val dataToSend = request.dataToSend()
@@ -39,10 +42,23 @@ object NewPipeUtils {
                     } else null
                 )
 
+            // Add headers from request
             request.headers().forEach { (key, values) ->
                 values.forEach { value ->
                     requestBuilder.addHeader(key, value)
                 }
+            }
+            
+            // Add essential headers if not already present to bypass bot detection
+            if (!request.headers().containsKey("User-Agent")) {
+                requestBuilder.addHeader("User-Agent", 
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            }
+            if (!request.headers().containsKey("Accept-Language")) {
+                requestBuilder.addHeader("Accept-Language", "en-US,en;q=0.9")
+            }
+            if (!request.headers().containsKey("Accept")) {
+                requestBuilder.addHeader("Accept", "*/*")
             }
 
             val response = client.newCall(requestBuilder.build()).execute()

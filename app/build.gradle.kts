@@ -52,6 +52,16 @@ android {
             "YOUTUBE_CLIENT_ID",
             "\"${properties.getProperty("YOUTUBE_CLIENT_ID") ?: ""}\""
         )
+        buildConfigField(
+            "String",
+            "SPOTIFY_CLIENT_ID",
+            "\"${properties.getProperty("SPOTIFY_CLIENT_ID") ?: ""}\""
+        )
+        buildConfigField(
+            "String",
+            "SPOTIFY_CLIENT_SECRET",
+            "\"${properties.getProperty("SPOTIFY_CLIENT_SECRET") ?: ""}\""
+        )
 
         ndk {
             // Only include ARM architectures - covers 99%+ of Android devices

@@ -363,6 +363,10 @@ interface OnlineListeningHistoryDao {
     suspend fun delete(id: Long)
 }
 
+```kotlin
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+
 @Dao
 interface RecommendationCacheDao {
     @Query("SELECT * FROM recommendations_cache WHERE cacheKey = :key AND expiresAt > :currentTime")
@@ -376,12 +380,38 @@ interface RecommendationCacheDao {
     
     @Query("DELETE FROM recommendations_cache WHERE expiresAt < :currentTime")
     suspend fun deleteExpired(currentTime: Long = System.currentTimeMillis())
+    
+    // Helper method to save recommendations
+    suspend fun saveRecommendations(key: String, songs: List<Song>, expiryTime: Long) {
+        val json = kotlinx.serialization.json.Json.encodeToString(songs)
+        val cache = RecommendationCache(
+            cacheKey = key,
+            recommendationsJson = json,
+            expiresAt = expiryTime
+        )
+        insert(cache)
+    }
+    
+    // Helper method to get valid recommendations
+    suspend fun getValidRecommendations(key: String): List<Song>? {
+        val cache = getValidCache(key)
+        return cache?.let {
+            try {
+                kotlinx.serialization.json.Json.decodeFromString(it.recommendationsJson)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 }
 
 @Dao
 interface RecommendationInteractionDao {
     @Insert
     suspend fun insert(interaction: RecommendationInteraction)
+    
+    @Query("SELECT * FROM recommendation_interactions ORDER BY timestamp DESC")
+    suspend fun getAllInteractions(): List<RecommendationInteraction>
     
     @Query("SELECT * FROM recommendation_interactions WHERE songId = :songId ORDER BY timestamp DESC")
     suspend fun getSongInteractions(songId: String): List<RecommendationInteraction>
@@ -396,11 +426,14 @@ interface RecommendationInteractionDao {
 ### 1. Home Screen Integration
 
 ```kotlin
+import androidx.navigation.NavController
+
 @Composable
 fun HomeScreen(
     homeViewModel: HomeViewModel,
     playerViewModel: PlayerViewModel,
-    recommendationViewModel: RecommendationViewModel
+    recommendationViewModel: RecommendationViewModel,
+    navController: NavController
 ) {
     val recommendations by recommendationViewModel.recommendations.collectAsState()
     val isLoadingRecommendations by recommendationViewModel.isLoading.collectAsState()
@@ -420,8 +453,9 @@ fun HomeScreen(
                         // Track interaction
                         recommendationViewModel.trackInteraction(song.videoId, "played", song.source)
                     },
-                    onRefreshClick = {
-                        recommendationViewModel.refreshRecommendations()
+                    onViewAllClick = {
+                        // Navigate to detailed recommendations screen
+                        navController.navigate("recommendations_detail")
                     }
                 )
             } else {
@@ -441,67 +475,51 @@ fun HomeScreen(
 fun RecommendationsSection(
     recommendations: RecommendationService.RecommendationResult,
     onSongClick: (Song) -> Unit,
-    onRefreshClick: () -> Unit
+    onViewAllClick: () -> Unit
 ) {
     Column {
-        SectionHeader(
-            title = "Recommended for You",
-            actionIcon = Icons.Default.Refresh,
-            onActionClick = onRefreshClick
-        )
-        
-        // Mix of different recommendation types
-        val mixedRecommendations = (recommendations.artistBased.take(5) + 
-                                   recommendations.similarSongs.take(5) + 
-                                   recommendations.discovery.take(5)).shuffled()
-        
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Header with View All button instead of title
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(mixedRecommendations) { song ->
-                RecommendationCard(
-                    song = song,
-                    reason = getRecommendationReason(song, recommendations),
-                    onClick = { onSongClick(song) }
+            Text(
+                text = "Online Recommendations",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            TextButton(onClick = onViewAllClick) {
+                Text("View All")
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "View All",
+                    modifier = Modifier.padding(start = 4.dp)
                 )
             }
         }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        // 3x3 Grid of 9 recommendations
+        val gridRecommendations = (recommendations.artistBased.take(3) + 
+                                  recommendations.similarSongs.take(3) + 
+                                  recommendations.discovery.take(3)).shuffled().take(9)
         
-        // Discovery section
-        if (recommendations.discovery.isNotEmpty()) {
-            SectionHeader(title = "Discover New Artists")
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(recommendations.discovery) { song ->
-                    RecommendationCard(
-                        song = song,
-                        reason = "Similar to artists you love",
-                        onClick = { onSongClick(song) }
-                    )
-                }
-            }
-        }
-        
-        // Similar songs section
-        if (recommendations.similarSongs.isNotEmpty()) {
-            val referenceSong = recommendations.similarSongs.firstOrNull()
-            SectionHeader(title = "More Like ${referenceSong?.title?.take(20) ?: "This"}")
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(recommendations.similarSongs.take(10)) { song ->
-                    RecommendationCard(
-                        song = song,
-                        reason = "Because you listened to similar songs",
-                        onClick = { onSongClick(song) }
-                    )
-                }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.height(400.dp) // Fixed height for 3 rows
+        ) {
+            items(gridRecommendations) { song ->
+                RecommendationGridCard(
+                    song = song,
+                    reason = getRecommendationReason(song, recommendations),
+                    onClick = { onSongClick(song) }
+                )
             }
         }
     }
@@ -521,7 +539,61 @@ private fun getRecommendationReason(song: Song, recommendations: RecommendationS
 }
 ```
 
-### 3. RecommendationCard Component
+### 3. RecommendationGridCard Component
+
+```kotlin
+@Composable
+fun RecommendationGridCard(
+    song: Song,
+    reason: String,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f), // Square cards
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Album art
+            AsyncImage(
+                model = song.thumbnailUrl,
+                contentDescription = song.title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentScale = ContentScale.Crop
+            )
+            
+            // Song info - compact
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp)
+            ) {
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+```
+
+### 4. RecommendationCard Component (for horizontal lists)
 
 ```kotlin
 @Composable
@@ -569,36 +641,64 @@ fun RecommendationCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                Text(
-                    text = reason,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                if (reason.isNotEmpty()) {
+                    Text(
+                        text = reason,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
             }
         }
     }
 }
 ```
 
-### 4. Loading and Empty States
+### 5. Loading and Empty States
 
 ```kotlin
 @Composable
 fun RecommendationSkeleton() {
     Column {
-        SectionHeader(title = "Recommended for You")
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Header skeleton
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(5) {
+            Box(
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(24.dp)
+                    .shimmer()
+            )
+            
+            Box(
+                modifier = Modifier
+                    .width(60.dp)
+                    .height(24.dp)
+                    .shimmer()
+            )
+        }
+        
+        // 3x3 Grid skeleton
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.height(400.dp)
+        ) {
+            items(9) {
                 Card(
                     modifier = Modifier
-                        .width(160.dp)
-                        .height(200.dp)
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
                 ) {
                     Box(
                         modifier = Modifier
@@ -657,11 +757,299 @@ fun EmptyRecommendationsPrompt(onExploreClick: () -> Unit) {
 }
 ```
 
+## Detailed Recommendations Screen
+
+### 1. RecommendationsDetailScreen
+
+```kotlin
+import androidx.compose.material3.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+
+@Composable
+fun RecommendationsDetailScreen(
+    recommendationViewModel: RecommendationViewModel,
+    playerViewModel: PlayerViewModel,
+    onNavigateBack: () -> Unit
+) {
+    val recommendations by recommendationViewModel.recommendations.collectAsState()
+    val isLoading by recommendationViewModel.isLoading.collectAsState()
+    val currentShuffleBatch by recommendationViewModel.currentShuffleBatch.collectAsState()
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Recommendations") },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { recommendationViewModel.shuffleRecommendations() }
+                    ) {
+                        Icon(Icons.Default.Shuffle, "Shuffle")
+                    }
+                    IconButton(
+                        onClick = { recommendationViewModel.refreshRecommendations() }
+                    ) {
+                        Icon(Icons.Default.Refresh, "Refresh")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding)) {
+            when {
+                isLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                recommendations == null -> {
+                    EmptyRecommendationsPrompt(
+                        onExploreClick = { /* Navigate to search */ }
+                    )
+                }
+                else -> {
+                    RecommendationsDetailContent(
+                        recommendations = recommendations!!,
+                        currentBatch = currentShuffleBatch,
+                        onSongClick = { song ->
+                            playerViewModel.playSong(song)
+                            recommendationViewModel.trackInteraction(song.videoId, "played", song.source)
+                        },
+                        onLoadMore = {
+                            recommendationViewModel.loadNextShuffleBatch()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+```
+
+### 2. RecommendationsDetailContent Component
+
+```kotlin
+@Composable
+fun RecommendationsDetailContent(
+    recommendations: RecommendationService.RecommendationResult,
+    currentBatch: List<Song>,
+    onSongClick: (Song) -> Unit,
+    onLoadMore: () -> Unit
+) {
+    val allRecommendations = recommendations.artistBased + 
+                            recommendations.genreBased + 
+                            recommendations.similarSongs + 
+                            recommendations.discovery + 
+                            recommendations.trending
+    
+    val displaySongs = if (currentBatch.isNotEmpty()) currentBatch else allRecommendations.take(20)
+    
+    LazyColumn {
+        // Categories
+        item {
+            RecommendationCategorySection(
+                title = "Based on Your Artists",
+                songs = recommendations.artistBased.take(10),
+                onSongClick = onSongClick
+            )
+        }
+        
+        item {
+            RecommendationCategorySection(
+                title = "Similar Songs",
+                songs = recommendations.similarSongs.take(10),
+                onSongClick = onSongClick
+            )
+        }
+        
+        item {
+            RecommendationCategorySection(
+                title = "Discover New Music",
+                songs = recommendations.discovery.take(10),
+                onSongClick = onSongClick
+            )
+        }
+        
+        item {
+            RecommendationCategorySection(
+                title = "Trending Now",
+                songs = recommendations.trending.take(10),
+                onSongClick = onSongClick
+            )
+        }
+        
+        // Current shuffle batch
+        if (currentBatch.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Shuffle Mix (${currentBatch.size} songs)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            
+            items(currentBatch) { song ->
+                SongListItem(
+                    song = song,
+                    onClick = { onSongClick(song) }
+                )
+            }
+            
+            item {
+                Button(
+                    onClick = onLoadMore,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text("Load More Shuffle Songs")
+                }
+            }
+        }
+    }
+}
+```
+
+### 3. RecommendationCategorySection Component
+
+```kotlin
+@Composable
+fun RecommendationCategorySection(
+    title: String,
+    songs: List<Song>,
+    onSongClick: (Song) -> Unit
+) {
+    if (songs.isEmpty()) return
+    
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+        
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(songs) { song ->
+                RecommendationCard(
+                    song = song,
+                    reason = "", // No reason needed in detail view
+                    onClick = { onSongClick(song) }
+                )
+            }
+        }
+    }
+}
+```
+
+### 4. SongListItem Component
+
+```kotlin
+@Composable
+fun SongListItem(
+    song: Song,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Album art
+        AsyncImage(
+            model = song.thumbnailUrl,
+            contentDescription = song.title,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Crop
+        )
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        // Song info
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            Text(
+                text = song.artist,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        
+        // Play button
+        IconButton(onClick = onClick) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Play"
+            )
+        }
+    }
+}
+```
+
+## Navigation Setup
+
+Add the detailed recommendations screen to your navigation graph:
+
+```kotlin
+@Composable
+fun AppNavigation() {
+    val navController = rememberNavController()
+    
+    NavHost(navController = navController, startDestination = "home") {
+        composable("home") {
+            HomeScreen(
+                homeViewModel = hiltViewModel(),
+                playerViewModel = hiltViewModel(),
+                recommendationViewModel = hiltViewModel(),
+                navController = navController
+            )
+        }
+        
+        composable("recommendations_detail") {
+            RecommendationsDetailScreen(
+                recommendationViewModel = hiltViewModel(),
+                playerViewModel = hiltViewModel(),
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        // Other screens...
+    }
+}
+```
+
 ## ViewModel Layer
 
 ### 1. RecommendationViewModel
 
 ```kotlin
+import kotlin.math.minOf
+
 class RecommendationViewModel(
     private val recommendationService: RecommendationService,
     private val interactionDao: RecommendationInteractionDao
@@ -676,6 +1064,13 @@ class RecommendationViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
     
+    private val _currentShuffleBatch = MutableStateFlow<List<Song>>(emptyList())
+    val currentShuffleBatch: StateFlow<List<Song>> = _currentShuffleBatch.asStateFlow()
+    
+    private var allAvailableSongs = listOf<Song>()
+    private var currentBatchIndex = 0
+    private val BATCH_SIZE = 15 // Load 15 songs at a time to avoid performance issues
+    
     init {
         loadRecommendations()
     }
@@ -688,6 +1083,14 @@ class RecommendationViewModel(
             try {
                 val result = recommendationService.generateRecommendations()
                 _recommendations.value = result
+                
+                // Prepare shuffle pool
+                allAvailableSongs = (result.artistBased + result.genreBased + 
+                                   result.similarSongs + result.discovery + 
+                                   result.trending).distinctBy { it.videoId }.shuffled()
+                currentBatchIndex = 0
+                _currentShuffleBatch.value = emptyList()
+                
             } catch (e: Exception) {
                 _error.value = "Failed to load recommendations: ${e.message}"
                 Log.e("RecommendationViewModel", "Error loading recommendations", e)
@@ -705,12 +1108,48 @@ class RecommendationViewModel(
             try {
                 val result = recommendationService.generateRecommendations(forceRefresh = true)
                 _recommendations.value = result
+                
+                // Refresh shuffle pool
+                allAvailableSongs = (result.artistBased + result.genreBased + 
+                                   result.similarSongs + result.discovery + 
+                                   result.trending).distinctBy { it.videoId }.shuffled()
+                currentBatchIndex = 0
+                _currentShuffleBatch.value = emptyList()
+                
             } catch (e: Exception) {
                 _error.value = "Failed to refresh recommendations: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+    
+    fun shuffleRecommendations() {
+        if (allAvailableSongs.isEmpty()) {
+            loadNextShuffleBatch()
+        } else {
+            // Shuffle current batch
+            _currentShuffleBatch.value = _currentShuffleBatch.value.shuffled()
+        }
+    }
+    
+    fun loadNextShuffleBatch() {
+        if (allAvailableSongs.isEmpty()) return
+        
+        val startIndex = currentBatchIndex
+        val endIndex = minOf(startIndex + BATCH_SIZE, allAvailableSongs.size)
+        
+        if (startIndex >= allAvailableSongs.size) {
+            // Wrap around or reshuffle
+            allAvailableSongs = allAvailableSongs.shuffled()
+            currentBatchIndex = 0
+            loadNextShuffleBatch()
+            return
+        }
+        
+        val newBatch = allAvailableSongs.subList(startIndex, endIndex)
+        _currentShuffleBatch.value = newBatch
+        currentBatchIndex = endIndex
     }
     
     fun trackInteraction(songId: String, action: String, source: String) {

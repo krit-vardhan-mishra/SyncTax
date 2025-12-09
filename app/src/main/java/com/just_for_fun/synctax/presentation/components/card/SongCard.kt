@@ -25,8 +25,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +50,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import androidx.compose.ui.graphics.painter.ColorPainter
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.createSongOptions
 import java.io.File
 
 /**
@@ -94,7 +94,7 @@ fun SongCard(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     var isPressed by remember { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
+    var showOptionsDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.95f else 1f,
@@ -105,6 +105,61 @@ fun SongCard(
         label = "scale"
     )
 
+    // Create options for the dialog
+    val dialogOptions = remember(song, onAddToPlaylist, onAddNext, onDelete) {
+        mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
+            onAddToPlaylist?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "add_to_playlist",
+                    title = "Add to Playlist",
+                    subtitle = "Save to a playlist",
+                    icon = {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+            onAddNext?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "add_next",
+                    title = "Play Next",
+                    subtitle = "Add to queue after current song",
+                    icon = {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+            onDelete?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "delete",
+                    title = "Delete",
+                    subtitle = "Remove from device",
+                    icon = {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    destructive = true,
+                    onClick = { showDeleteDialog = true }
+                ))
+            }
+        }
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -113,7 +168,7 @@ fun SongCard(
                 onClick = onClick,
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showMenu = true
+                    showOptionsDialog = true
                 }
             )
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -196,7 +251,7 @@ fun SongCard(
         // More options
         Box {
             IconButton(
-                onClick = { showMenu = true },
+                onClick = { showOptionsDialog = true },
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
@@ -204,58 +259,6 @@ fun SongCard(
                     contentDescription = "More Options",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                if (onAddToPlaylist != null) {
-                    DropdownMenuItem(
-                        text = { Text("Add to Playlist") },
-                        onClick = {
-                            showMenu = false
-                            onAddToPlaylist(song)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null
-                            )
-                        }
-                    )
-                }
-                if (onAddNext != null) {
-                    DropdownMenuItem(
-                        text = { Text("Add Next in Queue") },
-                        onClick = {
-                            showMenu = false
-                            onAddNext(song)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = null
-                            )
-                        }
-                    )
-                }
-                if (onDelete != null) {
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        onClick = {
-                            showMenu = false
-                            showDeleteDialog = true
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    )
-                }
             }
         }
     }
@@ -337,4 +340,12 @@ fun SongCard(
             }
         )
     }
+
+    // Bottom options dialog
+    BottomOptionsDialog(
+        song = song,
+        isVisible = showOptionsDialog,
+        onDismiss = { showOptionsDialog = false },
+        options = dialogOptions
+    )
 }

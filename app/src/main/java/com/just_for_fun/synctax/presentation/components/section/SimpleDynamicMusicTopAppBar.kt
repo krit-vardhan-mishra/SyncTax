@@ -63,11 +63,12 @@ fun SimpleDynamicMusicTopAppBar(
     userInitial: String? = null,
     sortOption: SortOption? = null,
     onSortOptionChange: ((SortOption) -> Unit)? = null,
-    currentTab: Int? = null
+    currentTab: Int? = null,
+    showSortDialog: Boolean = false,
+    onShowSortDialogChange: ((Boolean) -> Unit)? = null
 ) {
     var showProfileDialog by remember { mutableStateOf(false) }
     var showProfileMenu by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
 
     // Theme-aware colors from AppColors
     val appBarBackgroundColor = AppColors.appBarBackground
@@ -116,36 +117,11 @@ fun SimpleDynamicMusicTopAppBar(
             // Sort button
             if (showSortButton && onSortOptionChange != null && currentTab == 0) {
                 TooltipBox(tooltip = "Sort songs") {
-                    IconButton(onClick = { showSortMenu = true }) {
+                    IconButton(onClick = { onShowSortDialogChange?.invoke(true) }) {
                         Icon(
                             imageVector = Icons.Default.Sort,
                             contentDescription = "Sort",
                             tint = dynamicIconColor
-                        )
-                    }
-                }
-
-                DropdownMenu(
-                    expanded = showSortMenu,
-                    onDismissRequest = { showSortMenu = false }
-                ) {
-                    SortOption.entries.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option.displayName) },
-                            onClick = {
-                                onSortOptionChange?.invoke(option)
-                                showSortMenu = false
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = if (option == sortOption) Icons.Default.Check else Icons.Default.Sort,
-                                    contentDescription = null,
-                                    tint = if (option == sortOption)
-                                        accentIconColor
-                                    else
-                                        iconColor
-                                )
-                            }
                         )
                     }
                 }

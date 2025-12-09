@@ -75,12 +75,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.core.utils.AppConfig
 import com.just_for_fun.synctax.core.utils.AppIconManager
 import com.just_for_fun.synctax.data.preferences.UserPreferences
@@ -703,7 +705,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Folder, // Or use a GitHub icon if available
+                            painter = painterResource(R.drawable.github),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary
                         )

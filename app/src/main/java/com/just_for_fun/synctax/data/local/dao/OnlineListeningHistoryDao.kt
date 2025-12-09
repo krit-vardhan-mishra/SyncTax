@@ -17,11 +17,35 @@ interface OnlineListeningHistoryDao {
     fun getRecentOnlineHistory(limit: Int = 10): Flow<List<OnlineListeningHistory>>
     
     /**
+     * Get all history records (for analytics) - suspend function
+     */
+    @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC")
+    suspend fun getAllHistory(): List<OnlineListeningHistory>
+    
+    /**
+     * Get recent history as a suspend function (for analytics)
+     */
+    @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentHistory(limit: Int): List<OnlineListeningHistory>
+    
+    /**
+     * Get history for a specific song
+     */
+    @Query("SELECT * FROM online_listening_history WHERE videoId = :videoId")
+    suspend fun getSongHistory(videoId: String): List<OnlineListeningHistory>
+    
+    /**
      * Insert a new online listening record
      * If the table has more than 15 records, delete the oldest ones
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOnlineListening(history: OnlineListeningHistory)
+    
+    /**
+     * Update an existing history record
+     */
+    @androidx.room.Update
+    suspend fun update(history: OnlineListeningHistory)
     
     /**
      * Delete existing record with the same videoId to prevent duplicates
