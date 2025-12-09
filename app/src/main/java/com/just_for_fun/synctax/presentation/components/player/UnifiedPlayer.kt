@@ -4,21 +4,25 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.presentation.components.player.PlayerSheetConstants
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
 
 private const val TAG = "UnifiedPlayer"
@@ -56,19 +60,53 @@ fun UnifiedPlayer(
     val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
 
-    // Animation progress (0f = mini, 1f = expanded)
+    // Track drag offset for enhanced gesture handling
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+
+    // Enhanced expansion animation with spring for bouncy feedback
     val expansionProgress by animateFloatAsState(
         targetValue = if (isExpanded) 1f else 0f,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
         label = "expansion"
     )
 
     var showUpNext by remember { mutableStateOf(false) }
 
+    // Album art scale with overshoot for bouncy feedback
     val albumArtMiniScale by animateFloatAsState(
-        targetValue = if (isExpanded) 1.0f else 0.85f,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        targetValue = if (isExpanded) {
+            PlayerSheetConstants.ALBUM_ART_EXPANDED_SCALE
+        } else {
+            PlayerSheetConstants.ALBUM_ART_MINI_SCALE
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
         label = "albumArtMiniScale"
+    )
+
+    // Alpha blending for content transitions
+    val miniPlayerAlpha by animateFloatAsState(
+        targetValue = if (isExpanded) 0f else 1f,
+        animationSpec = tween(
+            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
+            easing = FastOutSlowInEasing
+        ),
+        label = "mini_alpha"
+    )
+
+    val expandedAlpha by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
+            delayMillis = PlayerSheetConstants.FADE_IN_DELAY_MS,
+            easing = FastOutSlowInEasing
+        ),
+        label = "expanded_alpha"
     )
 
     BackHandler(enabled = isExpanded) {
@@ -81,18 +119,50 @@ fun UnifiedPlayer(
         Log.d(TAG, ">>> LaunchedEffect: isExpanded changed to: $isExpanded")
     }
 
-    // Main Container
+    // Main Container with enhanced drag gesture handling
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // Calculate height precisely: Min 80dp, Max expands to full screen
-            .height(if (isExpanded) (expansionProgress * 1000).dp else 80.dp)
+            // Dynamic height with smooth interpolation
+            .height(
+                (PlayerSheetConstants.MINI_PLAYER_HEIGHT_DP +
+                        (expansionProgress * PlayerSheetConstants.MAX_EXPANSION_HEIGHT_DP)).dp
+            )
+            .pointerInput(isExpanded) {
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        dragOffset = 0f
+                    },
+                    onDragEnd = {
+                        val absOffset = kotlin.math.abs(dragOffset)
+                        if (absOffset > PlayerSheetConstants.DRAG_THRESHOLD_PX) {
+                            // Trigger state change based on drag direction
+                            if (dragOffset < 0 && !isExpanded) {
+                                // Swipe up to expand
+                                Log.d(TAG, ">>> Drag gesture: expanding player")
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onExpandedChange(true)
+                            } else if (dragOffset > 0 && isExpanded) {
+                                // Swipe down to collapse
+                                Log.d(TAG, ">>> Drag gesture: collapsing player")
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onExpandedChange(false)
+                            }
+                        }
+                        dragOffset = 0f
+                    },
+                    onVerticalDrag = { _, dragAmount ->
+                        dragOffset += dragAmount
+                    }
+                )
+            }
             .background(PlayerBackground)
     ) {
-        // --- 1. ALIVE BACKGROUND LAYER ---
+        // --- 1. ENHANCED ANIMATED BACKGROUND LAYER ---
         if (!song.albumArtUri.isNullOrEmpty()) {
-            // Blur Logic: Less blur when mini (to see texture), more when expanded (ambient)
-            val blurRadius = if (isExpanded) 50.dp else 20.dp
+            // Dynamic blur radius interpolates smoothly based on expansion
+            val blurRadius = (PlayerSheetConstants.MIN_BLUR_RADIUS_DP +
+                    (expansionProgress * PlayerSheetConstants.BLUR_RADIUS_EXPANSION_DP)).dp
 
             AsyncImage(
                 model = song.albumArtUri,
@@ -101,34 +171,54 @@ fun UnifiedPlayer(
                 modifier = Modifier
                     .fillMaxSize()
                     .blur(blurRadius)
-                    .alpha(0.6f)
+                    .alpha(
+                        PlayerSheetConstants.MIN_BACKGROUND_OPACITY +
+                                (expansionProgress * PlayerSheetConstants.BACKGROUND_OPACITY_EXPANSION)
+                    )
+                    .scale(
+                        PlayerSheetConstants.MIN_BACKGROUND_SCALE +
+                                (expansionProgress * PlayerSheetConstants.BACKGROUND_SCALE_EXPANSION)
+                    )
             )
 
-            // Gradient Overlay for contrast
+            // Animated gradient overlay for smooth contrast transitions
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.2f),
-                                Color.Black.copy(alpha = 0.6f)
+                                Color.Black.copy(
+                                    alpha = PlayerSheetConstants.MIN_GRADIENT_TOP_ALPHA +
+                                            (expansionProgress * PlayerSheetConstants.GRADIENT_TOP_ALPHA_EXPANSION)
+                                ),
+                                Color.Black.copy(
+                                    alpha = PlayerSheetConstants.MIN_GRADIENT_BOTTOM_ALPHA +
+                                            (expansionProgress * PlayerSheetConstants.GRADIENT_BOTTOM_ALPHA_EXPANSION)
+                                )
                             )
                         )
                     )
             )
         }
 
-        // --- 2. CONTENT LAYER ---
+        // --- 2. CONTENT LAYER WITH ALPHA BLENDING ---
         Surface(
             color = Color.Transparent, // Must be transparent for background to show
             tonalElevation = 0.dp,     // Must be 0 to prevent M3 surface tint
             shape = RectangleShape,
             modifier = Modifier.fillMaxSize()
         ) {
-            if (!isExpanded) {
-                Log.d(TAG, ">>> Rendering MiniPlayerContent (isExpanded: $isExpanded)")
-                MiniPlayerContent(
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Mini player content with fade-out animation
+                if (miniPlayerAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(miniPlayerAlpha)
+                    ) {
+                        Log.d(TAG, ">>> Rendering MiniPlayerContent with alpha: $miniPlayerAlpha")
+                        MiniPlayerContent(
                     song = song,
                     isPlaying = isPlaying,
                     position = position,
@@ -151,12 +241,22 @@ fun UnifiedPlayer(
                     },
                     onSwipeUp = { 
                         Log.d(TAG, ">>> MiniPlayerContent onSwipeUp - calling onExpandedChange(true)")
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         onExpandedChange(true) 
                     }
                 )
-            } else {
-                Log.d(TAG, ">>> Rendering FullScreenPlayerContent (isExpanded: $isExpanded)")
-                FullScreenPlayerContent(
+                    }
+                }
+
+                // Expanded player content with fade-in animation
+                if (expandedAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .alpha(expandedAlpha)
+                    ) {
+                        Log.d(TAG, ">>> Rendering FullScreenPlayerContent with alpha: $expandedAlpha")
+                        FullScreenPlayerContent(
                     song = song,
                     isPlaying = isPlaying,
                     isBuffering = isBuffering,
@@ -187,10 +287,15 @@ fun UnifiedPlayer(
                     onShuffleClick = onShuffleClick,
                     onRepeatClick = onRepeatClick,
                     onSeek = onSeek,
-                    onClose = { onExpandedChange(false) },
+                    onClose = { 
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onExpandedChange(false)
+                    },
                     expansionProgress = expansionProgress,
                     downloadPercent = downloadPercent
                 )
+                    }
+                }
             }
         }
     }

@@ -28,5 +28,6 @@ data class PlayerUiState(
     val isLoadingFormats: Boolean = false, // Loading indicator for format selection
     val selectedFormat: Format? = null,  // Currently selected format for download
     val upNextRecommendations: List<Song> = emptyList(), // YouTube-recommended songs for online player
-    val isLoadingRecommendations: Boolean = false // Loading indicator for recommendations
+    val isLoadingRecommendations: Boolean = false, // Loading indicator for recommendations
+    val playerSheetState: PlayerSheetState = PlayerSheetState.COLLAPSED, // Player sheet expansion state
 )

@@ -83,6 +83,7 @@ fun MusicApp(userPreferences: UserPreferences) {
         viewModel()
 
     // --- HOISTED STATE ---
+    // Use ViewModel-managed player sheet state for better state management
     // Manual expansion state - ONLY controlled by user actions (click/swipe on mini-player)
     // This is completely independent from BottomSheetScaffold's internal state
     var isPlayerExpanded by remember { mutableStateOf(false) }
