@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -55,7 +56,9 @@ fun RecommendationsSection(
     onSongClick: (OnlineSearchResult) -> Unit,
     onViewAllClick: () -> Unit,
     getRecommendationReason: (OnlineSearchResult) -> String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
 ) {
     Column(modifier = modifier) {
         // Header with View All button
@@ -71,7 +74,7 @@ fun RecommendationsSection(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-            
+
             TextButton(onClick = onViewAllClick) {
                 Text("View All")
                 Icon(
@@ -81,20 +84,22 @@ fun RecommendationsSection(
                 )
             }
         }
-        
+
         // 3x3 Grid of 9 recommendations - don't filter by duration since online results may not have it
-        val gridRecommendations = (recommendations.artistBased + 
-                                  recommendations.similarSongs + 
-                                  recommendations.discovery)
+        val gridRecommendations = (recommendations.artistBased +
+                recommendations.similarSongs +
+                recommendations.discovery)
             .distinctBy { it.id }
             .shuffled()
             .take(9)
-        
+
         if (gridRecommendations.isNotEmpty()) {
             RecommendationsQuickAccessGrid(
                 songs = gridRecommendations,
                 onSongClick = onSongClick,
-                modifier = Modifier.height(400.dp)
+                modifier = Modifier.height(400.dp),
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist
             )
         } else {
             // Empty state
@@ -125,7 +130,8 @@ fun RecommendationsQuickAccessGrid(
     onSongClick: (OnlineSearchResult) -> Unit,
     modifier: Modifier = Modifier,
     currentSong: OnlineSearchResult? = null,
-    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -149,7 +155,8 @@ fun RecommendationsQuickAccessGrid(
                         song = song,
                         onClick = { onSongClick(song) },
                         isPlaying = song.id == currentSong?.id,
-                        onAddToQueue = onAddToQueue
+                        onAddToQueue = onAddToQueue,
+                        onAddToPlaylist = onAddToPlaylist
                     )
                 }
             }
@@ -164,14 +171,14 @@ private fun RecommendationSpeedDialItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = false,
-    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var showOptionsDialog by remember { mutableStateOf(false) }
-    
+
     // Use ElevatedCard for a nice pop off the background
     ElevatedCard(
-        onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -262,7 +269,7 @@ private fun RecommendationSpeedDialItem(
                     text = song.title,
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.SemiBold,
                     lineHeight = MaterialTheme.typography.labelMedium.lineHeight
@@ -270,35 +277,81 @@ private fun RecommendationSpeedDialItem(
             }
         }
     }
-    
+
     // Create options for the dialog
-    val dialogOptions = remember(song, onAddToQueue) {
+    val dialogOptions = remember(song, onAddToQueue, onAddToPlaylist) {
         mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
-            onAddToQueue?.let {
-                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
-                    id = "add_to_queue",
-                    title = "Add to Queue",
-                    subtitle = "Add to current playlist",
+            // Play option
+            add(
+                com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "play",
+                    title = "Play",
+                    subtitle = "Play this song",
                     icon = {
                         Icon(
-                            Icons.Default.PlaylistAdd,
+                            Icons.Default.PlayArrow,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     },
-                    onClick = { it(song) }
-                ))
+                    onClick = onClick
+                )
+            )
+
+            // Add to Queue option
+            onAddToQueue?.let {
+                add(
+                    com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                        id = "add_to_queue",
+                        title = "Add to Queue",
+                        subtitle = "Add to current playlist",
+                        icon = {
+                            Icon(
+                                Icons.Default.PlaylistAdd,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { it(song) }
+                    )
+                )
+            }
+
+            // Add to Playlist option
+            onAddToPlaylist?.let {
+                add(
+                    com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                        id = "add_to_playlist",
+                        title = "Add to Playlist",
+                        subtitle = "Save to a playlist",
+                        icon = {
+                            Icon(
+                                Icons.Rounded.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { it(song) }
+                    )
+                )
             }
         }
     }
-    
+
     // Bottom options dialog
     com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog(
         song = null, // No song entity for online results
         isVisible = showOptionsDialog,
         onDismiss = { showOptionsDialog = false },
-        options = dialogOptions
+        options = dialogOptions,
+        title = "Song Options",
+        description = "Choose an action for this song",
+        songTitle = song.title,
+        songArtist = song.author,
+        songThumbnail = song.thumbnailUrl
     )
 }
 
@@ -346,67 +399,203 @@ private fun EmptyRecommendationsStateCard() {
 }
 
 /**
- * Horizontal list card for category sections.
+ * Category section for detail screen with horizontal scroll.
+ * Redesigned to match the app's design pattern with ElevatedCard and gradient overlays.
  */
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun RecommendationCard(
-    song: OnlineSearchResult,
-    reason: String = "",
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+fun RecommendationCategorySection(
+    title: String,
+    songs: List<OnlineSearchResult>,
+    onSongClick: (OnlineSearchResult) -> Unit,
+    modifier: Modifier = Modifier,
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
 ) {
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .width(160.dp)
-            .height(200.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Album art
-            AsyncImage(
-                model = song.thumbnailUrl,
-                contentDescription = song.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Song info
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+    if (songs.isEmpty()) return
+
+    Column(modifier = modifier.padding(vertical = 12.dp)) {
+        // Section Header
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // Horizontal scrolling list of recommendation cards
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(
+                items = songs,
+                key = { it.id }
+            ) { song ->
+                RecommendationCarouselCard(
+                    song = song,
+                    onClick = { onSongClick(song) },
+                    onAddToQueue = onAddToQueue,
+                    onAddToPlaylist = onAddToPlaylist
                 )
-                
-                Text(
-                    text = song.author ?: "Unknown Artist",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                
-                if (reason.isNotEmpty()) {
-                    Text(
-                        text = reason,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
             }
         }
     }
+}
+
+/**
+ * Carousel-style card inspired by OnlineHistoryCarousel design.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RecommendationCarouselCard(
+    song: OnlineSearchResult,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
+) {
+    val haptic = LocalHapticFeedback.current
+    var showOptionsDialog by remember { mutableStateOf(false) }
+
+    // Create options for the dialog
+    val dialogOptions = remember(song, onAddToQueue, onAddToPlaylist) {
+        mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
+            // Play option
+            add(
+                com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "play",
+                    title = "Play",
+                    subtitle = "Play this song",
+                    icon = {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = onClick
+                )
+            )
+
+            // Add to Queue option
+            onAddToQueue?.let {
+                add(
+                    com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                        id = "add_to_queue",
+                        title = "Add to Queue",
+                        subtitle = "Add to current playlist",
+                        icon = {
+                            Icon(
+                                Icons.Default.PlaylistAdd,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { it(song) }
+                    )
+                )
+            }
+
+            // Add to Playlist option
+            onAddToPlaylist?.let {
+                add(
+                    com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                        id = "add_to_playlist",
+                        title = "Add to Playlist",
+                        subtitle = "Save to a playlist",
+                        icon = {
+                            Icon(
+                                Icons.Rounded.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { it(song) }
+                    )
+                )
+            }
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .wrapContentWidth()
+            .wrapContentHeight()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    showOptionsDialog = true
+                }
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .size(180.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            AsyncImage(
+                model = song.thumbnailUrl,
+                contentDescription = song.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // Shadow overlay on bottom
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.3f)
+                            ),
+                            startY = 120f
+                        )
+                    )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = song.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.width(180.dp)
+        )
+
+        Text(
+            text = song.author ?: "Unknown Artist",
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(180.dp)
+        )
+    }
+
+    // Bottom options dialog
+    com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog(
+        song = null,
+        isVisible = showOptionsDialog,
+        onDismiss = { showOptionsDialog = false },
+        options = dialogOptions,
+        title = "Song Options",
+        description = "Choose an action for this song",
+        songTitle = song.title,
+        songArtist = song.author,
+        songThumbnail = song.thumbnailUrl
+    )
 }
 
 /**
@@ -432,7 +621,7 @@ fun RecommendationSkeleton(
                     .clip(RoundedCornerShape(4.dp))
                     .shimmer()
             )
-            
+
             Box(
                 modifier = Modifier
                     .width(70.dp)
@@ -441,7 +630,7 @@ fun RecommendationSkeleton(
                     .shimmer()
             )
         }
-        
+
         // 3x3 Grid skeleton
         LazyVerticalGrid(
             columns = GridCells.Fixed(3),
@@ -494,61 +683,26 @@ fun EmptyRecommendationsPrompt(
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = "Start listening to get personalized recommendations",
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center
             )
-            
+
             Text(
                 text = "Play some songs and we'll suggest music you'll love",
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Button(onClick = onExploreClick) {
                 Text("Explore Music")
-            }
-        }
-    }
-}
-
-/**
- * Category section for detail screen with horizontal scroll.
- */
-@Composable
-fun RecommendationCategorySection(
-    title: String,
-    songs: List<OnlineSearchResult>,
-    onSongClick: (OnlineSearchResult) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (songs.isEmpty()) return
-    
-    Column(modifier = modifier.padding(vertical = 8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-        
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(songs) { song ->
-                RecommendationCard(
-                    song = song,
-                    reason = "",
-                    onClick = { onSongClick(song) }
-                )
             }
         }
     }
@@ -579,9 +733,9 @@ fun SongListItem(
                 .clip(RoundedCornerShape(4.dp)),
             contentScale = ContentScale.Crop
         )
-        
+
         Spacer(modifier = Modifier.width(12.dp))
-        
+
         // Song info
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -590,7 +744,7 @@ fun SongListItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            
+
             Text(
                 text = song.author ?: "Unknown Artist",
                 style = MaterialTheme.typography.bodyMedium,
@@ -599,7 +753,7 @@ fun SongListItem(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        
+
         // Play button
         IconButton(onClick = onClick) {
             Icon(

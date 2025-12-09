@@ -48,6 +48,7 @@ fun RecommendationCard(
     confidence: Float? = null,
     reason: String? = null,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isPressed by remember { mutableStateOf(false) }
@@ -64,7 +65,10 @@ fun RecommendationCard(
         modifier = modifier
             .fillMaxWidth()
             .scale(scale)
-            .combinedClickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)

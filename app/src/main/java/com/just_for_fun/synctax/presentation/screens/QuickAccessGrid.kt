@@ -5,20 +5,35 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material3.*
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,8 +51,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
-import com.just_for_fun.synctax.presentation.components.player.createSongOptions
-import kotlinx.coroutines.launch
 
 /**
  * Quick Access Component - 3x3 Grid of random song thumbnails
@@ -97,7 +110,6 @@ private fun SpeedDialItem(
     
     // Use ElevatedCard for a nice pop off the background
     ElevatedCard(
-        onClick = onClick,
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -201,8 +213,23 @@ private fun SpeedDialItem(
     }
     
     // Create options for the dialog
-    val dialogOptions = remember(song, onAddToQueue) {
+    val dialogOptions = remember(song, onAddToQueue, onClick) {
         mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
+            // Play option
+            add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                id = "play",
+                title = "Play",
+                subtitle = "Play this song",
+                icon = {
+                    Icon(
+                        Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = onClick
+            ))
             onAddToQueue?.let {
                 add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
                     id = "add_to_queue",
@@ -210,7 +237,7 @@ private fun SpeedDialItem(
                     subtitle = "Add to current playlist",
                     icon = {
                         Icon(
-                            Icons.Default.PlaylistAdd,
+                            Icons.Filled.PlaylistAdd,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -227,7 +254,9 @@ private fun SpeedDialItem(
         song = song,
         isVisible = showOptionsDialog,
         onDismiss = { showOptionsDialog = false },
-        options = dialogOptions
+        options = dialogOptions,
+        title = "Song Options",
+        description = "Choose an action for this song"
     )
 }
 

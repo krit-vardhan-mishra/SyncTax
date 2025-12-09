@@ -271,6 +271,9 @@ fun LibraryScreen(
                     showSortDialog = false
                 }
             )
-        }
+        },
+        title = "Sort by",
+        description = "Choose how to sort your library",
+        scrimAlpha = 0.5f
     )
 }

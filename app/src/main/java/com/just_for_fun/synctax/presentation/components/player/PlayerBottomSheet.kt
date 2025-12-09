@@ -1,6 +1,5 @@
 package com.just_for_fun.synctax.presentation.components.player
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,10 +41,6 @@ fun PlayerBottomSheet(
 ) {
     val miniPlayerHeight = 80.dp
     
-    // Log state for debugging
-    Log.d(TAG, "=== PlayerBottomSheet Recomposition ===")
-    Log.d(TAG, "isExpanded (hoisted): $isExpanded, song: ${song?.title}")
-
     val currentPeekHeight = if (song != null) miniPlayerHeight else 0.dp
     
     // Track previous song to detect when song goes from null to non-null
@@ -54,7 +49,6 @@ fun PlayerBottomSheet(
     // Ensure mini-player is visible when a song is first set (only on initial song set)
     LaunchedEffect(song?.id) {
         if (song != null && previousSongId == null) {
-            Log.d(TAG, ">>> Song set for first time - calling partialExpand() to show mini-player")
             scaffoldState.bottomSheetState.partialExpand()
         }
         previousSongId = song?.id
@@ -63,7 +57,6 @@ fun PlayerBottomSheet(
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
         sheetContent = {
-            Log.d(TAG, "sheetContent composing - song: ${song?.title}, isExpanded: $isExpanded")
             if (song != null) {
                 UnifiedPlayer(
                     song = song,
@@ -78,7 +71,6 @@ fun PlayerBottomSheet(
                     playHistory = playHistory,
                     isExpanded = isExpanded, // Use the hoisted state directly
                     onExpandedChange = { expand ->
-                        Log.d(TAG, ">>> onExpandedChange called with expand: $expand (user action)")
                         onExpandedChange(expand) // Just call the hoisted callback
                     },
                     onSelectSong = onSelectSong,

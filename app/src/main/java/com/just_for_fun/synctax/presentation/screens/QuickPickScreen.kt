@@ -4,15 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -25,14 +25,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.background.EnhancedEmptyQuickPicksState
 import com.just_for_fun.synctax.presentation.components.card.RecommendationCard
+import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.guide.GuideContent
@@ -55,6 +61,11 @@ fun QuickPicksScreen(
     var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(UserPreferences.GUIDE_QUICK_PICKS)) }
     val playerState by playerViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+
+    // Bottom sheet state
+    var showOptionsDialog by remember { mutableStateOf(false) }
+    var selectedSong by remember { mutableStateOf<Song?>(null) }
+    val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
@@ -133,6 +144,11 @@ fun QuickPicksScreen(
                             reason = score?.reason,
                             onClick = {
                                 playerViewModel.playSong(song, uiState.quickPicks)
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedSong = song
+                                showOptionsDialog = true
                             }
                         )
                         Divider(
@@ -143,6 +159,43 @@ fun QuickPicksScreen(
                 }
             }
         }
+    
+        // Create options for the dialog
+        val dialogOptions = remember(selectedSong) {
+            selectedSong?.let { song ->
+                mutableListOf<DialogOption>().apply {
+                    // Play option
+                    add(
+                        DialogOption(
+                            id = "play",
+                            title = "Play",
+                            subtitle = "Play this song",
+                            icon = {
+                                Icon(
+                                    Icons.Filled.PlayArrow,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            onClick = {
+                                playerViewModel.playSong(song, uiState.quickPicks)
+                            }
+                        )
+                    )
+                }
+            } ?: emptyList()
+        }
+
+        // Bottom options dialog
+        BottomOptionsDialog(
+            song = selectedSong,
+            isVisible = showOptionsDialog,
+            onDismiss = { showOptionsDialog = false },
+            options = dialogOptions,
+            title = "Song Options",
+            description = "Choose an action for this song"
+        )
     
         // Guide overlay
         if (showGuide) {

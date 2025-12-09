@@ -1,8 +1,10 @@
 package com.just_for_fun.synctax.presentation.screens
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,7 +43,9 @@ import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
 fun RecommendationsDetailScreen(
     recommendationViewModel: RecommendationViewModel = viewModel(),
     onNavigateBack: () -> Unit,
-    onPlaySong: (OnlineSearchResult) -> Unit
+    onPlaySong: (OnlineSearchResult) -> Unit,
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
 ) {
     val recommendations by recommendationViewModel.recommendations.collectAsState()
     val isLoading by recommendationViewModel.isLoading.collectAsState()
@@ -100,7 +104,9 @@ fun RecommendationsDetailScreen(
                         },
                         onLoadMore = {
                             recommendationViewModel.loadNextShuffleBatch()
-                        }
+                        },
+                        onAddToQueue = onAddToQueue,
+                        onAddToPlaylist = onAddToPlaylist
                     )
                 }
             }
@@ -116,7 +122,9 @@ private fun RecommendationsDetailContent(
     recommendations: com.just_for_fun.synctax.core.service.RecommendationService.RecommendationResult,
     currentBatch: List<OnlineSearchResult>,
     onSongClick: (OnlineSearchResult) -> Unit,
-    onLoadMore: () -> Unit
+    onLoadMore: () -> Unit,
+    onAddToQueue: ((OnlineSearchResult) -> Unit)? = null,
+    onAddToPlaylist: ((OnlineSearchResult) -> Unit)? = null
 ) {
     LazyColumn {
         // Artist-based recommendations
@@ -124,7 +132,9 @@ private fun RecommendationsDetailContent(
             RecommendationCategorySection(
                 title = "Based on Your Artists",
                 songs = recommendations.artistBased.take(10),
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist
             )
         }
         
@@ -133,7 +143,9 @@ private fun RecommendationsDetailContent(
             RecommendationCategorySection(
                 title = "Similar Songs",
                 songs = recommendations.similarSongs.take(10),
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist
             )
         }
         
@@ -142,7 +154,9 @@ private fun RecommendationsDetailContent(
             RecommendationCategorySection(
                 title = "Discover New Music",
                 songs = recommendations.discovery.take(10),
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist
             )
         }
         
@@ -151,7 +165,9 @@ private fun RecommendationsDetailContent(
             RecommendationCategorySection(
                 title = "Trending Now",
                 songs = recommendations.trending.take(10),
-                onSongClick = onSongClick
+                onSongClick = onSongClick,
+                onAddToQueue = onAddToQueue,
+                onAddToPlaylist = onAddToPlaylist
             )
         }
         
@@ -183,6 +199,11 @@ private fun RecommendationsDetailContent(
                     Text("Load More Shuffle Songs")
                 }
             }
+        }
+
+        // Bottom padding for mini player
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }

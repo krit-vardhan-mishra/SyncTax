@@ -3,6 +3,10 @@ package com.just_for_fun.synctax
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -41,8 +45,6 @@ import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.app.AppNavigationBar
 import com.just_for_fun.synctax.presentation.components.player.PlayerBottomSheet
-import com.just_for_fun.synctax.presentation.utils.BottomPaddingDefaults
-import com.just_for_fun.synctax.presentation.utils.LocalBottomPadding
 import com.just_for_fun.synctax.presentation.screens.AlbumDetailScreen
 import com.just_for_fun.synctax.presentation.screens.ArtistDetailScreen
 import com.just_for_fun.synctax.presentation.screens.HomeScreen
@@ -94,7 +96,7 @@ fun MusicApp(userPreferences: UserPreferences) {
     // Manual expansion state - ONLY controlled by user actions (click/swipe on mini-player)
     // This is completely independent from BottomSheetScaffold's internal state
     var isPlayerExpanded by remember { mutableStateOf(false) }
-    
+
     // Simple scaffold state without confirmValueChange - we control expansion manually
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
@@ -102,7 +104,7 @@ fun MusicApp(userPreferences: UserPreferences) {
             skipHiddenState = true
         )
     )
-    
+
     // Sync BottomSheet visual state with our manual state
     // This only controls the animation, not the content rendering
     val scope = rememberCoroutineScope()
@@ -120,17 +122,6 @@ fun MusicApp(userPreferences: UserPreferences) {
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var searchResetTrigger by remember { mutableStateOf(0) }
-    
-    // Calculate bottom padding - accounts for mini player + nav bar
-    val bottomPadding by remember(playerState.currentSong) {
-        derivedStateOf {
-            if (playerState.currentSong != null) {
-                BottomPaddingDefaults.TotalPadding
-            } else {
-                BottomPaddingDefaults.NavBarOnlyPadding
-            }
-        }
-    }
 
     // Update album colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -203,18 +194,23 @@ fun MusicApp(userPreferences: UserPreferences) {
                     onExpandedChange = { isPlayerExpanded = it }
                 ) { innerPadding ->
                     // Provide bottom padding to all screens via CompositionLocal
-                    CompositionLocalProvider(LocalBottomPadding provides bottomPadding) {
-                        NavHost(
-                            navController = navController,
-                            startDestination = "home",
-                            modifier = Modifier.padding(
-                                top = innerPadding.calculateTopPadding(),
-                                start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
-                                end = innerPadding.calculateEndPadding(LayoutDirection.Ltr),
-                                bottom = 0.dp // Screens handle their own bottom padding via LocalBottomPadding
-                            )
+                    NavHost(
+                        navController = navController,
+                        startDestination = "home",
+                        modifier = Modifier.padding(
+                            top = innerPadding.calculateTopPadding(),
+                            start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
+                            end = innerPadding.calculateEndPadding(LayoutDirection.Ltr),
+                            bottom = 0.dp // Screens handle their own bottom padding via LocalBottomPadding
+                        )
+                    ) {
+                        composable(
+                            "home",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                         ) {
-                        composable("home") {
                             HomeScreen(
                                 homeViewModel = homeViewModel,
                                 playerViewModel = playerViewModel,
@@ -230,7 +226,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 onNavigateToRecommendations = { navController.navigate("recommendations_detail") }
                             )
                         }
-                        composable("search") {
+                        composable(
+                            "search",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             SearchScreen(
                                 navController = navController,
                                 onBackClick = { navController.popBackStack() },
@@ -243,7 +245,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 playerViewModel = playerViewModel
                             )
                         }
-                        composable("library") {
+                        composable(
+                            "library",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             LibraryScreen(
                                 homeViewModel = homeViewModel,
@@ -263,7 +271,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 onTrainClick = { navController.navigate("train") }
                             )
                         }
-                        composable("playlists") {
+                        composable(
+                            "playlists",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val playlistViewModel: PlaylistViewModel = viewModel()
                             PlaylistScreen(
                                 playlistViewModel = playlistViewModel,
@@ -283,7 +297,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 }
                             )
                         }
-                        composable("import_playlist") {
+                        composable(
+                            "import_playlist",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val playlistViewModel: PlaylistViewModel = viewModel()
                             ImportPlaylistScreen(
                                 playlistViewModel = playlistViewModel,
@@ -291,7 +311,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 onImportSuccess = { navController.popBackStack() }
                             )
                         }
-                        composable("create_playlist") {
+                        composable(
+                            "create_playlist",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val playlistViewModel: PlaylistViewModel = viewModel()
                             CreatePlaylistScreen(
                                 playlistViewModel = playlistViewModel,
@@ -304,7 +330,11 @@ fun MusicApp(userPreferences: UserPreferences) {
                             route = "playlist_detail/{playlistId}",
                             arguments = listOf(navArgument("playlistId") {
                                 type = NavType.IntType
-                            })
+                            }),
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                         ) { backStackEntry ->
                             val playlistId = backStackEntry.arguments?.getInt("playlistId") ?: 0
                             val playlistViewModel: PlaylistViewModel = viewModel()
@@ -333,26 +363,50 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 }
                             )
                         }
-                        composable("quick_picks") {
+                        composable(
+                            "quick_picks",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             QuickPicksScreen(
                                 homeViewModel = homeViewModel,
                                 playerViewModel = playerViewModel
                             )
                         }
-                        composable("train") {
+                        composable(
+                            "train",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             TrainingScreen(
                                 homeViewModel = homeViewModel,
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
-                        composable("settings") {
+                        composable(
+                            "settings",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             SettingsScreen(
                                 userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() },
                                 onScanTrigger = { homeViewModel.forceRefreshLibrary() }
                             )
                         }
-                        composable("recommendations_detail") {
+                        composable(
+                            "recommendations_detail",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             RecommendationsDetailScreen(
                                 recommendationViewModel = recommendationViewModel,
                                 onNavigateBack = { navController.popBackStack() },
@@ -370,7 +424,11 @@ fun MusicApp(userPreferences: UserPreferences) {
                             route = "artist/{artistName}",
                             arguments = listOf(navArgument("artistName") {
                                 type = NavType.StringType
-                            })
+                            }),
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                         ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             uiState.selectedArtistSongs?.let { songs ->
@@ -393,19 +451,28 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 )
                             }
                         }
-                        composable("online_artist") {
+                        composable(
+                            "online_artist",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             uiState.selectedOnlineArtist?.let { artist ->
                                 ArtistDetailScreen(
                                     artistName = "", // not used
                                     songs = emptyList(), // not used
-                                    onBackClick = { 
-                                        navController.popBackStack() 
+                                    onBackClick = {
+                                        navController.popBackStack()
                                     },
                                     onSongClick = {}, // not used
                                     onPlayAll = {
                                         // Play all online artist songs with queue - NO recommendations
-                                        playerViewModel.playRecommendedSongsPlaylist(artist.songs, 0)
+                                        playerViewModel.playRecommendedSongsPlaylist(
+                                            artist.songs,
+                                            0
+                                        )
                                     },
                                     onShuffle = {
                                         // Shuffle and play all online artist songs - NO recommendations
@@ -420,7 +487,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 )
                             }
                         }
-                        composable("online_songs") {
+                        composable(
+                            "online_songs",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
                             OnlineSongsScreen(
                                 onlineSongsViewModel = onlineSongsViewModel,
@@ -448,42 +521,51 @@ fun MusicApp(userPreferences: UserPreferences) {
                             route = "album/{albumName}",
                             arguments = listOf(navArgument("albumName") {
                                 type = NavType.StringType
-                            })
+                            }),
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                         ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             val playlistViewModel: PlaylistViewModel = viewModel()
-                            
+
                             // Track if album is saved
                             var isAlbumSaved by remember { mutableStateOf(false) }
-                            
+
                             uiState.selectedAlbumSongs?.let { songs ->
                                 // Check for both "youtube:" and "online:" prefixes for online albums
                                 val isOnlineAlbum = songs.firstOrNull()?.id?.let { id ->
                                     id.startsWith("youtube:") || id.startsWith("online:")
                                 } == true
-                                
+
                                 val currentAlbumName = uiState.selectedAlbum ?: ""
                                 val currentArtistName = uiState.selectedAlbumArtist ?: ""
-                                val albumThumbnail = if (isOnlineAlbum) uiState.selectedOnlineAlbum?.thumbnail else songs.firstOrNull()?.albumArtUri
-                                
+                                val albumThumbnail =
+                                    if (isOnlineAlbum) uiState.selectedOnlineAlbum?.thumbnail else songs.firstOrNull()?.albumArtUri
+
                                 // Check if album is saved when screen loads or album changes
                                 LaunchedEffect(currentAlbumName, currentArtistName) {
-                                    playlistViewModel.isAlbumSaved(currentAlbumName, currentArtistName) { saved ->
+                                    playlistViewModel.isAlbumSaved(
+                                        currentAlbumName,
+                                        currentArtistName
+                                    ) { saved ->
                                         isAlbumSaved = saved
                                     }
                                 }
-                                
+
                                 AlbumDetailScreen(
                                     albumName = currentAlbumName,
                                     artistName = currentArtistName,
                                     songs = songs,
-                                    onBackClick = { 
-                                        navController.popBackStack() 
+                                    onBackClick = {
+                                        navController.popBackStack()
                                     },
                                     onSongClick = { song ->
                                         if (isOnlineAlbum) {
                                             // Play individual song WITH recommendations for continuous playback
-                                            val videoId = song.id.removePrefix("youtube:").removePrefix("online:")
+                                            val videoId = song.id.removePrefix("youtube:")
+                                                .removePrefix("online:")
                                             playerViewModel.playOnlineSongWithRecommendations(
                                                 videoId = videoId,
                                                 title = song.title,
@@ -540,9 +622,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     }
                                 )
                             }
+
                         }
                     }
-                    } // end CompositionLocalProvider
                 }
             }
 

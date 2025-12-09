@@ -1,6 +1,5 @@
 package com.just_for_fun.synctax.presentation.components.player
 
-import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -22,7 +21,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
-import com.just_for_fun.synctax.presentation.components.player.PlayerSheetConstants
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
 
 private const val TAG = "UnifiedPlayer"
@@ -55,8 +53,6 @@ fun UnifiedPlayer(
     onSeek: (Long) -> Unit,
     downloadPercent: Int = 0,
 ) {
-    Log.d(TAG, "=== UnifiedPlayer Recomposition === isExpanded: $isExpanded, song: ${song.title}")
-    
     val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
 
@@ -110,13 +106,7 @@ fun UnifiedPlayer(
     )
 
     BackHandler(enabled = isExpanded) {
-        Log.d(TAG, ">>> BackHandler triggered - calling onExpandedChange(false)")
         onExpandedChange(false)
-    }
-    
-    // Log when isExpanded changes
-    LaunchedEffect(isExpanded) {
-        Log.d(TAG, ">>> LaunchedEffect: isExpanded changed to: $isExpanded")
     }
 
     // Main Container with enhanced drag gesture handling
@@ -139,12 +129,10 @@ fun UnifiedPlayer(
                             // Trigger state change based on drag direction
                             if (dragOffset < 0 && !isExpanded) {
                                 // Swipe up to expand
-                                Log.d(TAG, ">>> Drag gesture: expanding player")
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onExpandedChange(true)
                             } else if (dragOffset > 0 && isExpanded) {
                                 // Swipe down to collapse
-                                Log.d(TAG, ">>> Drag gesture: collapsing player")
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onExpandedChange(false)
                             }
@@ -217,34 +205,31 @@ fun UnifiedPlayer(
                             .fillMaxSize()
                             .alpha(miniPlayerAlpha)
                     ) {
-                        Log.d(TAG, ">>> Rendering MiniPlayerContent with alpha: $miniPlayerAlpha")
                         MiniPlayerContent(
-                    song = song,
-                    isPlaying = isPlaying,
-                    position = position,
-                    duration = duration,
-                    albumArtScale = albumArtMiniScale,
-                    // Pass Transparent here to trigger the fix in MiniPlayerContent
-                    backgroundColor = Color.Transparent,
-                    onPlayPauseClick = onPlayPauseClick,
-                    onNextClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onNextClick()
-                    },
-                    onPreviousClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onPreviousClick()
-                    },
-                    onClick = { 
-                        Log.d(TAG, ">>> MiniPlayerContent onClick - calling onExpandedChange(true)")
-                        onExpandedChange(true) 
-                    },
-                    onSwipeUp = { 
-                        Log.d(TAG, ">>> MiniPlayerContent onSwipeUp - calling onExpandedChange(true)")
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onExpandedChange(true) 
-                    }
-                )
+                            song = song,
+                            isPlaying = isPlaying,
+                            position = position,
+                            duration = duration,
+                            albumArtScale = albumArtMiniScale,
+                            // Pass Transparent here to trigger the fix in MiniPlayerContent
+                            backgroundColor = Color.Transparent,
+                            onPlayPauseClick = onPlayPauseClick,
+                            onNextClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onNextClick()
+                            },
+                            onPreviousClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onPreviousClick()
+                            },
+                            onClick = {
+                                onExpandedChange(true)
+                            },
+                            onSwipeUp = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onExpandedChange(true)
+                            }
+                        )
                     }
                 }
 
@@ -255,45 +240,44 @@ fun UnifiedPlayer(
                             .fillMaxSize()
                             .alpha(expandedAlpha)
                     ) {
-                        Log.d(TAG, ">>> Rendering FullScreenPlayerContent with alpha: $expandedAlpha")
                         FullScreenPlayerContent(
-                    song = song,
-                    isPlaying = isPlaying,
-                    isBuffering = isBuffering,
-                    position = position,
-                    duration = duration,
-                    shuffleEnabled = shuffleEnabled,
-                    repeatEnabled = repeatEnabled,
-                    volume = volume,
-                    upNext = upNext,
-                    playHistory = playHistory,
-                    showUpNext = showUpNext,
-                    snackbarHostState = snackBarHostState,
-                    onShowUpNextChange = { showUpNext = it },
-                    onSelectSong = onSelectSong,
-                    onPlaceNext = onPlaceNext,
-                    onRemoveFromQueue = onRemoveFromQueue,
-                    onReorderQueue = onReorderQueue,
-                    onSetVolume = onSetVolume,
-                    onPlayPauseClick = onPlayPauseClick,
-                    onNextClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onNextClick()
-                    },
-                    onPreviousClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onPreviousClick()
-                    },
-                    onShuffleClick = onShuffleClick,
-                    onRepeatClick = onRepeatClick,
-                    onSeek = onSeek,
-                    onClose = { 
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onExpandedChange(false)
-                    },
-                    expansionProgress = expansionProgress,
-                    downloadPercent = downloadPercent
-                )
+                            song = song,
+                            isPlaying = isPlaying,
+                            isBuffering = isBuffering,
+                            position = position,
+                            duration = duration,
+                            shuffleEnabled = shuffleEnabled,
+                            repeatEnabled = repeatEnabled,
+                            volume = volume,
+                            upNext = upNext,
+                            playHistory = playHistory,
+                            showUpNext = showUpNext,
+                            snackbarHostState = snackBarHostState,
+                            onShowUpNextChange = { showUpNext = it },
+                            onSelectSong = onSelectSong,
+                            onPlaceNext = onPlaceNext,
+                            onRemoveFromQueue = onRemoveFromQueue,
+                            onReorderQueue = onReorderQueue,
+                            onSetVolume = onSetVolume,
+                            onPlayPauseClick = onPlayPauseClick,
+                            onNextClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onNextClick()
+                            },
+                            onPreviousClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onPreviousClick()
+                            },
+                            onShuffleClick = onShuffleClick,
+                            onRepeatClick = onRepeatClick,
+                            onSeek = onSeek,
+                            onClose = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onExpandedChange(false)
+                            },
+                            expansionProgress = expansionProgress,
+                            downloadPercent = downloadPercent
+                        )
                     }
                 }
             }

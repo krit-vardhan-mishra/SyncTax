@@ -12,12 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +25,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,11 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
 import com.just_for_fun.synctax.presentation.components.player.DialogOption
-import androidx.compose.material.icons.rounded.Delete
 
 fun createOnlineHistoryOptions(
     history: OnlineListeningHistory,
@@ -168,7 +167,12 @@ fun OnlineHistoryCarousel(
                     onRemoveFromHistory?.invoke(selectedHistory.value!!)
                     showDialog.value = false
                 }
-            )
+            ),
+            title = "History Options",
+            description = "Manage this song in your listening history",
+            songTitle = selectedHistory.value!!.title,
+            songArtist = selectedHistory.value!!.artist,
+            songThumbnail = selectedHistory.value!!.thumbnailUrl
         )
     }
 }
