@@ -50,6 +50,7 @@ data class DialogOption(
  * @param songTitle Alternative song title if Song entity not available
  * @param songArtist Alternative song artist if Song entity not available
  * @param songThumbnail Alternative song thumbnail URL if Song entity not available
+ * @param customHeader Optional custom header composable to display at the top of the dialog
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +64,8 @@ fun BottomOptionsDialog(
     scrimAlpha: Float = 0.6f,
     songTitle: String? = null,
     songArtist: String? = null,
-    songThumbnail: String? = null
+    songThumbnail: String? = null,
+    customHeader: @Composable (() -> Unit)? = null
 ) {
     if (!isVisible) return
 
@@ -94,135 +96,144 @@ fun BottomOptionsDialog(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // General header with title and description (if no song)
-                if (song == null && (title != null || description != null)) {
-                    title?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            color = PlayerTextPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    description?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(bottom = 16.dp),
-                            color = PlayerTextSecondary
-                        )
-                    }
+                // Custom header if provided
+                if (customHeader != null) {
+                    customHeader()
                     HorizontalDivider(
                         modifier = Modifier.padding(bottom = 8.dp),
                         color = PlayerTextSecondary.copy(alpha = 0.2f)
                     )
-                }
+                } else {
+                    // General header with title and description (if no song)
+                    if (song == null && (title != null || description != null)) {
+                        title?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = PlayerTextPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        description?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(bottom = 16.dp),
+                                color = PlayerTextSecondary
+                            )
+                        }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            color = PlayerTextSecondary.copy(alpha = 0.2f)
+                        )
+                    }
 
-                // Alternative song header if song entity not provided but details are
-                if (song == null && songTitle != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Song thumbnail
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = PlayerTextSecondary.copy(alpha = 0.1f),
-                            modifier = Modifier.size(48.dp)
+                    // Alternative song header if song entity not provided but details are
+                    if (song == null && songTitle != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (songThumbnail != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(songThumbnail)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = songTitle,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                            // Song thumbnail
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PlayerTextSecondary.copy(alpha = 0.1f),
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                if (songThumbnail != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(songThumbnail)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = songTitle,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = songTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PlayerTextPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
                                 )
+                                songArtist?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = PlayerTextSecondary,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        HorizontalDivider(
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            color = PlayerTextSecondary.copy(alpha = 0.2f)
+                        )
+                    }
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = songTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = PlayerTextPrimary,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                            songArtist?.let {
+                    // Header with song info if available
+                    song?.let {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Song thumbnail placeholder
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PlayerTextSecondary.copy(alpha = 0.1f),
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                if (it.albumArtUri != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(it.albumArtUri)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = it.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = it,
+                                    text = it.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = PlayerTextPrimary,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = it.artist,
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = PlayerTextSecondary,
                                     maxLines = 1
                                 )
                             }
                         }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            color = PlayerTextSecondary.copy(alpha = 0.2f)
+                        )
                     }
-
-                    HorizontalDivider(
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        color = PlayerTextSecondary.copy(alpha = 0.2f)
-                    )
-                }
-
-                // Header with song info if available
-                song?.let {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Song thumbnail placeholder
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = PlayerTextSecondary.copy(alpha = 0.1f),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            if (it.albumArtUri != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(it.albumArtUri)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = it.title,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = it.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = PlayerTextPrimary,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = it.artist,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = PlayerTextSecondary,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        color = PlayerTextSecondary.copy(alpha = 0.2f)
-                    )
                 }
 
                 // Options list with staggered animation

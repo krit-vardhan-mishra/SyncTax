@@ -147,6 +147,39 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
             }
         }
     }
+
+    /**
+     * Generates personalized recommendations based on user inputs.
+     */
+    fun generateUserInputRecommendations(userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs) {
+        if (_isLoading.value) return
+
+        viewModelScope.launch(AppDispatchers.Network) {
+            _isLoading.value = true
+            _error.value = null
+
+            try {
+                Log.d(TAG, "Generating user-input-based recommendations...")
+                val result = recommendationService.generateUserInputRecommendations(userInputs)
+                _recommendations.value = result
+
+                // Prepare shuffle pool with user-input recommendations
+                allAvailableSongs = (result.artistBased + result.similarSongs +
+                                    result.discovery + result.trending)
+                    .distinctBy { it.id }
+                    .shuffled()
+                currentBatchIndex = 0
+                _currentShuffleBatch.value = emptyList()
+
+                Log.d(TAG, "Generated ${allAvailableSongs.size} user-input-based recommendations")
+            } catch (e: Exception) {
+                _error.value = "Failed to generate personalized recommendations: ${e.message}"
+                Log.e(TAG, "Error generating user-input recommendations", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
     
     /**
      * Shuffles the current batch of recommendations.

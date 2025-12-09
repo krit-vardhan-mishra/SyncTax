@@ -1,23 +1,22 @@
 package com.just_for_fun.synctax.presentation.components.section
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,10 +35,15 @@ import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.app.UserProfileDialog
 import com.just_for_fun.synctax.presentation.components.app.UserProfileIcon
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.utils.SortOption
 import com.just_for_fun.synctax.presentation.components.utils.TooltipBox
 import com.just_for_fun.synctax.presentation.ui.theme.AppColors
+import com.just_for_fun.synctax.presentation.ui.theme.PlayerTextPrimary
 import com.just_for_fun.synctax.presentation.utils.AlbumColors
+import androidx.compose.material.icons.filled.Person
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,11 +55,14 @@ fun SimpleDynamicMusicTopAppBar(
     showSearchButton: Boolean = false,
     showSortButton: Boolean = false,
     showProfileButton: Boolean = false,
+    showPersonalizeButton: Boolean = false,
     onShuffleClick: (() -> Unit)? = null,
     onRefreshClick: (() -> Unit)? = null,
     onSearchClick: (() -> Unit)? = null,
     onSortClick: (() -> Unit)? = null,
     onProfileClick: (() -> Unit)? = null,
+    onPersonalizeClick: (() -> Unit)? = null,
+    onNavigateBack: (() -> Unit)? = null,
     onTrainClick: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
     userPreferences: UserPreferences? = null,
@@ -68,15 +75,13 @@ fun SimpleDynamicMusicTopAppBar(
     onShowSortDialogChange: ((Boolean) -> Unit)? = null
 ) {
     var showProfileDialog by remember { mutableStateOf(false) }
-    var showProfileMenu by remember { mutableStateOf(false) }
+    var showNameChangeDialog by remember { mutableStateOf(false) }
 
     // Theme-aware colors from AppColors
     val appBarBackgroundColor = AppColors.appBarBackground
     val titleTextColor = AppColors.topAppBarTitle
     val iconColor = AppColors.topAppBarTitle
     val accentIconColor = AppColors.topAppBarIcon
-
-    val dynamicIconColor = iconColor
 
     TopAppBar(
         title = {
@@ -86,6 +91,17 @@ fun SimpleDynamicMusicTopAppBar(
                 fontWeight = FontWeight.Bold,
                 color = titleTextColor
             )
+        },
+        navigationIcon = {
+            if (onNavigateBack != null) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = iconColor
+                    )
+                }
+            }
         },
         actions = {
             // Shuffle button
@@ -108,7 +124,7 @@ fun SimpleDynamicMusicTopAppBar(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh",
-                            tint = dynamicIconColor
+                            tint = iconColor
                         )
                     }
                 }
@@ -121,7 +137,7 @@ fun SimpleDynamicMusicTopAppBar(
                         Icon(
                             imageVector = Icons.Default.Sort,
                             contentDescription = "Sort",
-                            tint = dynamicIconColor
+                            tint = iconColor
                         )
                     }
                 }
@@ -134,7 +150,20 @@ fun SimpleDynamicMusicTopAppBar(
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search",
-                            tint = dynamicIconColor
+                            tint = iconColor
+                        )
+                    }
+                }
+            }
+
+            // Personalize button
+            if (showPersonalizeButton && onPersonalizeClick != null) {
+                TooltipBox(tooltip = "Personalize recommendations") {
+                    IconButton(onClick = onPersonalizeClick) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Personalize",
+                            tint = accentIconColor
                         )
                     }
                 }
@@ -144,68 +173,9 @@ fun SimpleDynamicMusicTopAppBar(
             if (showProfileButton && userInitial != null) {
                 Box {
                     TooltipBox(tooltip = "Profile & Settings") {
-                        IconButton(onClick = { showProfileMenu = true }) {
+                        IconButton(onClick = { showProfileDialog = true }) {
                             UserProfileIcon(userInitial = userInitial)
                         }
-                    }
-                    DropdownMenu(
-                        expanded = showProfileMenu,
-                        onDismissRequest = { showProfileMenu = false }
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalAlignment = Alignment.Start
-                        ) {
-                            UserProfileIcon(userInitial = userInitial)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = userName?.ifEmpty { "User" } ?: "User",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = titleTextColor
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("Train model") },
-                            onClick = {
-                                showProfileMenu = false
-                                onTrainClick?.invoke()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Build,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("App settings") },
-                            onClick = {
-                                showProfileMenu = false
-                                onOpenSettings?.invoke()
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Change name") },
-                            onClick = {
-                                showProfileMenu = false
-                                showProfileDialog = true
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = null
-                                )
-                            }
-                        )
                     }
                 }
             }
@@ -216,10 +186,87 @@ fun SimpleDynamicMusicTopAppBar(
     )
 
     // User Profile Dialog
-    if (showProfileDialog && userPreferences != null && userName != null) {
+    if (showProfileDialog) {
+        val options = listOf(
+            DialogOption(
+                id = "train",
+                title = "Train model",
+                icon = {
+                    Icon(
+                        Icons.Default.Build,
+                        contentDescription = null,
+                        tint = PlayerTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    showProfileDialog = false
+                    onTrainClick?.invoke()
+                }
+            ),
+            DialogOption(
+                id = "settings",
+                title = "App settings",
+                icon = {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = PlayerTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    showProfileDialog = false
+                    onOpenSettings?.invoke()
+                }
+            ),
+            DialogOption(
+                id = "edit",
+                title = "Change name",
+                icon = {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = PlayerTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    showProfileDialog = false
+                    showNameChangeDialog = true
+                }
+            )
+        )
+
+        BottomOptionsDialog(
+            isVisible = true,
+            onDismiss = { showProfileDialog = false },
+            options = options,
+            customHeader = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    UserProfileIcon(userInitial = userInitial ?: "")
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = userName?.ifEmpty { "User" } ?: "User",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = PlayerTextPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        )
+    }
+
+    // User Profile Name Change Dialog
+    if (showNameChangeDialog && userPreferences != null && userName != null) {
         UserProfileDialog(
             currentUserName = userName,
-            onDismiss = { showProfileDialog = false },
+            onDismiss = { showNameChangeDialog = false },
             onNameUpdate = { newName ->
                 userPreferences.saveUserName(newName)
             }

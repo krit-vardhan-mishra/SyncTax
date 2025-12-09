@@ -21,7 +21,7 @@ fun OnlineHistorySection(
     onRemoveFromHistory: (OnlineListeningHistory) -> Unit = {}
 ) {
     Column(
-        modifier = Modifier.padding(vertical = 16.dp),
+        modifier = Modifier.padding(vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(

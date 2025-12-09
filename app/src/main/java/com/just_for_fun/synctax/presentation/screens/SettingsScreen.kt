@@ -312,7 +312,8 @@ fun SettingsScreen(
     userPreferences: UserPreferences,
     onBackClick: () -> Unit,
     onScanTrigger: () -> Unit = {},
-    onNavigateToPlaylists: () -> Unit = {}
+    onNavigateToPlaylists: () -> Unit = {},
+    onCheckForUpdate: () -> Unit = {}
 ) {
     val themeMode by userPreferences.themeMode.collectAsState(initial = UserPreferences.KEY_THEME_MODE_SYSTEM)
     val scanPaths by userPreferences.scanPaths.collectAsState(initial = emptyList())
@@ -729,6 +730,16 @@ fun SettingsScreen(
                             modifier = Modifier.rotate(180f) // Point right
                         )
                     }
+                }
+            }
+
+            // --- Check for Updates ---
+            item {
+                Button(
+                    onClick = onCheckForUpdate,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Check for Updates")
                 }
             }
 

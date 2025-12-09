@@ -93,6 +93,29 @@ class RecommendationService(
         
         return result
     }
+
+    /**
+     * Generates personalized recommendations based on user inputs.
+     * Takes precedence over cached recommendations for user-input-based results.
+     */
+    suspend fun generateUserInputRecommendations(
+        userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs
+    ): RecommendationResult {
+        Log.d(TAG, "Generating user-input-based recommendations")
+
+        // Generate recommendations on network dispatcher
+        val result = withContext(AppDispatchers.Network) {
+            RecommendationResult(
+                artistBased = filterSongsOnly(generateUserArtistBasedRecommendations(userInputs.artists)),
+                similarSongs = filterSongsOnly(generateUserSongBasedRecommendations(userInputs.songs)),
+                discovery = filterSongsOnly(generateUserDiscoveryRecommendations(userInputs)),
+                trending = filterSongsOnly(getTrendingRecommendations())
+            )
+        }
+
+        // Don't cache user-input recommendations as they are personalized
+        return result
+    }
     
     /**
      * Filters results to only include songs (not videos, episodes, etc.).
@@ -300,7 +323,7 @@ class RecommendationService(
      * Serializes songs to JSON for caching.
      */
     private fun serializeSongs(songs: List<OnlineSearchResult>): String {
-        val cachedSongs = songs.map { 
+        val cachedSongs = songs.map {
             CachedSong(
                 id = it.id,
                 title = it.title,
@@ -310,6 +333,79 @@ class RecommendationService(
             )
         }
         return json.encodeToString(cachedSongs)
+    }
+
+    /**
+     * Generates artist-based recommendations from user inputs.
+     */
+    private suspend fun generateUserArtistBasedRecommendations(userArtists: List<String>): List<OnlineSearchResult> {
+        val recommendations = mutableListOf<OnlineSearchResult>()
+
+        for (artist in userArtists.take(5)) {
+            try {
+                // Search for artist's popular songs
+                val searchResults = ytClient.search("$artist popular songs", limit = 6)
+                recommendations.addAll(searchResults)
+                Log.d(TAG, "Found ${searchResults.size} songs for user-input artist: $artist")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get recommendations for user-input artist: $artist", e)
+            }
+        }
+
+        return recommendations.distinctBy { it.id }.take(25)
+    }
+
+    /**
+     * Generates song-based recommendations from user inputs.
+     */
+    private suspend fun generateUserSongBasedRecommendations(userSongs: List<String>): List<OnlineSearchResult> {
+        val recommendations = mutableListOf<OnlineSearchResult>()
+
+        for (song in userSongs.take(5)) {
+            try {
+                // Search for songs similar to user-input songs
+                val searchResults = ytClient.search("songs similar to $song", limit = 5)
+                recommendations.addAll(searchResults)
+                Log.d(TAG, "Found ${searchResults.size} similar songs for user-input song: $song")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get similar songs for user-input song: $song", e)
+            }
+        }
+
+        return recommendations.distinctBy { it.id }.take(25)
+    }
+
+    /**
+     * Generates discovery recommendations based on user inputs (albums and genres).
+     */
+    private suspend fun generateUserDiscoveryRecommendations(
+        userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs
+    ): List<OnlineSearchResult> {
+        val recommendations = mutableListOf<OnlineSearchResult>()
+
+        // Use albums for discovery
+        for (album in userInputs.albums.take(3)) {
+            try {
+                val searchResults = ytClient.search("songs from album $album", limit = 4)
+                recommendations.addAll(searchResults)
+                Log.d(TAG, "Found ${searchResults.size} songs from user-input album: $album")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get songs from user-input album: $album", e)
+            }
+        }
+
+        // Use genres for discovery
+        for (genre in userInputs.genres.take(3)) {
+            try {
+                val searchResults = ytClient.search("popular $genre songs", limit = 5)
+                recommendations.addAll(searchResults)
+                Log.d(TAG, "Found ${searchResults.size} songs in user-input genre: $genre")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get songs in user-input genre: $genre", e)
+            }
+        }
+
+        return recommendations.distinctBy { it.id }.take(25)
     }
     
     /**

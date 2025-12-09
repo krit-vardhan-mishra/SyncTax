@@ -100,7 +100,7 @@ fun HomeScreen(
     val userInitial = userPreferences.getUserInitial()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val scanPaths by userPreferences.scanPaths.collectAsState()
-    
+
     // Recommendation state
     val recommendations by recommendationViewModel.recommendations.collectAsState()
     val isLoadingRecommendations by recommendationViewModel.isLoading.collectAsState()
@@ -325,55 +325,6 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(15.dp))
                             }
                         }
-                        
-                        // Online Recommendations Section
-                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                            item(
-                                key = "recommendations",
-                                contentType = "recommendations"
-                            ) {
-                                when {
-                                    isLoadingRecommendations -> {
-                                        RecommendationSkeleton()
-                                    }
-                                    recommendations != null -> {
-                                        RecommendationsSection(
-                                            recommendations = recommendations!!,
-                                            onSongClick = { song ->
-                                                playerViewModel.playOnlineSongWithRecommendations(
-                                                    videoId = song.id,
-                                                    title = song.title,
-                                                    artist = song.author ?: "Unknown Artist",
-                                                    thumbnailUrl = song.thumbnailUrl
-                                                )
-                                                recommendationViewModel.trackInteraction(
-                                                    song.id,
-                                                    "played",
-                                                    recommendationViewModel.getRecommendationReason(song)
-                                                )
-                                            },
-                                            onViewAllClick = onNavigateToRecommendations,
-                                            getRecommendationReason = { song ->
-                                                recommendationViewModel.getRecommendationReason(song)
-                                            }
-                                        )
-                                    }
-                                    hasEnoughHistory -> {
-                                        // Has history but no recommendations loaded yet
-                                        EmptyRecommendationsPrompt(
-                                            onExploreClick = { recommendationViewModel.loadRecommendations() }
-                                        )
-                                    }
-                                    // Don't show anything if no listening history
-                                }
-                            }
-                        }
-                        
-                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                            item {
-                                Spacer(modifier = Modifier.height(15.dp))
-                            }
-                        }
 
                         // Listen Again Section (only show if there are local songs)
                         if ((selectedFilter == "All" || selectedFilter == "Listen Again") && uiState.allSongs.isNotEmpty()) {
@@ -384,7 +335,11 @@ fun HomeScreen(
                             ) {
                                 // State for bottom sheet dialog
                                 var showOptionsDialog by remember { mutableStateOf(false) }
-                                var selectedSong by remember { mutableStateOf<com.just_for_fun.synctax.data.local.entities.Song?>(null) }
+                                var selectedSong by remember {
+                                    mutableStateOf<com.just_for_fun.synctax.data.local.entities.Song?>(
+                                        null
+                                    )
+                                }
                                 val haptic = LocalHapticFeedback.current
 
                                 SectionHeader(
@@ -425,7 +380,9 @@ fun HomeScreen(
                                                         )
                                                     },
                                                     onLongClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        haptic.performHapticFeedback(
+                                                            HapticFeedbackType.LongPress
+                                                        )
                                                         selectedSong = song
                                                         showOptionsDialog = true
                                                     }
@@ -476,6 +433,59 @@ fun HomeScreen(
                                     songTitle = selectedSong?.title ?: "",
                                     songArtist = selectedSong?.artist ?: ""
                                 )
+                            }
+                        }
+
+                        // Online Recommendations Section
+                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                            item(
+                                key = "recommendations",
+                                contentType = "recommendations"
+                            ) {
+                                when {
+                                    isLoadingRecommendations -> {
+                                        RecommendationSkeleton()
+                                    }
+
+                                    recommendations != null -> {
+                                        RecommendationsSection(
+                                            recommendations = recommendations!!,
+                                            onSongClick = { song ->
+                                                playerViewModel.playOnlineSongWithRecommendations(
+                                                    videoId = song.id,
+                                                    title = song.title,
+                                                    artist = song.author ?: "Unknown Artist",
+                                                    thumbnailUrl = song.thumbnailUrl
+                                                )
+                                                recommendationViewModel.trackInteraction(
+                                                    song.id,
+                                                    "played",
+                                                    recommendationViewModel.getRecommendationReason(
+                                                        song
+                                                    )
+                                                )
+                                            },
+                                            onViewAllClick = onNavigateToRecommendations,
+                                            getRecommendationReason = { song ->
+                                                recommendationViewModel.getRecommendationReason(song)
+                                            }
+                                        )
+                                    }
+
+                                    hasEnoughHistory -> {
+                                        // Has history but no recommendations loaded yet
+                                        EmptyRecommendationsPrompt(
+                                            onExploreClick = { recommendationViewModel.loadRecommendations() }
+                                        )
+                                    }
+                                    // Don't show anything if no listening history
+                                }
+                            }
+                        }
+
+                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                            item {
+                                Spacer(modifier = Modifier.height(15.dp))
                             }
                         }
 

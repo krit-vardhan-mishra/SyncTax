@@ -18,6 +18,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
@@ -57,6 +58,7 @@ import com.just_for_fun.synctax.presentation.screens.QuickPicksScreen
 import com.just_for_fun.synctax.presentation.screens.SearchScreen
 import com.just_for_fun.synctax.presentation.screens.SettingsScreen
 import com.just_for_fun.synctax.presentation.screens.TrainingScreen
+import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputScreen
 import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
@@ -64,8 +66,10 @@ import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
+import com.just_for_fun.synctax.core.utils.UpdateChecker
 import com.just_for_fun.synctax.presentation.screens.CreatePlaylistScreen
 import com.just_for_fun.synctax.presentation.screens.RecommendationsDetailScreen
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +94,12 @@ fun MusicApp(userPreferences: UserPreferences) {
     val dynamicBgViewModel: DynamicBackgroundViewModel =
         viewModel()
     val recommendationViewModel: RecommendationViewModel = viewModel()
+
+    val playerState by playerViewModel.uiState.collectAsState()
+    val homeState by homeViewModel.uiState.collectAsState()
+    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var searchResetTrigger by remember { mutableStateOf(0) }
 
     // --- HOISTED STATE ---
     // Use ViewModel-managed player sheet state for better state management
@@ -117,11 +127,49 @@ fun MusicApp(userPreferences: UserPreferences) {
     }
     // --- END HOISTED STATE ---
 
-    val playerState by playerViewModel.uiState.collectAsState()
-    val homeState by homeViewModel.uiState.collectAsState()
-    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var searchResetTrigger by remember { mutableStateOf(0) }
+    // Update check state
+    var checkForUpdate by remember { mutableStateOf(false) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+
+    // Handle update check
+    LaunchedEffect(checkForUpdate) {
+        if (checkForUpdate && !isCheckingUpdate) {
+            checkForUpdate = false
+            isCheckingUpdate = true
+            val result = UpdateChecker(context).checkForUpdate()
+            isCheckingUpdate = false
+            result.onSuccess { info ->
+                if (info.isUpdateAvailable) {
+                    scope.launch {
+                        val snackbarResult = snackbarHostState.showSnackbar(
+                            message = "Update available: v${info.latestVersion}",
+                            actionLabel = "Download",
+                            duration = SnackbarDuration.Long
+                        )
+                        if (snackbarResult == SnackbarResult.ActionPerformed) {
+                            info.downloadUrl?.let { url ->
+                                UpdateChecker(context).downloadAndInstallApk(url)
+                            }
+                        }
+                    }
+                } else {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "App is up to date",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "Failed to check for updates: ${error.message}",
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
+        }
+    }
 
     // Update album colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -397,7 +445,8 @@ fun MusicApp(userPreferences: UserPreferences) {
                             SettingsScreen(
                                 userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() },
-                                onScanTrigger = { homeViewModel.forceRefreshLibrary() }
+                                onScanTrigger = { homeViewModel.forceRefreshLibrary() },
+                                onCheckForUpdate = { checkForUpdate = true }
                             )
                         }
                         composable(
@@ -417,6 +466,24 @@ fun MusicApp(userPreferences: UserPreferences) {
                                         artist = song.author ?: "Unknown Artist",
                                         thumbnailUrl = song.thumbnailUrl
                                     )
+                                },
+                                onNavigateToUserInput = { navController.navigate("user_recommendations_input") }
+                            )
+                        }
+                        composable(
+                            "user_recommendations_input",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            UserRecommendationInputScreen(
+                                recommendationViewModel = recommendationViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onGenerateRecommendations = { userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs ->
+                                    recommendationViewModel.generateUserInputRecommendations(userInputs)
+                                    // Navigate back to home screen to show the new recommendations
+                                    navController.popBackStack()
                                 }
                             )
                         }

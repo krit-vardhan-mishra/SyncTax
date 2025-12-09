@@ -1,7 +1,7 @@
 # Performance Optimizations Implementation Summary
 
 ## Date: January 2025
-## Project: SnycTax (YoutubeMusic)
+## Project: SnycTax
 
 ---
 
