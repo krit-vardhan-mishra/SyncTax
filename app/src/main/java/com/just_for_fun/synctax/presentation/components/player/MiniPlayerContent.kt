@@ -5,7 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -113,37 +113,30 @@ fun MiniPlayerContent(
                             }
                             .pointerInput(song.id) {
                                 var totalDragX = 0f
-                                var totalDragY = 0f
-                                var hasTriggeredAction = false
+                                var isHorizontalDrag = false
 
-                                detectDragGestures(
+                                detectHorizontalDragGestures(
                                     onDragStart = {
                                         totalDragX = 0f
-                                        totalDragY = 0f
-                                        hasTriggeredAction = false
+                                        isHorizontalDrag = false
                                     },
                                     onDragEnd = {
+                                        // Only handle horizontal swipes for next/prev
                                         val absX = kotlin.math.abs(totalDragX)
-                                        val absY = kotlin.math.abs(totalDragY)
-                                        if (absX > absY && absX > 50f && !hasTriggeredAction) {
+                                        if (absX > 50f) {
                                             if (totalDragX > swipeThreshold) onPreviousClick()
                                             else if (totalDragX < -swipeThreshold) onNextClick()
-                                            hasTriggeredAction = true
-                                        } else if (absY > absX && absY > 50f && totalDragY < 0 && !hasTriggeredAction) {
-                                            onSwipeUp()
-                                            hasTriggeredAction = true
                                         }
                                         albumArtOffsetX = 0f
                                     },
-                                    onDrag = { change, dragAmount ->
+                                    onHorizontalDrag = { change, dragAmount ->
                                         change.consume()
-                                        totalDragX += dragAmount.x
-                                        totalDragY += dragAmount.y
-                                        if (kotlin.math.abs(totalDragX) > kotlin.math.abs(totalDragY)) {
-                                            albumArtOffsetX += dragAmount.x
-                                        }
+                                        totalDragX += dragAmount
+                                        albumArtOffsetX += dragAmount
                                     }
                                 )
+                                // Note: Vertical drags are NOT consumed here,
+                                // letting them propagate to UnifiedPlayerSheet for continuous tracking
                             }
                             .clip(RoundedCornerShape(12.dp)) // Rounded border for the Inner Box
                             .background(MoreBlurColor) // Stronger semi-transparent overlay for "more blur"

@@ -97,4 +97,41 @@ object PlayerSheetConstants {
      * Album art scale in expanded state
      */
     const val ALBUM_ART_EXPANDED_SCALE = 1.0f
+
+    // === STAGGERED CROSSFADE PARAMETERS ===
+
+    /**
+     * Mini player fades out at 2x the expansion rate.
+     * At 50% expansion, mini player is fully invisible.
+     */
+    const val MINI_ALPHA_FADE_MULTIPLIER = 2f
+
+    /**
+     * Expansion fraction at which full player starts fading in (0.0 to 1.0).
+     * This creates the crossfade overlap zone where both players are partially visible.
+     */
+    const val FULL_ALPHA_FADE_START = 0.25f
+
+    /**
+     * Initial Y offset for full player content (dp).
+     * Creates the slide-up effect as the full player fades in.
+     */
+    const val FULL_PLAYER_INITIAL_OFFSET_DP = 24f
+
+    /**
+     * Minimum drag distance in dp to detect as intentional vertical scroll.
+     */
+    const val MIN_DRAG_DISTANCE_DP = 5f
+
+    /**
+     * Velocity threshold (px/s) to determine expand/collapse on drag end.
+     * Lower values make the gesture more sensitive to quick flicks.
+     */
+    const val VELOCITY_THRESHOLD = 150f
+
+    /**
+     * Multiplier for drag-to-expansion conversion.
+     * Higher values make the sheet expand faster relative to finger movement.
+     */
+    const val DRAG_TO_EXPANSION_MULTIPLIER = 0.5f
 }

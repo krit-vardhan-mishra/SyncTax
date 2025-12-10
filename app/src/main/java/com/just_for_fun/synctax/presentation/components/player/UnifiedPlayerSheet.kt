@@ -2,12 +2,28 @@ package com.just_for_fun.synctax.presentation.components.player
 
 import android.util.Log
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -15,25 +31,35 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
-import com.just_for_fun.synctax.presentation.components.player.PlayerSheetConstants
 import com.just_for_fun.synctax.presentation.components.state.PlayerSheetState
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 private const val TAG = "UnifiedPlayerSheet"
 
 /**
  * Enhanced unified player sheet with smooth animated transitions between collapsed (miniplayer)
- * and expanded (fullscreen) states. Includes drag gesture handling, alpha blending, overshoot
- * scaling, and predictive back support.
+ * and expanded (fullscreen) states. Features PixelPlay-style staggered alpha crossfade,
+ * continuous drag-based expansion tracking, translation animations, and spring physics.
  *
- * Adapted from PixelPlay's UnifiedPlayerSheet for SyncTax.
+ * Key animation features:
+ * - Mini player fades out at 2x speed (completely gone by 50% expansion)
+ * - Full player starts fading in at 25% expansion
+ * - Full player slides up as it fades in for dynamic feel
+ * - Spring animations with overshoot for bouncy feedback
+ * - Real-time drag tracking for responsive gesture interaction
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,40 +93,53 @@ fun UnifiedPlayerSheet(
     
     val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
 
-    // Track drag offset for gesture handling
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    // === CORE ANIMATION STATE ===
+    // Animatable for continuous expansion tracking (0 = collapsed, 1 = expanded)
+    val expansionFractionAnimatable = remember { Animatable(if (playerSheetState == PlayerSheetState.EXPANDED) 1f else 0f) }
+    val expansionFraction by expansionFractionAnimatable.asState()
 
-    // Expansion fraction with overshoot animation for bouncy feedback
-    val expansionFraction by animateFloatAsState(
-        targetValue = if (playerSheetState == PlayerSheetState.EXPANDED) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "expansion_fraction"
-    )
+    // Track if user is currently dragging
+    var isDragging by remember { mutableStateOf(false) }
+    
+    // Velocity tracker for fling detection
+    val velocityTracker = remember { VelocityTracker() }
+    
+    // Accumulated drag for threshold detection
+    var accumulatedDragY by remember { mutableFloatStateOf(0f) }
+    var initialFractionOnDragStart by remember { mutableFloatStateOf(0f) }
 
-    // Alpha for mini player content (fades out when expanding)
-    val miniPlayerAlpha by animateFloatAsState(
-        targetValue = if (playerSheetState == PlayerSheetState.COLLAPSED) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "mini_alpha"
-    )
+    // === STAGGERED ALPHA CROSSFADE (PixelPlay-style) ===
+    // Mini player fades out at 2x speed - completely gone by 50% expansion
+    val miniPlayerAlpha by remember {
+        derivedStateOf {
+            (1f - expansionFraction * PlayerSheetConstants.MINI_ALPHA_FADE_MULTIPLIER)
+                .coerceIn(0f, 1f)
+        }
+    }
 
-    // Alpha for expanded content (fades in when expanding)
-    val expandedAlpha by animateFloatAsState(
-        targetValue = if (playerSheetState == PlayerSheetState.EXPANDED) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
-            delayMillis = PlayerSheetConstants.FADE_IN_DELAY_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "expanded_alpha"
-    )
+    // Full player starts fading in at 25% expansion, fully visible by 100%
+    val fullPlayerContentAlpha by remember {
+        derivedStateOf {
+            val fadeRange = 1f - PlayerSheetConstants.FULL_ALPHA_FADE_START
+            ((expansionFraction - PlayerSheetConstants.FULL_ALPHA_FADE_START)
+                .coerceIn(0f, fadeRange) / fadeRange)
+        }
+    }
+
+    // === TRANSLATION ANIMATION FOR FULL PLAYER ===
+    // Full player slides up as it fades in for dynamic feel
+    val initialFullPlayerOffsetPx = with(density) {
+        PlayerSheetConstants.FULL_PLAYER_INITIAL_OFFSET_DP.dp.toPx()
+    }
+    
+    val fullPlayerTranslationY by remember {
+        derivedStateOf {
+            lerp(initialFullPlayerOffsetPx, 0f, fullPlayerContentAlpha)
+        }
+    }
 
     // Album art scale with overshoot for bouncy feedback
     val albumArtScale by animateFloatAsState(
@@ -116,19 +155,34 @@ fun UnifiedPlayerSheet(
         label = "album_art_scale"
     )
 
+    // Sync animatable with external state changes (e.g., from back button)
+    LaunchedEffect(playerSheetState) {
+        if (!isDragging) {
+            val targetFraction = if (playerSheetState == PlayerSheetState.EXPANDED) 1f else 0f
+            if (abs(expansionFractionAnimatable.value - targetFraction) > 0.01f) {
+                expansionFractionAnimatable.animateTo(
+                    targetValue = targetFraction,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                )
+            }
+        }
+        Log.d(TAG, ">>> LaunchedEffect: playerSheetState changed to: $playerSheetState")
+    }
+
     // Predictive back support: collapse on back press when expanded
     BackHandler(enabled = playerSheetState == PlayerSheetState.EXPANDED) {
         Log.d(TAG, ">>> BackHandler triggered - collapsing player sheet")
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         onPlayerSheetStateChange(PlayerSheetState.COLLAPSED)
     }
-    
-    // Log when sheet state changes
-    LaunchedEffect(playerSheetState) {
-        Log.d(TAG, ">>> LaunchedEffect: playerSheetState changed to: $playerSheetState")
-    }
 
-    // Main Container with drag gesture handling
+    // Calculate minimum drag threshold in pixels
+    val minDragDistancePx = with(density) { PlayerSheetConstants.MIN_DRAG_DISTANCE_DP.dp.toPx() }
+
+    // Main Container with enhanced drag gesture handling
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -137,31 +191,83 @@ fun UnifiedPlayerSheet(
                 (PlayerSheetConstants.MINI_PLAYER_HEIGHT_DP +
                         (expansionFraction * PlayerSheetConstants.MAX_EXPANSION_HEIGHT_DP)).dp
             )
-            .pointerInput(playerSheetState) {
+            .pointerInput(Unit) {
+                val screenHeightPx = size.height.toFloat()
+                val maxExpansionPx = PlayerSheetConstants.MAX_EXPANSION_HEIGHT_DP * density.density
+                
                 detectVerticalDragGestures(
-                    onDragStart = {
-                        dragOffset = 0f
+                    onDragStart = { offset ->
+                        // Stop any ongoing animation
+                        scope.launch {
+                            expansionFractionAnimatable.stop()
+                        }
+                        isDragging = true
+                        velocityTracker.resetTracking()
+                        initialFractionOnDragStart = expansionFractionAnimatable.value
+                        accumulatedDragY = 0f
+                        Log.d(TAG, ">>> Drag started at fraction: $initialFractionOnDragStart")
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        accumulatedDragY += dragAmount
+                        
+                        // Convert drag distance to expansion fraction change
+                        // Negative drag (up) = expand, positive drag (down) = collapse
+                        val dragFraction = -accumulatedDragY / (maxExpansionPx * PlayerSheetConstants.DRAG_TO_EXPANSION_MULTIPLIER)
+                        val newFraction = (initialFractionOnDragStart + dragFraction).coerceIn(0f, 1f)
+                        
+                        // Update expansion fraction in real-time
+                        scope.launch {
+                            expansionFractionAnimatable.snapTo(newFraction)
+                        }
+                        
+                        // Track velocity for fling detection
+                        velocityTracker.addPosition(change.uptimeMillis, change.position)
                     },
                     onDragEnd = {
-                        val absOffset = kotlin.math.abs(dragOffset)
-                        if (absOffset > PlayerSheetConstants.DRAG_THRESHOLD_PX) {
-                            // Trigger state change based on drag direction
-                            if (dragOffset < 0 && playerSheetState == PlayerSheetState.COLLAPSED) {
-                                // Swipe up to expand
-                                Log.d(TAG, ">>> Drag gesture: expanding player sheet")
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onPlayerSheetStateChange(PlayerSheetState.EXPANDED)
-                            } else if (dragOffset > 0 && playerSheetState == PlayerSheetState.EXPANDED) {
-                                // Swipe down to collapse
-                                Log.d(TAG, ">>> Drag gesture: collapsing player sheet")
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onPlayerSheetStateChange(PlayerSheetState.COLLAPSED)
-                            }
+                        isDragging = false
+                        val velocity = velocityTracker.calculateVelocity().y
+                        val currentFraction = expansionFractionAnimatable.value
+                        
+                        Log.d(TAG, ">>> Drag ended - velocity: $velocity, fraction: $currentFraction, accumulatedDrag: $accumulatedDragY")
+                        
+                        // Determine target state based on drag direction, velocity, and position
+                        val shouldExpand = when {
+                            // Check if drag was significant
+                            abs(accumulatedDragY) > minDragDistancePx ->
+                                accumulatedDragY < 0 // Dragged up = expand
+                            // Check for fast fling
+                            abs(velocity) > PlayerSheetConstants.VELOCITY_THRESHOLD ->
+                                velocity < 0 // Fast upward = expand
+                            // Fallback to position-based decision
+                            else ->
+                                currentFraction > 0.5f
                         }
-                        dragOffset = 0f
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        dragOffset += dragAmount
+                        
+                        val targetFraction = if (shouldExpand) 1f else 0f
+                        val newState = if (shouldExpand) PlayerSheetState.EXPANDED else PlayerSheetState.COLLAPSED
+                        
+                        Log.d(TAG, ">>> Animating to target: $targetFraction, newState: $newState")
+                        
+                        // Animate to target with spring physics
+                        scope.launch {
+                            // Provide haptic feedback at state change
+                            if ((currentFraction > 0.5f) != shouldExpand || 
+                                abs(currentFraction - targetFraction) > 0.3f) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                            
+                            expansionFractionAnimatable.animateTo(
+                                targetValue = targetFraction,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
+                        }
+                        
+                        // Update the sheet state
+                        onPlayerSheetStateChange(newState)
                     }
                 )
             }
@@ -211,7 +317,7 @@ fun UnifiedPlayerSheet(
             )
         }
 
-        // --- 2. CONTENT LAYER WITH ALPHA BLENDING ---
+        // --- 2. CONTENT LAYER WITH STAGGERED ALPHA CROSSFADE ---
         Surface(
             color = Color.Transparent, // Transparent for background visibility
             tonalElevation = 0.dp,
@@ -219,7 +325,7 @@ fun UnifiedPlayerSheet(
             modifier = Modifier.fillMaxSize()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Mini player content with fade-out animation
+                // Mini player content with staggered fade-out (fades completely by 50% expansion)
                 if (miniPlayerAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
                     Box(
                         modifier = Modifier
@@ -256,12 +362,15 @@ fun UnifiedPlayerSheet(
                     }
                 }
 
-                // Expanded player content with fade-in animation
-                if (expandedAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
+                // Expanded player content with staggered fade-in and slide-up animation
+                if (fullPlayerContentAlpha > PlayerSheetConstants.ALPHA_RENDER_THRESHOLD) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .alpha(expandedAlpha)
+                            .alpha(fullPlayerContentAlpha)
+                            .graphicsLayer {
+                                translationY = fullPlayerTranslationY
+                            }
                     ) {
                         FullScreenPlayerContent(
                             song = song,
