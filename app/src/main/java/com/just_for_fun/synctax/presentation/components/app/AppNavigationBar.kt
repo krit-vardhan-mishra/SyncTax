@@ -113,21 +113,15 @@ fun AppNavigationBar(
                             showLibraryBottomSheet = true
                         } else {
                             navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(navController.graph.findStartDestination().id)
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         }
                         lastLibraryClickTime = currentTime
                     } else {
                         navController.navigate(item.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
+                            popUpTo(navController.graph.findStartDestination().id)
                             launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 },
@@ -161,11 +155,8 @@ fun AppNavigationBar(
                         showLibraryBottomSheet = false
                         if (currentRoute != "library") {
                             navController.navigate("library") {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
+                                popUpTo(navController.graph.findStartDestination().id)
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         }
                     }
@@ -177,11 +168,8 @@ fun AppNavigationBar(
                     onClick = {
                         showLibraryBottomSheet = false
                         navController.navigate("playlists") {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
+                            popUpTo(navController.graph.findStartDestination().id)
                             launchSingleTop = true
-                            restoreState = true
                         }
                     }
                 )

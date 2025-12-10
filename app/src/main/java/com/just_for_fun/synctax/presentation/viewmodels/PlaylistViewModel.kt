@@ -10,6 +10,8 @@ import com.just_for_fun.synctax.data.repository.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -287,14 +289,17 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
         name: String,
         offlineSongs: List<Song>,
         onlineSongs: List<OnlineSong>,
+        thumbnailUrl: String? = null,
         onResult: (Boolean) -> Unit = {}
     ) {
         viewModelScope.launch(AppDispatchers.Database) {
-            val result = playlistRepository.createPlaylist(name, offlineSongs, onlineSongs)
-            if (result != null) {
-                loadPlaylists()
+            val result = playlistRepository.createPlaylist(name, offlineSongs, onlineSongs, thumbnailUrl)
+            withContext(Dispatchers.Main) {
+                if (result != null) {
+                    loadPlaylists()
+                }
+                onResult(result != null)
             }
-            onResult(result != null)
         }
     }
 
@@ -309,6 +314,23 @@ class PlaylistViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(AppDispatchers.Database) {
             val result = playlistRepository.addSongToPlaylist(playlistId, song)
             onResult(result)
+        }
+    }
+
+    fun updatePlaylist(
+        playlistId: Int,
+        name: String? = null,
+        thumbnailUrl: String? = null,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch(AppDispatchers.Database) {
+            val result = playlistRepository.updatePlaylist(playlistId, name, thumbnailUrl)
+            withContext(Dispatchers.Main) {
+                if (result) {
+                    loadPlaylists()
+                }
+                onResult(result)
+            }
         }
     }
 }

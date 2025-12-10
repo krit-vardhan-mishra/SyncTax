@@ -2,16 +2,30 @@ package com.just_for_fun.synctax.core.ml
 
 import android.content.Context
 import com.just_for_fun.synctax.core.chaquopy.ChaquopyMusicAnalyzer
-import com.just_for_fun.synctax.data.local.MusicDatabase
-import com.just_for_fun.synctax.core.ml.agents.*
-import com.just_for_fun.synctax.core.ml.models.*
+import com.just_for_fun.synctax.core.chaquopy.ModelStatus
+import com.just_for_fun.synctax.core.ml.agents.CollaborativeFilteringAgent
+import com.just_for_fun.synctax.core.ml.agents.FusionAgent
+import com.just_for_fun.synctax.core.ml.agents.RecommendationAgent
+import com.just_for_fun.synctax.core.ml.agents.StatisticalAgent
+import com.just_for_fun.synctax.core.ml.models.QuickPicksResult
+import com.just_for_fun.synctax.core.ml.models.RecommendationResult
+import com.just_for_fun.synctax.core.ml.models.SongFeatures
 import com.just_for_fun.synctax.core.utils.VectorDatabase
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import org.schabi.newpipe.extractor.NewPipe.init
+import com.just_for_fun.synctax.data.local.MusicDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
-import com.just_for_fun.synctax.core.chaquopy.ModelStatus
 
 /**
  * Manager that orchestrates the recommendation pipeline.

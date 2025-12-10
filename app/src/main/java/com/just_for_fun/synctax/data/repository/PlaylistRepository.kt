@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
-import com.just_for_fun.synctax.BuildConfig
 import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
 import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
@@ -434,7 +433,8 @@ class PlaylistRepository(private val context: Context) {
     suspend fun createPlaylist(
         name: String,
         offlineSongs: List<Song>,
-        onlineSongs: List<OnlineSong>
+        onlineSongs: List<OnlineSong>,
+        thumbnailUrl: String? = null
     ): Int? = withContext(AppDispatchers.Database) {
         try {
             val timestamp = System.currentTimeMillis()
@@ -447,7 +447,7 @@ class PlaylistRepository(private val context: Context) {
                 if (isOffline) "Offline" else "Online" // Using "Online" generic for manually created online playlists
 
             // Determine thumbnail
-            val thumbnail = if (isOffline) {
+            val defaultThumbnail = if (isOffline) {
                 offlineSongs.firstOrNull()?.albumArtUri
             } else {
                 onlineSongs.firstOrNull()?.thumbnailUrl
@@ -457,10 +457,10 @@ class PlaylistRepository(private val context: Context) {
 
             val playlist = Playlist(
                 name = name,
-                description = "Created by user",
+                description = "Created by You",
                 platform = platform,
                 playlistUrl = playlistUrl,
-                thumbnailUrl = thumbnail,
+                thumbnailUrl = thumbnailUrl ?: defaultThumbnail,
                 songCount = totalSongs,
                 createdAt = timestamp,
                 updatedAt = timestamp
@@ -508,6 +508,26 @@ class PlaylistRepository(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to create playlist", e)
             return@withContext null
+        }
+    }
+
+    suspend fun updatePlaylist(
+        playlistId: Int,
+        name: String? = null,
+        thumbnailUrl: String? = null
+    ): Boolean = withContext(AppDispatchers.Database) {
+        try {
+            val existing = playlistDao.getPlaylistById(playlistId) ?: return@withContext false
+            val updated = existing.copy(
+                name = name ?: existing.name,
+                thumbnailUrl = thumbnailUrl ?: existing.thumbnailUrl,
+                updatedAt = System.currentTimeMillis()
+            )
+            playlistDao.updatePlaylist(updated)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update playlist", e)
+            false
         }
     }
 

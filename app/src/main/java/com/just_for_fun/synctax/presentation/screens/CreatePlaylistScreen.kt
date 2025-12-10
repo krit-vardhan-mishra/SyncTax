@@ -1,5 +1,8 @@
 package com.just_for_fun.synctax.presentation.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Title
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -97,6 +101,15 @@ fun CreatePlaylistScreen(
     var searchQuery by remember { mutableStateOf("") }
     var debouncedQuery by remember { mutableStateOf("") }
     var showSearchResults by remember { mutableStateOf(false) }
+    var thumbnailUri by remember { mutableStateOf<String?>(null) }
+
+    // Image picker launcher
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            thumbnailUri = uri?.toString()
+        }
+    )
 
     // Debounce jobs
     var offlineSearchJob by remember { mutableStateOf<Job?>(null) }
@@ -194,7 +207,8 @@ fun CreatePlaylistScreen(
                         playlistViewModel.createPlaylist(
                             name = playlistName,
                             offlineSongs = selectedOfflineSongs.toList(),
-                            onlineSongs = selectedOnlineSongs.toList()
+                            onlineSongs = selectedOnlineSongs.toList(),
+                            thumbnailUrl = thumbnailUri
                         ) { success ->
                             if (success) {
                                 onSaveSuccess()
@@ -232,6 +246,45 @@ fun CreatePlaylistScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                     )
+                }
+
+                // Playlist Thumbnail
+                item {
+                    Column {
+                        Text(
+                            text = "Playlist Thumbnail (Optional)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (thumbnailUri != null) {
+                                AsyncImage(
+                                    model = thumbnailUri,
+                                    contentDescription = "Selected thumbnail",
+                                    modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp))
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Button(onClick = { imagePickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                                Text("Choose Image")
+                            }
+                            if (thumbnailUri != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(onClick = { thumbnailUri = null }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Playlist Type Selection

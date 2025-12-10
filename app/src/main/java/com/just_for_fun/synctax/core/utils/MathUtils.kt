@@ -1,6 +1,9 @@
 package com.just_for_fun.synctax.core.utils
 
-import kotlin.math.*
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 object MathUtils {
     /**

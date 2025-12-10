@@ -2,7 +2,7 @@ package com.just_for_fun.synctax.core.utils
 
 import android.content.Context
 import java.io.IOException
-import java.util.*
+import java.util.Properties
 
 /**
  * Utility class for reading application configuration from app_config.properties in assets

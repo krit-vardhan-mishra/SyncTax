@@ -2,17 +2,24 @@ package com.just_for_fun.synctax.core.player
 
 import android.content.Context
 import android.util.Log
-import androidx.media3.common.MediaItem
-import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheWriter
-import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.core.network.OnlineSearchManager
-import kotlinx.coroutines.*
+import com.just_for_fun.synctax.data.local.entities.Song
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Manages preloading of adjacent songs (next/previous) for instant playback switching.
