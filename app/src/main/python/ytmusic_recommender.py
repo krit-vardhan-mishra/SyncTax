@@ -183,6 +183,7 @@ class YTMusicRecommender:
                 'thumbnail': album.get('thumbnails', [{}])[-1].get('url', '') if album.get('thumbnails') else '',
                 'trackCount': album.get('trackCount', len(songs)),
                 'duration': album.get('duration', ''),
+                'description': album.get('description', ''),
                 'songs': songs
             }
             
@@ -462,3 +463,28 @@ def get_artist_details(browse_id):
     except Exception as e:
         logger.error(f"get_artist_details error: {e}")
         return json.dumps(None)
+
+
+def get_search_suggestions(query):
+    """
+    Get search suggestions for the given query
+    Returns JSON string of suggestions list
+    """
+    global _recommender
+    if not _recommender:
+        initialize()
+    
+    try:
+        if not _recommender.yt:
+            logger.error("YTMusic client not initialized")
+            return json.dumps([])
+        
+        suggestions = _recommender.yt.get_search_suggestions(query)
+        # The API returns a list of suggestion strings
+        result = suggestions if suggestions else []
+        logger.info(f"Got {len(result)} suggestions for query: {query}")
+        return json.dumps(result)
+    except Exception as e:
+        logger.error(f"get_search_suggestions error: {e}")
+        return json.dumps([])
+

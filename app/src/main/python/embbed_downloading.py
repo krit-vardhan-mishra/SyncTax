@@ -65,7 +65,10 @@ def _get_image_size(image_path):
 
 
 def crop_center_thumbnail(orig_thumb, out_dir, base):
-    """Crop (and if needed scale) the thumbnail to 720x720 from center.
+    """Crop thumbnail to 720x720 from center.
+    
+    Extracts the center 2x2 grid from a 4x4 grid (center 50% of image),
+    removing the outer 25% on each edge, then scales to 720x720.
 
     Returns the path to the cropped thumbnail on success, else None.
     """
@@ -75,20 +78,13 @@ def crop_center_thumbnail(orig_thumb, out_dir, base):
     ext = os.path.splitext(orig_thumb)[1]
     cropped = os.path.join(out_dir, f"{base}_thumb_720x720{ext}")
 
-    size = _get_image_size(orig_thumb)
-    if not size:
-        # If we can't determine size, still try a straight center-crop (ffmpeg will fail if too small)
-        vf = "crop=720:720:(iw-720)/2:(ih-720)/2"
-    else:
-        w, h = size
-        # If either dimension is less than 720, scale up so the smaller dimension becomes 720
-        if w < 720 or h < 720:
-            scale_factor = 720 / min(w, h)
-            new_w = max(720, int(math.ceil(w * scale_factor)))
-            new_h = max(720, int(math.ceil(h * scale_factor)))
-            vf = f"scale={new_w}:{new_h},crop=720:720:({new_w}-720)/2:({new_h}-720)/2"
-        else:
-            vf = "crop=720:720:(iw-720)/2:(ih-720)/2"
+    # Crop center 50% of image (2x2 from 4x4 grid):
+    # - New width = iw/2 (50% of original width)
+    # - New height = ih/2 (50% of original height)
+    # - X offset = iw/4 (start at 25% from left)
+    # - Y offset = ih/4 (start at 25% from top)
+    # Then scale to 720x720
+    vf = "crop=iw/2:ih/2:iw/4:ih/4,scale=720:720"
 
     cmd = ['ffmpeg', '-y', '-i', orig_thumb, '-vf', vf, cropped]
 

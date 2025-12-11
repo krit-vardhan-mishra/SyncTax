@@ -26,6 +26,14 @@ class UserPreferences(context: Context) {
     private val _scanLocalAlbumArt = MutableStateFlow(isScanLocalAlbumArtEnabled())
     val scanLocalAlbumArt: StateFlow<Boolean> = _scanLocalAlbumArt.asStateFlow()
 
+    // --- Online history count preference ---
+    private val _onlineHistoryCount = MutableStateFlow(getOnlineHistoryCount())
+    val onlineHistoryCount: StateFlow<Int> = _onlineHistoryCount.asStateFlow()
+
+    // --- Recommendations count preference ---
+    private val _recommendationsCount = MutableStateFlow(getRecommendationsCount())
+    val recommendationsCount: StateFlow<Int> = _recommendationsCount.asStateFlow()
+
     fun isScanLocalAlbumArtEnabled(): Boolean {
         return prefs.getBoolean(KEY_SCAN_LOCAL_ALBUM_ART, false)
     }
@@ -33,6 +41,26 @@ class UserPreferences(context: Context) {
     fun setScanLocalAlbumArt(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_SCAN_LOCAL_ALBUM_ART, enabled).apply()
         _scanLocalAlbumArt.value = enabled
+    }
+
+    fun getOnlineHistoryCount(): Int {
+        return prefs.getInt(KEY_ONLINE_HISTORY_COUNT, 10)
+    }
+
+    fun setOnlineHistoryCount(count: Int) {
+        val clamped = count.coerceIn(1, 100)
+        prefs.edit().putInt(KEY_ONLINE_HISTORY_COUNT, clamped).apply()
+        _onlineHistoryCount.value = clamped
+    }
+
+    fun getRecommendationsCount(): Int {
+        return prefs.getInt(KEY_RECOMMENDATIONS_COUNT, 20)
+    }
+
+    fun setRecommendationsCount(count: Int) {
+        val clamped = count.coerceIn(1, 100)
+        prefs.edit().putInt(KEY_RECOMMENDATIONS_COUNT, clamped).apply()
+        _recommendationsCount.value = clamped
     }
 
     // --- new: persisted scan paths (list of tree URIs as strings) ---
@@ -129,21 +157,63 @@ class UserPreferences(context: Context) {
         return !isGuideShown(screen)
     }
 
+    // Directory selection dialog preference
+    fun isDirectorySelectionShown(): Boolean {
+        return prefs.getBoolean(KEY_DIRECTORY_SELECTION_SHOWN, false)
+    }
+
+    fun setDirectorySelectionShown(shown: Boolean = true) {
+        prefs.edit().putBoolean(KEY_DIRECTORY_SELECTION_SHOWN, shown).apply()
+    }
+
+    // --- Sleep Timer preference ---
+    private val _sleepTimerMinutes = MutableStateFlow(getSleepTimerMinutes())
+    val sleepTimerMinutes: StateFlow<Int> = _sleepTimerMinutes.asStateFlow()
+
+    fun getSleepTimerMinutes(): Int {
+        return prefs.getInt(KEY_SLEEP_TIMER_MINUTES, 0) // 0 = disabled
+    }
+
+    fun setSleepTimerMinutes(minutes: Int) {
+        prefs.edit().putInt(KEY_SLEEP_TIMER_MINUTES, minutes).apply()
+        _sleepTimerMinutes.value = minutes
+    }
+
+    // --- Crossfade preference ---
+    private val _crossfadeEnabled = MutableStateFlow(isCrossfadeEnabled())
+    val crossfadeEnabled: StateFlow<Boolean> = _crossfadeEnabled.asStateFlow()
+
+    fun isCrossfadeEnabled(): Boolean {
+        return prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
+    }
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_CROSSFADE_ENABLED, enabled).apply()
+        _crossfadeEnabled.value = enabled
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
         private const val KEY_SHOW_QUICK_PICKS_GUIDE = "show_quick_picks_guide"
         private const val KEY_YOUTUBE_API_KEY = "youtube_api_key"
         private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_DIRECTORY_SELECTION_SHOWN = "directory_selection_shown"
         const val KEY_THEME_MODE_SYSTEM = "system"
         const val KEY_THEME_MODE_LIGHT = "light"
         const val KEY_THEME_MODE_DARK = "dark"
 
         // new: key for scan paths
         private const val KEY_SCAN_PATHS = "scan_paths"
-        
+
         // Album art scanning from local library
         private const val KEY_SCAN_LOCAL_ALBUM_ART = "scan_local_album_art"
+
+        // Online history count
+        private const val KEY_ONLINE_HISTORY_COUNT = "online_history_count"
+
+        // Recommendations count
+        private const val KEY_RECOMMENDATIONS_COUNT = "recommendations_count"
 
         // Guide screen identifiers
         const val GUIDE_HOME = "home"
@@ -151,5 +221,11 @@ class UserPreferences(context: Context) {
         const val GUIDE_SEARCH = "search"
         const val GUIDE_LIBRARY = "library"
         const val GUIDE_QUICK_PICKS = "quick_picks"
+
+        // Sleep timer
+        private const val KEY_SLEEP_TIMER_MINUTES = "sleep_timer_minutes"
+
+        // Crossfade/gapless playback
+        private const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
     }
 }

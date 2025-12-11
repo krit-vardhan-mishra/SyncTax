@@ -313,3 +313,10 @@ ytdlnis-main/
 .externalNativeBuild
 /benchmark
 *.png
+app/src/main/java/com/just_for_fun/synctax/ui/screens/WelcomeScreen.kt
+app/src/main/assets/app_config.properties
+docs/THUMBNAIL_EMBEDDING_DIAGRAM.md
+.kotlin/sessions/
+
+.kotlin
+.kotlin/

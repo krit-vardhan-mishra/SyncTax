@@ -5,6 +5,8 @@ Downloads audio from YouTube and other platforms with album art embedding
 import os
 import sys
 import json
+import subprocess
+import math
 from typing import Dict, Any
 
 
@@ -41,6 +43,71 @@ def map_format_id_to_selector(format_id: str) -> str:
     # If specific format ID, try it but fallback to bestaudio
     else:
         return f'{format_id}/bestaudio'
+
+
+def _get_image_size(image_path):
+    """Return (width, height) of image using ffprobe, or None on failure."""
+    try:
+        proc = subprocess.run([
+            'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+            '-show_entries', 'stream=width,height', '-of', 'csv=p=0:s=x', image_path
+        ], capture_output=True, text=True)
+        out = proc.stdout.strip()
+        if not out:
+            return None
+        parts = out.split('x')
+        if len(parts) != 2:
+            return None
+        return int(parts[0]), int(parts[1])
+    except Exception:
+        return None
+
+
+def crop_center_thumbnail(orig_thumb, out_dir, base):
+    """Crop thumbnail to 720x720 from center.
+    
+    Extracts the center 2x2 grid from a 4x4 grid (center 50% of image),
+    removing the outer 25% on each edge, then scales to 720x720.
+
+    Returns the path to the cropped thumbnail on success, else None.
+    """
+    if not orig_thumb or not os.path.exists(orig_thumb):
+        return None
+
+    ext = os.path.splitext(orig_thumb)[1]
+    cropped = os.path.join(out_dir, f"{base}_thumb_720x720{ext}")
+
+    # Crop center 50% of image (2x2 from 4x4 grid):
+    # - New width = iw/2 (50% of original width)
+    # - New height = ih/2 (50% of original height)
+    # - X offset = iw/4 (start at 25% from left)
+    # - Y offset = ih/4 (start at 25% from top)
+    # Then scale to 720x720
+    vf = "crop=iw/2:ih/2:iw/4:ih/4,scale=720:720"
+
+    print(f"🎨 Python: Cropping thumbnail with filter: {vf}", file=sys.stderr)
+    cmd = ['ffmpeg', '-y', '-i', orig_thumb, '-vf', vf, cropped]
+
+    # Simple run_cmd equivalent
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0 and os.path.exists(cropped) and os.path.getsize(cropped) > 1024:
+            return cropped
+        else:
+            if os.path.exists(cropped):
+                try:
+                    os.remove(cropped)
+                except:
+                    pass
+            return None
+    except Exception:
+        if os.path.exists(cropped):
+            try:
+                os.remove(cropped)
+            except:
+                pass
+        return None
+
 
 def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_id: str = None, po_token_data: str = None) -> str:
     """
@@ -223,6 +290,33 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                 else:
                     # Keep original extension when FFmpeg not available
                     filename = os.path.splitext(filename)[0] + '.' + actual_ext
+
+                # Crop thumbnail to 720x720 if it exists
+                thumb_base = os.path.splitext(filename)[0]
+                orig_thumb = None
+                for ext in ['.jpg', '.webp', '.png', '.jpeg', '.jpg.webp']:
+                    potential_thumb = thumb_base + ext
+                    if os.path.exists(potential_thumb):
+                        orig_thumb = potential_thumb
+                        break
+
+                cropped_thumb = None
+                if orig_thumb and ffmpeg_available:
+                    print(f"🎵 Python: Cropping thumbnail to 720x720...", file=sys.stderr)
+                    base_name = os.path.splitext(os.path.basename(filename))[0]
+                    cropped_thumb = crop_center_thumbnail(orig_thumb, output_dir, base_name)
+                    if cropped_thumb:
+                        print(f"🎵 Python: Thumbnail cropped successfully: {cropped_thumb}", file=sys.stderr)
+                        # Replace original thumbnail with cropped one for embedding
+                        try:
+                            os.remove(orig_thumb)
+                            # Rename cropped to original name so EmbedThumbnail uses it
+                            os.rename(cropped_thumb, orig_thumb)
+                            cropped_thumb = orig_thumb
+                        except Exception as e:
+                            print(f"🎵 Python: Failed to replace thumbnail: {e}", file=sys.stderr)
+                    else:
+                        print(f"🎵 Python: Thumbnail cropping failed, using original", file=sys.stderr)
                 
                 # If FFmpeg is NOT available, try to embed metadata using Mutagen
                 metadata_embedded = False

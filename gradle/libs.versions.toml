@@ -1,5 +1,7 @@
 [versions]
 agp = "8.13.1"
+composeMultiplatformPager = "1.2.0"
+core = "3.3.0"
 kotlin = "2.1.0"
 coreKtx = "1.13.1"
 junit = "4.13.2"
@@ -7,16 +9,29 @@ junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 appcompat = "1.7.1"
 material = "1.13.0"
+foundation = "1.10.0"
+material3 = "1.5.0-alpha10"
+material3WindowSizeClassMultiplatform = "1.3.0"
+newpipeextractor = "v0.24.8"
+wavySlider = "2.2.0"
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+compose-multiplatform-pager = { module = "io.github.qdsfdhvh:compose-multiplatform-pager", version.ref = "composeMultiplatformPager" }
+core = { module = "com.afollestad.material-dialogs:core", version.ref = "core" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+# material3-expressive library doesn't exist at io.github.fornewid - removed
+material3-window-size-class1-multiplatform = { module = "io.github.fornewid:material3-window-size-class-multiplatform", version.ref = "material3WindowSizeClassMultiplatform" }
+newpipeextractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "newpipeextractor" }
+wavy-slider = { module = "ir.mahozad.multiplatform:wavy-slider", version.ref = "wavySlider" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-

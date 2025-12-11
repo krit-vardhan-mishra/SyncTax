@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
-import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.core.data.model.Format
+import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.data.local.entities.Format
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient

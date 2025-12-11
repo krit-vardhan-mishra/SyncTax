@@ -1,8 +1,8 @@
 package com.just_for_fun.synctax.core.player
 
 import android.content.Context
-import com.just_for_fun.synctax.core.data.local.entities.Song
-import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.data.repository.MusicRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

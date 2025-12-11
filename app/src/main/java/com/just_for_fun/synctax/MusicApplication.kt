@@ -15,6 +15,9 @@ import coil.memory.MemoryCache
 import coil.request.Options
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
+import com.just_for_fun.synctax.core.network.NewPipeUtils
+import com.just_for_fun.synctax.core.utils.YTMusicRecommender
+import com.just_for_fun.synctax.core.worker.RecommendationUpdateWorker
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +29,7 @@ import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    
+
     // FFmpeg initialization status
     var isFFmpegInitialized = false
         private set
@@ -47,10 +50,26 @@ class MusicApplication : Application(), ImageLoaderFactory {
         applicationScope.launch {
             initializePython()
         }
-        
-        // Initialize YoutubeDL on background thread
+
+        // Initialize YoutubeDL and SpotDL on background thread
         applicationScope.launch {
             initializeYoutubeDLAndFFmpeg()
+        }
+
+        // Initialize NewPipe early to avoid delays on first use
+        try {
+            NewPipeUtils.ensureInitialized()
+            Log.d(TAG, "✅ NewPipe initialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to initialize NewPipe", e)
+        }
+        
+        // Schedule periodic recommendation updates (every 12 hours)
+        try {
+            RecommendationUpdateWorker.schedule(this)
+            Log.d(TAG, "✅ Recommendation worker scheduled")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to schedule recommendation worker", e)
         }
 
         Log.d(TAG, "Music Application initialized")
@@ -64,16 +83,19 @@ class MusicApplication : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
+                    .maxSizePercent(0.30)  // 30% of available memory
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizePercent(0.02)
+                    .maxSizeBytes(512L * 1024 * 1024)  // 512MB
                     .build()
             }
-            .crossfade(true)
+            // Optimize for smoothness like OuterTune/SimpMusic
+            .crossfade(300) // Faster crossfade (300ms vs default 1000ms)
+            .respectCacheHeaders(false) // Ignore server cache headers
+            .allowHardware(false) // Disable hardware bitmaps for better thread safety
             .build()
     }
 
@@ -82,23 +104,23 @@ class MusicApplication : Application(), ImageLoaderFactory {
             if (!Python.isStarted()) {
                 Python.start(AndroidPlatform(this))
                 Log.d(TAG, "Python runtime initialized")
-                
+
                 // Initialize YTMusicRecommender for song-only recommendations
-                com.just_for_fun.synctax.util.YTMusicRecommender.initialize()
+                YTMusicRecommender.initialize()
                 Log.d(TAG, "YTMusicRecommender initialized")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize Python runtime", e)
         }
     }
-    
+
     private fun initializeYoutubeDLAndFFmpeg() {
         try {
             // Initialize YoutubeDL
             Log.d(TAG, "🔧 Initializing YoutubeDL...")
             YoutubeDL.getInstance().init(this)
             Log.d(TAG, "✅ YoutubeDL initialized successfully")
-            
+
             // FFmpeg library removed to reduce APK size (~136MB savings)
             // We use Mutagen (Python) for metadata embedding instead
             isFFmpegInitialized = false
@@ -110,7 +132,7 @@ class MusicApplication : Application(), ImageLoaderFactory {
 
     companion object {
         private const val TAG = "MusicApplication"
-            lateinit var instance: MusicApplication
+        lateinit var instance: MusicApplication
     }
 }
 

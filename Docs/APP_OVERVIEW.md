@@ -250,10 +250,15 @@
 ## Future Enhancements
 
 1. **Offline Album Caching**: Save online albums for offline playback
-2. **Playlist Management**: Create and manage playlists
-3. **Equalizer**: Audio equalization settings
-4. **Sleep Timer**: Auto-stop playback
-5. **Model Persistence**: Save trained ML weights across app restarts
+2. **Equalizer**: Audio equalization settings
+3. **Sleep Timer**: Auto-stop playback
+4. **Model Persistence**: Save trained ML weights across app restarts
+
+## Recent Updates (December 2025)
+
+- ✅ **Playlist Management**: Create, import, and manage playlists
+- ✅ **Responsive UI Scaling**: Automatic UI scaling across different screen sizes
+- ✅ **Enhanced Dialog Options**: Comprehensive song options in all screens
 
 ---
 
@@ -265,5 +270,5 @@
 
 ---
 
-**Version**: 3.0.0  
-**Last Updated**: November 30, 2025
+**Version**: 3.1.0  
+**Last Updated**: December 2025

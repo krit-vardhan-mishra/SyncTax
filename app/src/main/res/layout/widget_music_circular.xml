@@ -11,7 +11,7 @@
         android:id="@+id/widget_album_art"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:src="@mipmap/ic_launcher"
+        android:src="@mipmap/app_icon_main"
         android:scaleType="centerCrop"
         android:alpha="0.3"
         android:layout_centerInParent="true" />

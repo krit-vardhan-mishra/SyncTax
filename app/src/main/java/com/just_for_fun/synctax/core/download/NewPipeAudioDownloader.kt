@@ -14,6 +14,9 @@ import org.schabi.newpipe.extractor.stream.AudioStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import kotlin.math.ceil
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Downloads YouTube audio using NewPipe's stream extraction.
@@ -28,6 +31,68 @@ object NewPipeAudioDownloader {
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    /**
+     * Crop thumbnail to 720x720 from center.
+     * Extracts the center 2x2 grid from a 4x4 grid (center 50% of image),
+     * removing the outer 25% on each edge, then scales to 720x720.
+     */
+    private fun cropCenterThumbnail(origThumb: File, outDir: File, base: String): File? {
+        if (!origThumb.exists()) return null
+
+        val ext = origThumb.extension
+        val cropped = File(outDir, "${base}_thumb_720x720.${ext}")
+
+        try {
+            // Crop center 50% of image (2x2 from 4x4 grid):
+            // - New width = iw/2 (50% of original width)
+            // - New height = ih/2 (50% of original height)
+            // - X offset = iw/4 (start at 25% from left)
+            // - Y offset = ih/4 (start at 25% from top)
+            // Then scale to 720x720
+            val vf = "crop=iw/2:ih/2:iw/4:ih/4,scale=720:720"
+
+            Log.d(TAG, "🎨 Cropping thumbnail with filter: $vf")
+            val cmd = arrayOf("ffmpeg", "-y", "-i", origThumb.absolutePath, "-vf", vf, cropped.absolutePath)
+            
+            val process = Runtime.getRuntime().exec(cmd)
+            val exitCode = process.waitFor()
+            
+            return if (exitCode == 0 && cropped.exists() && cropped.length() > 1024) {
+                cropped
+            } else {
+                cropped.delete()
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Thumbnail cropping failed: ${e.message}")
+            cropped.delete()
+            return null
+        }
+    }
+
+    /**
+     * Get image dimensions using ffprobe
+     */
+    private fun getImageSize(imagePath: File): Pair<Int, Int>? {
+        return try {
+            val cmd = arrayOf("ffprobe", "-v", "error", "-select_streams", "v:0",
+                            "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", imagePath.absolutePath)
+            
+            val process = Runtime.getRuntime().exec(cmd)
+            val output = process.inputStream.bufferedReader().readText().trim()
+            val exitCode = process.waitFor()
+            
+            if (exitCode == 0 && output.isNotEmpty()) {
+                val parts = output.split("x")
+                if (parts.size == 2) {
+                    Pair(parts[0].toInt(), parts[1].toInt())
+                } else null
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     data class DownloadResult(
         val success: Boolean,
@@ -164,7 +229,7 @@ object NewPipeAudioDownloader {
             Log.d(TAG, "   Artist: $finalArtist")
             Log.d(TAG, "   Album: $album")
 
-            val baseName = "${sanitizedArtist} - ${sanitizedTitle}"
+            val baseName = "$sanitizedArtist - $sanitizedTitle"
 
             // Embed metadata using Mutagen (Python library)
             // This works for M4A files which we prefer when FFmpeg is not available
@@ -320,21 +385,21 @@ object NewPipeAudioDownloader {
                         if (contentLength > 0) {
                             val percent =
                                 ((downloaded * 100) / contentLength).toInt().coerceIn(0, 100)
-                            val shouldReport = when {
-                                percent == 100 -> true
-                                lastReportedPercent < 0 -> true
-                                progressStep <= 1 -> percent != lastReportedPercent
-                                else -> (percent - lastReportedPercent) >= progressStep || percent % progressStep == 0
-                            }
-
-                            if (shouldReport && percent != lastReportedPercent) {
+                            
+                            // Always call progress callback for UI updates (every 1%)
+                            if (percent != lastReportedPercent) {
                                 lastReportedPercent = percent
-                                val progressBar = getProgressBar(percent)
-                                Log.d(TAG, "⬇️ Download progress: $percent% $progressBar")
                                 try {
                                     progress?.invoke(percent)
                                 } catch (_: Exception) {
                                 }
+                            }
+                            
+                            // Only log to logcat every 10% or at 100%
+                            val shouldLog = percent == 100 || (percent > 0 && percent % 10 == 0)
+                            if (shouldLog) {
+                                val progressBar = getProgressBar(percent)
+                                Log.d(TAG, "⬇️ Download progress: $percent% $progressBar")
                             }
                         }
                     }
@@ -437,6 +502,16 @@ object NewPipeAudioDownloader {
                     message = "Python not initialized"
                 )
             }
+
+            // Check if FFmpeg is available for cropping
+            val ffmpegAvailable = try {
+                val process = Runtime.getRuntime().exec(arrayOf("ffmpeg", "-version"))
+                process.waitFor() == 0
+            } catch (e: Exception) {
+                false
+            }
+            
+            Log.d(TAG, "🎵 FFmpeg available for cropping: $ffmpegAvailable")
             
             val py = Python.getInstance()
             val sanitizedArtist = sanitizeFilename(artist)
@@ -501,6 +576,33 @@ object NewPipeAudioDownloader {
             val m4aFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.m4a")
             val webmFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.webm")
             
+            // Crop thumbnail to 720x720 if FFmpeg is available
+            val baseName = "${sanitizedArtist} - ${sanitizedTitle}"
+            var croppedThumb: File? = null
+            if (ffmpegAvailable) {
+                val origThumb = listOf(".jpg", ".webp", ".png", ".jpeg", ".jpg.webp").map { ext ->
+                    File(outputDir, baseName + ext)
+                }.find { it.exists() }
+                
+                if (origThumb != null) {
+                    Log.d(TAG, "🎨 Cropping thumbnail to 720x720...")
+                    croppedThumb = cropCenterThumbnail(origThumb, outputDir, baseName)
+                    if (croppedThumb != null) {
+                        Log.d(TAG, "✅ Thumbnail cropped successfully: ${croppedThumb.name}")
+                        // Replace original with cropped
+                        try {
+                            origThumb.delete()
+                            croppedThumb.renameTo(origThumb)
+                            croppedThumb = origThumb
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to replace thumbnail: ${e.message}")
+                        }
+                    } else {
+                        Log.w(TAG, "Thumbnail cropping failed, using original")
+                    }
+                }
+            }
+            
             val finalFile = when {
                 expectedFile.exists() -> expectedFile
                 m4aFile.exists() -> m4aFile
@@ -514,7 +616,6 @@ object NewPipeAudioDownloader {
             }
             
             // Clean up any leftover thumbnail files
-            val baseName = "${sanitizedArtist} - ${sanitizedTitle}"
             listOf(".jpg", ".webp", ".png", ".jpeg", ".jpg.webp").forEach { ext ->
                 val thumbFile = File(outputDir, baseName + ext)
                 if (thumbFile.exists()) {

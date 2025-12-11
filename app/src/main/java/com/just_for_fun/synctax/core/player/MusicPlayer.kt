@@ -3,16 +3,28 @@ package com.just_for_fun.synctax.core.player
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class MusicPlayer(context: Context) {
 
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
+    companion object {
+        private const val TAG = "MusicPlayer"
+    }
+
+    // Use cached data source for better performance
+    private val cachedDataSourceFactory = StreamCache.createCachedDataSourceFactory(context)
+    private val mediaSourceFactory = DefaultMediaSourceFactory(cachedDataSourceFactory)
+    
+    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
+        .setMediaSourceFactory(mediaSourceFactory)
+        .build()
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val _playerState = MutableStateFlow(PlayerState())
@@ -36,26 +48,43 @@ class MusicPlayer(context: Context) {
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                val isBuffering = playbackState == Player.STATE_BUFFERING
+                val isEnded = playbackState == Player.STATE_ENDED
+                val isReady = playbackState == Player.STATE_READY
+                
                 _playerState.value = _playerState.value.copy(
-                    isBuffering = playbackState == Player.STATE_BUFFERING,
-                    isEnded = playbackState == Player.STATE_ENDED
+                    isBuffering = isBuffering,
+                    isEnded = isEnded
                 )
                 
                 // Update duration when player is ready
-                if (playbackState == Player.STATE_READY) {
+                if (isReady) {
                     val duration = exoPlayer.duration
-                    if (duration > 0) {
+                    if (duration > 0 && duration != _playerState.value.duration) {
                         _playerState.value = _playerState.value.copy(duration = duration)
                     }
                 }
+                
+                // Log state changes for debugging (not in hot path)
+                if (isEnded || isBuffering) {
+                    Log.d(TAG, "Playback state: ${playbackStateToString(playbackState)}")
+                }
             }
         })
+    }
+    
+    private fun playbackStateToString(state: Int): String = when (state) {
+        Player.STATE_IDLE -> "IDLE"
+        Player.STATE_BUFFERING -> "BUFFERING"
+        Player.STATE_READY -> "READY"
+        Player.STATE_ENDED -> "ENDED"
+        else -> "UNKNOWN"
     }
 
     private var positionUpdateRunnable: Runnable? = null
 
     private var lastEmittedPosition = 0L
-    private val positionUpdateThreshold = 1000L // Only update if position changed by 1 second
+    private val positionUpdateThreshold = 150L // Throttle emissions to reduce recompositions
     
     private fun startPositionUpdates() {
         stopPositionUpdates()
@@ -67,7 +96,7 @@ class MusicPlayer(context: Context) {
                     _currentPosition.value = currentPos
                     lastEmittedPosition = currentPos
                 }
-                mainHandler.postDelayed(this, 500) // Update every 500ms (reduced frequency)
+                mainHandler.postDelayed(this, 250) // Update every 250ms to reduce recompositions
             }
         }
         mainHandler.post(positionUpdateRunnable!!)
@@ -88,6 +117,37 @@ class MusicPlayer(context: Context) {
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
 
+        _playerState.value = _playerState.value.copy(
+            currentSongId = songId,
+            duration = exoPlayer.duration,
+            isEnded = false
+        )
+    }
+
+    /**
+     * Prepare a media item with a custom cache key for cached playback.
+     * Use this for online songs to leverage pre-cached audio data.
+     * 
+     * @param uri The stream URL or file path
+     * @param songId The song ID for state tracking
+     * @param cacheKey Optional cache key (usually video ID for online songs)
+     */
+    fun prepareWithCacheKey(uri: String, songId: String, cacheKey: String? = null) {
+        _playerState.value = _playerState.value.copy(isEnded = false)
+        
+        val mediaItemBuilder = MediaItem.Builder()
+            .setUri(uri)
+        
+        // Set custom cache key if provided (for online songs)
+        if (cacheKey != null) {
+            mediaItemBuilder.setCustomCacheKey(cacheKey)
+            Log.d(TAG, "Preparing with cache key: $cacheKey")
+        }
+        
+        val mediaItem = mediaItemBuilder.build()
+        exoPlayer.setMediaItem(mediaItem)
+        exoPlayer.prepare()
+        
         _playerState.value = _playerState.value.copy(
             currentSongId = songId,
             duration = exoPlayer.duration,
@@ -164,6 +224,20 @@ class MusicPlayer(context: Context) {
             exoPlayer.isPlaying
         } else {
             _playerState.value.isPlaying
+        }
+    }
+
+    /**
+     * Check if the player has a media source prepared and ready to play.
+     * This is useful to detect if a restored song needs stream URL extraction.
+     */
+    fun isSourcePrepared(): Boolean {
+        return if (Looper.myLooper() == Looper.getMainLooper()) {
+            exoPlayer.playbackState != Player.STATE_IDLE && 
+            exoPlayer.playbackState != Player.STATE_ENDED &&
+            exoPlayer.mediaItemCount > 0
+        } else {
+            _playerState.value.currentSongId != null && !_playerState.value.isEnded
         }
     }
 

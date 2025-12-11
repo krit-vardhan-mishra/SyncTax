@@ -3,6 +3,10 @@ package com.just_for_fun.synctax
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -14,14 +18,19 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,22 +40,38 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.ui.components.app.AppNavigationBar
-import com.just_for_fun.synctax.ui.components.player.PlayerBottomSheet
-import com.just_for_fun.synctax.ui.screens.AlbumDetailScreen
-import com.just_for_fun.synctax.ui.screens.ArtistDetailScreen
-import com.just_for_fun.synctax.ui.screens.HomeScreen
-import com.just_for_fun.synctax.ui.screens.LibraryScreen
-import com.just_for_fun.synctax.ui.screens.QuickPicksScreen
-import com.just_for_fun.synctax.ui.screens.SearchScreen
-import com.just_for_fun.synctax.ui.screens.SettingsScreen
-import com.just_for_fun.synctax.ui.screens.TrainingScreen
-import com.just_for_fun.synctax.ui.screens.WelcomeScreen
-import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.presentation.components.app.AppNavigationBar
+import com.just_for_fun.synctax.presentation.components.player.PlayerBottomSheet
+import com.just_for_fun.synctax.presentation.screens.AlbumDetailScreen
+import com.just_for_fun.synctax.presentation.screens.ArtistDetailScreen
+import com.just_for_fun.synctax.presentation.screens.HomeScreen
+import com.just_for_fun.synctax.presentation.screens.ImportPlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.LibraryScreen
+import com.just_for_fun.synctax.presentation.screens.PlaylistDetailScreen
+import com.just_for_fun.synctax.presentation.screens.PlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.OnlineSongsScreen
+import com.just_for_fun.synctax.presentation.screens.QuickPicksScreen
+import com.just_for_fun.synctax.presentation.screens.SearchScreen
+import com.just_for_fun.synctax.presentation.screens.SettingsScreen
+import com.just_for_fun.synctax.presentation.screens.TrainingScreen
+import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputScreen
+import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
+import com.just_for_fun.synctax.presentation.screens.HistoryScreen
+import com.just_for_fun.synctax.presentation.screens.StatsScreen
+import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
+import com.just_for_fun.synctax.core.utils.UpdateChecker
+import com.just_for_fun.synctax.presentation.screens.CreatePlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.RecommendationsDetailScreen
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,24 +93,85 @@ fun MusicApp(userPreferences: UserPreferences) {
     val navController = rememberNavController()
     val playerViewModel: PlayerViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
-    val dynamicBgViewModel: com.just_for_fun.synctax.ui.viewmodels.DynamicBackgroundViewModel =
+    val dynamicBgViewModel: DynamicBackgroundViewModel =
         viewModel()
+    val recommendationViewModel: RecommendationViewModel = viewModel()
+
+    val playerState by playerViewModel.uiState.collectAsState()
+    val homeState by homeViewModel.uiState.collectAsState()
+    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var searchResetTrigger by remember { mutableStateOf(0) }
 
     // --- HOISTED STATE ---
-    // Hoist the scaffold state here to control nav bar visibility
+    // Use ViewModel-managed player sheet state for better state management
+    // Manual expansion state - ONLY controlled by user actions (click/swipe on mini-player)
+    // This is completely independent from BottomSheetScaffold's internal state
+    var isPlayerExpanded by remember { mutableStateOf(false) }
+
+    // Simple scaffold state without confirmValueChange - we control expansion manually
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
             initialValue = SheetValue.PartiallyExpanded,
             skipHiddenState = true
         )
     )
-    val isPlayerExpanded = scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded
+
+    // Sync BottomSheet visual state with our manual state
+    // This only controls the animation, not the content rendering
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(isPlayerExpanded) {
+        if (isPlayerExpanded) {
+            scaffoldState.bottomSheetState.expand()
+        } else {
+            scaffoldState.bottomSheetState.partialExpand()
+        }
+    }
     // --- END HOISTED STATE ---
 
-    val playerState by playerViewModel.uiState.collectAsState()
-    val albumColors by dynamicBgViewModel.albumColors.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
+    // Update check state
+    var checkForUpdate by remember { mutableStateOf(false) }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+
+    // Handle update check
+    LaunchedEffect(checkForUpdate) {
+        if (checkForUpdate && !isCheckingUpdate) {
+            checkForUpdate = false
+            isCheckingUpdate = true
+            val result = UpdateChecker(context).checkForUpdate()
+            isCheckingUpdate = false
+            result.onSuccess { info ->
+                if (info.isUpdateAvailable) {
+                    scope.launch {
+                        val snackbarResult = snackbarHostState.showSnackbar(
+                            message = "Update available: v${info.latestVersion}",
+                            actionLabel = "Download",
+                            duration = SnackbarDuration.Long
+                        )
+                        if (snackbarResult == SnackbarResult.ActionPerformed) {
+                            info.downloadUrl?.let { url ->
+                                UpdateChecker(context).downloadAndInstallApk(url)
+                            }
+                        }
+                    }
+                } else {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "App is up to date",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        message = "Failed to check for updates: ${error.message}",
+                        duration = SnackbarDuration.Short
+                    )
+                }
+            }
+        }
+    }
 
     // Update album colors when current song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
@@ -104,11 +190,35 @@ fun MusicApp(userPreferences: UserPreferences) {
         }
     }
 
+    // Show loading snackbar when fetching artist details
+    LaunchedEffect(homeState.isLoadingArtistDetails) {
+        if (homeState.isLoadingArtistDetails) {
+            snackbarHostState.showSnackbar(
+                message = "Loading artist details...",
+                duration = SnackbarDuration.Indefinite
+            )
+        } else {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+    }
+
+    // Show loading snackbar when fetching album details
+    LaunchedEffect(homeState.isLoadingAlbumDetails) {
+        if (homeState.isLoadingAlbumDetails) {
+            snackbarHostState.showSnackbar(
+                message = "Loading album details...",
+                duration = SnackbarDuration.Indefinite
+            )
+        } else {
+            snackbarHostState.currentSnackbarData?.dismiss()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f)) {
                 PlayerBottomSheet(
-                    scaffoldState = scaffoldState, // Pass the hoisted state down
+                    scaffoldState = scaffoldState, // For visual animation only
                     song = playerState.currentSong,
                     isPlaying = playerState.isPlaying,
                     isBuffering = playerState.isBuffering,
@@ -128,8 +238,12 @@ fun MusicApp(userPreferences: UserPreferences) {
                     onSelectSong = { song -> playerViewModel.playFromQueue(song) },
                     onPlaceNext = { song -> playerViewModel.placeNext(song) },
                     onRemoveFromQueue = { song -> playerViewModel.removeFromQueue(song) },
-                    downloadPercent = playerState.downloadPercent
+                    downloadPercent = playerState.downloadPercent,
+                    // Manual expansion control - only user actions can change this
+                    isExpanded = isPlayerExpanded,
+                    onExpandedChange = { isPlayerExpanded = it }
                 ) { innerPadding ->
+                    // Provide bottom padding to all screens via CompositionLocal
                     NavHost(
                         navController = navController,
                         startDestination = "home",
@@ -137,21 +251,44 @@ fun MusicApp(userPreferences: UserPreferences) {
                             top = innerPadding.calculateTopPadding(),
                             start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
                             end = innerPadding.calculateEndPadding(LayoutDirection.Ltr),
-                            bottom = if (playerState.currentSong != null) 0.dp else innerPadding.calculateBottomPadding()
+                            bottom = 0.dp // Screens handle their own bottom padding via LocalBottomPadding
                         )
                     ) {
-                        composable("home") {
+                        composable(
+                            "home",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             HomeScreen(
                                 homeViewModel = homeViewModel,
                                 playerViewModel = playerViewModel,
+                                recommendationViewModel = recommendationViewModel,
                                 userPreferences = userPreferences,
                                 onTrainClick = { navController.navigate("train") },
-                                onOpenSettings = { navController.navigate("settings") }
+                                onOpenSettings = { navController.navigate("settings") },
+                                onNavigateToPlaylist = { playlistId ->
+                                    navController.navigate("playlist_detail/$playlistId")
+                                },
+                                onNavigateToPlaylists = { navController.navigate("playlists") },
+                                onNavigateToOnlineSongs = { navController.navigate("online_songs") },
+                                onNavigateToRecommendations = { navController.navigate("recommendations_detail") },
+                                onNavigateToHistory = { navController.navigate("history") },
+                                onNavigateToStats = { navController.navigate("stats") }
                             )
                         }
-                        composable("search") {
+                        composable(
+                            "search",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             SearchScreen(
+                                navController = navController,
                                 onBackClick = { navController.popBackStack() },
+                                resetTrigger = searchResetTrigger,
                                 onNavigateToAlbum = { album, artist, songs ->
                                     homeViewModel.setSelectedAlbum(album, artist, songs)
                                     navController.navigate("album/$album")
@@ -160,7 +297,13 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 playerViewModel = playerViewModel
                             )
                         }
-                        composable("library") {
+                        composable(
+                            "library",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             LibraryScreen(
                                 homeViewModel = homeViewModel,
@@ -180,30 +323,208 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 onTrainClick = { navController.navigate("train") }
                             )
                         }
-                        composable("quick_picks") {
+                        composable(
+                            "playlists",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            PlaylistScreen(
+                                playlistViewModel = playlistViewModel,
+                                playerViewModel = playerViewModel,
+                                dynamicBgViewModel = dynamicBgViewModel,
+                                userPreferences = userPreferences,
+                                scaffoldState = scaffoldState,
+                                onOpenSettings = { navController.navigate("settings") },
+                                onPlaylistClick = { playlistId ->
+                                    navController.navigate("playlist_detail/$playlistId")
+                                },
+                                onImportClick = {
+                                    navController.navigate("import_playlist")
+                                },
+                                onCreatePlaylistClick = {
+                                    navController.navigate("create_playlist")
+                                }
+                            )
+                        }
+                        composable(
+                            "import_playlist",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            ImportPlaylistScreen(
+                                playlistViewModel = playlistViewModel,
+                                onBackClick = { navController.popBackStack() },
+                                onImportSuccess = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            "create_playlist",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            CreatePlaylistScreen(
+                                playlistViewModel = playlistViewModel,
+                                homeViewModel = homeViewModel,
+                                onBackClick = { navController.popBackStack() },
+                                onSaveSuccess = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            route = "playlist_detail/{playlistId}",
+                            arguments = listOf(navArgument("playlistId") {
+                                type = NavType.IntType
+                            }),
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) { backStackEntry ->
+                            val playlistId = backStackEntry.arguments?.getInt("playlistId") ?: 0
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+                            PlaylistDetailScreen(
+                                playlistId = playlistId,
+                                playlistViewModel = playlistViewModel,
+                                scaffoldState = scaffoldState,
+                                onBackClick = { navController.popBackStack() },
+                                onSongClick = { song ->
+                                    // Play individual song WITH recommendations for continuous playback
+                                    playerViewModel.playOnlineSongEntityWithRecommendations(song)
+                                },
+                                onPlayAll = {
+                                    val songs = playlistViewModel.detailState.value.songs
+                                    if (songs.isNotEmpty()) {
+                                        // Play all playlist songs in order - NO recommendations
+                                        playerViewModel.playOnlineSongEntitiesPlaylist(songs, 0)
+                                    }
+                                },
+                                onShuffle = {
+                                    val songs = playlistViewModel.detailState.value.songs
+                                    if (songs.isNotEmpty()) {
+                                        // Shuffle and play all playlist songs - NO recommendations
+                                        playerViewModel.playOnlineSongEntitiesShuffled(songs)
+                                    }
+                                }
+                            )
+                        }
+                        composable(
+                            "quick_picks",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             QuickPicksScreen(
                                 homeViewModel = homeViewModel,
                                 playerViewModel = playerViewModel
                             )
                         }
-                        composable("train") {
+                        composable(
+                            "train",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             TrainingScreen(
                                 homeViewModel = homeViewModel,
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
-                        composable("settings") {
+                        composable(
+                            "settings",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
                             SettingsScreen(
                                 userPreferences = userPreferences,
                                 onBackClick = { navController.popBackStack() },
-                                onScanTrigger = { homeViewModel.forceRefreshLibrary() }
+                                onScanTrigger = { homeViewModel.forceRefreshLibrary() },
+                                onCheckForUpdate = { checkForUpdate = true }
+                            )
+                        }
+                        composable(
+                            "history",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            HistoryScreen(
+                                homeViewModel = homeViewModel,
+                                playerViewModel = playerViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            "stats",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            StatsScreen(
+                                homeViewModel = homeViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            "recommendations_detail",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            RecommendationsDetailScreen(
+                                recommendationViewModel = recommendationViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onPlaySong = { song ->
+                                    playerViewModel.playOnlineSongWithRecommendations(
+                                        videoId = song.id,
+                                        title = song.title,
+                                        artist = song.author ?: "Unknown Artist",
+                                        thumbnailUrl = song.thumbnailUrl
+                                    )
+                                },
+                                onNavigateToUserInput = { navController.navigate("user_recommendations_input") }
+                            )
+                        }
+                        composable(
+                            "user_recommendations_input",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            UserRecommendationInputScreen(
+                                recommendationViewModel = recommendationViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onGenerateRecommendations = { userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs ->
+                                    recommendationViewModel.generateUserInputRecommendations(userInputs)
+                                    // Navigate back to home screen to show the new recommendations
+                                    navController.popBackStack()
+                                }
                             )
                         }
                         composable(
                             route = "artist/{artistName}",
                             arguments = listOf(navArgument("artistName") {
                                 type = NavType.StringType
-                            })
+                            }),
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                         ) {
                             val uiState by homeViewModel.uiState.collectAsState()
                             uiState.selectedArtistSongs?.let { songs ->
@@ -220,35 +541,124 @@ fun MusicApp(userPreferences: UserPreferences) {
                                         }
                                     },
                                     onShuffle = {
-                                        playerViewModel.toggleShuffle()
-                                        songs.firstOrNull()?.let { firstSong ->
-                                            playerViewModel.playSong(firstSong, songs)
-                                        }
+                                        // Shuffle and play all offline artist songs
+                                        playerViewModel.playSongShuffled(songs)
                                     }
                                 )
                             }
                         }
                         composable(
+                            "online_artist",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            val uiState by homeViewModel.uiState.collectAsState()
+                            uiState.selectedOnlineArtist?.let { artist ->
+                                ArtistDetailScreen(
+                                    artistName = "", // not used
+                                    songs = emptyList(), // not used
+                                    onBackClick = {
+                                        navController.popBackStack()
+                                    },
+                                    onSongClick = {}, // not used
+                                    onPlayAll = {
+                                        // Play all online artist songs with queue - NO recommendations
+                                        playerViewModel.playRecommendedSongsPlaylist(
+                                            artist.songs,
+                                            0
+                                        )
+                                    },
+                                    onShuffle = {
+                                        // Shuffle and play all online artist songs - NO recommendations
+                                        playerViewModel.playRecommendedSongsShuffled(artist.songs)
+                                    },
+                                    isOnline = true,
+                                    artistDetails = artist,
+                                    onOnlineSongClick = { song ->
+                                        // Play individual song WITH recommendations for continuous playback
+                                        playerViewModel.playRecommendedSongWithRecommendations(song)
+                                    }
+                                )
+                            }
+                        }
+                        composable(
+                            "online_songs",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            val onlineSongsViewModel: OnlineSongsViewModel = viewModel()
+                            OnlineSongsScreen(
+                                onlineSongsViewModel = onlineSongsViewModel,
+                                playerViewModel = playerViewModel,
+                                dynamicBgViewModel = dynamicBgViewModel,
+                                userPreferences = userPreferences,
+                                scaffoldState = scaffoldState,
+                                onOpenSettings = { navController.navigate("settings") },
+                                onShuffleClick = {
+                                    val history = onlineSongsViewModel.uiState.value.history
+                                    if (history.isNotEmpty()) {
+                                        playerViewModel.shufflePlayOnlineHistory(history)
+                                    }
+                                }
+                            )
+                        }
+                        composable(
                             route = "album/{albumName}",
                             arguments = listOf(navArgument("albumName") {
                                 type = NavType.StringType
-                            })
+                            }),
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                         ) {
                             val uiState by homeViewModel.uiState.collectAsState()
+                            val playlistViewModel: PlaylistViewModel = viewModel()
+
+                            // Track if album is saved
+                            var isAlbumSaved by remember { mutableStateOf(false) }
+
                             uiState.selectedAlbumSongs?.let { songs ->
-                                val isOnlineAlbum = songs.firstOrNull()?.id?.startsWith("youtube:") == true
+                                // Check for both "youtube:" and "online:" prefixes for online albums
+                                val isOnlineAlbum = songs.firstOrNull()?.id?.let { id ->
+                                    id.startsWith("youtube:") || id.startsWith("online:")
+                                } == true
+
+                                val currentAlbumName = uiState.selectedAlbum ?: ""
+                                val currentArtistName = uiState.selectedAlbumArtist ?: ""
+                                val albumThumbnail =
+                                    if (isOnlineAlbum) uiState.selectedOnlineAlbum?.thumbnail else songs.firstOrNull()?.albumArtUri
+
+                                // Check if album is saved when screen loads or album changes
+                                LaunchedEffect(currentAlbumName, currentArtistName) {
+                                    playlistViewModel.isAlbumSaved(
+                                        currentAlbumName,
+                                        currentArtistName
+                                    ) { saved ->
+                                        isAlbumSaved = saved
+                                    }
+                                }
+
                                 AlbumDetailScreen(
-                                    albumName = uiState.selectedAlbum ?: "",
-                                    artistName = uiState.selectedAlbumArtist ?: "",
+                                    albumName = currentAlbumName,
+                                    artistName = currentArtistName,
                                     songs = songs,
-                                    onBackClick = { navController.popBackStack() },
+                                    onBackClick = {
+                                        navController.popBackStack()
+                                    },
                                     onSongClick = { song ->
                                         if (isOnlineAlbum) {
-                                            playerViewModel.playUrl(
-                                                url = song.filePath,
+                                            // Play individual song WITH recommendations for continuous playback
+                                            val videoId = song.id.removePrefix("youtube:")
+                                                .removePrefix("online:")
+                                            playerViewModel.playOnlineSongWithRecommendations(
+                                                videoId = videoId,
                                                 title = song.title,
                                                 artist = song.artist,
-                                                durationMs = song.duration,
                                                 thumbnailUrl = song.albumArtUri
                                             )
                                         } else {
@@ -257,7 +667,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     },
                                     onPlayAll = {
                                         if (isOnlineAlbum) {
-                                            // Play all online songs in order with queue
+                                            // Play all online songs in order with queue - NO recommendations
                                             playerViewModel.playOnlinePlaylist(songs, 0)
                                         } else {
                                             songs.firstOrNull()?.let { firstSong ->
@@ -267,24 +677,52 @@ fun MusicApp(userPreferences: UserPreferences) {
                                     },
                                     onShuffle = {
                                         if (isOnlineAlbum) {
-                                            // Shuffle and play all online songs with queue
+                                            // Shuffle and play all online songs with queue - NO recommendations
                                             playerViewModel.playOnlinePlaylistShuffled(songs)
                                         } else {
-                                            playerViewModel.toggleShuffle()
-                                            songs.firstOrNull()?.let { firstSong ->
-                                                playerViewModel.playSong(firstSong, songs)
+                                            // Shuffle and play all offline songs
+                                            playerViewModel.playSongShuffled(songs)
+                                        }
+                                    },
+                                    isOnline = isOnlineAlbum,
+                                    albumDetails = uiState.selectedOnlineAlbum,
+                                    isAlbumSaved = isAlbumSaved,
+                                    onSaveAlbumClick = {
+                                        playlistViewModel.saveAlbumAsPlaylist(
+                                            albumName = currentAlbumName,
+                                            artistName = currentArtistName,
+                                            thumbnailUrl = albumThumbnail,
+                                            songs = songs
+                                        ) { success ->
+                                            if (success) {
+                                                isAlbumSaved = true
+                                            }
+                                        }
+                                    },
+                                    onUnsaveAlbumClick = {
+                                        playlistViewModel.unsaveAlbum(
+                                            albumName = currentAlbumName,
+                                            artistName = currentArtistName
+                                        ) { success ->
+                                            if (success) {
+                                                isAlbumSaved = false
                                             }
                                         }
                                     }
                                 )
                             }
+
                         }
                     }
                 }
             }
 
+            // Get current route to determine navigation bar visibility
+            val navBackStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = navBackStackEntry?.destination?.route
+
             AnimatedVisibility(
-                visible = !isPlayerExpanded,
+                visible = !isPlayerExpanded && currentRoute != "train" && currentRoute != "settings",
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it })
             ) {

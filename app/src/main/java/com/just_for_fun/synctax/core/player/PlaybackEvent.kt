@@ -1,6 +1,6 @@
 package com.just_for_fun.synctax.core.player
 
-import com.just_for_fun.synctax.core.data.local.entities.Song
+import com.just_for_fun.synctax.data.local.entities.Song
 
 /**
  * Events emitted by the playback system for global synchronization

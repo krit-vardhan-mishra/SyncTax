@@ -1,42 +1,28 @@
 package com.just_for_fun.synctax
 
 import android.Manifest
-import android.content.*
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.IBinder
-import android.widget.Toast
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import com.just_for_fun.synctax.core.service.MusicService
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.service.MusicService
-import com.just_for_fun.synctax.ui.components.app.AppNavigationBar
-import com.just_for_fun.synctax.ui.components.player.PlayerBottomSheet
-import com.just_for_fun.synctax.ui.screens.*
-import com.just_for_fun.synctax.ui.theme.synctaxTheme
-import com.just_for_fun.synctax.ui.viewmodels.HomeViewModel
-import com.just_for_fun.synctax.ui.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.presentation.ui.theme.SynctaxTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -56,19 +42,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Registering the permission request launchers
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            // Permission granted, music scanning can proceed in the ViewModel
+    // Registering the permission request launcher for multiple permissions
+    private val requestMultiplePermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        // Store that we've asked for permissions
+        getSharedPreferences("app_permissions", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("permissions_requested", true)
+            .apply()
+        
+        // Log results (optional)
+        permissions.entries.forEach { entry ->
+            android.util.Log.d("MainActivity", "Permission ${entry.key} = ${entry.value}")
         }
     }
-
-    private val requestNotificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        // Notification permission result
+    
+    private val manageStoragePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        // MANAGE_EXTERNAL_STORAGE permission result handled
+        getSharedPreferences("app_permissions", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("permissions_requested", true)
+            .apply()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,7 +88,7 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
-            synctaxTheme(darkTheme = darkTheme) {
+            SynctaxTheme(darkTheme = darkTheme) {
                 MusicApp(userPreferences = userPreferences)
             }
         }
@@ -106,53 +103,66 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkAndRequestPermissions() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        // Check if we've already requested permissions this session
+        val prefs = getSharedPreferences("app_permissions", Context.MODE_PRIVATE)
+        val permissionsRequested = prefs.getBoolean("permissions_requested", false)
+        
+        if (permissionsRequested) {
+            return // Don't ask again
+        }
+        
+        // Build list of permissions to request based on Android version
+        val permissionsToRequest = mutableListOf<String>()
+        
+        // Audio permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // Android 13+ uses READ_MEDIA_AUDIO for audio files
-            Manifest.permission.READ_MEDIA_AUDIO
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
+            }
+            // Note: READ_MEDIA_IMAGES is requested only in SettingsScreen when user enables album art scanning
+            // Notification permission for Android 13+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
         } else {
             // Older Android versions use READ_EXTERNAL_STORAGE
             @Suppress("DEPRECATION")
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                permission
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                // Permission already granted
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
-
-            else -> {
-                // Request the permission
-                requestPermissionLauncher.launch(permission)
+            // Request WRITE_EXTERNAL_STORAGE for Android 10 and below
+            @Suppress("DEPRECATION")
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
         }
-
-        // Note: READ_MEDIA_IMAGES is no longer requested
-        // Downloaded songs have thumbnails embedded directly in the audio file
-        // Local library songs will use MediaStore album art if permission is granted via system settings
-
-        // Request notification permission for Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        
+        // Handle MANAGE_EXTERNAL_STORAGE for Android 11+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                try {
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    manageStoragePermissionLauncher.launch(intent)
+                    return // Handle other permissions after this returns
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "Error requesting MANAGE_EXTERNAL_STORAGE", e)
+                }
             }
         }
-
-        // Request audio recording permission (optional - for audio visualization)
-        // Note: This is optional and the app will work without it using fallback visualization
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            // We don't force request this permission as it's not critical
-            // The AudioAnalyzer will gracefully handle missing permission
+        
+        // Request all regular permissions at once
+        if (permissionsToRequest.isNotEmpty()) {
+            requestMultiplePermissionsLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            // All permissions already granted, mark as requested
+            prefs.edit().putBoolean("permissions_requested", true).apply()
         }
     }
 }

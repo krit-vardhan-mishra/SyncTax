@@ -1,6 +1,6 @@
 package com.just_for_fun.synctax.core.player
 
-import com.just_for_fun.synctax.core.data.repository.MusicRepository
+import com.just_for_fun.synctax.data.repository.MusicRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

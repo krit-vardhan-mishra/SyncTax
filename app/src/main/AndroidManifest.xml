@@ -17,6 +17,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".MusicApplication"
@@ -24,9 +25,9 @@
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/app_icon_main"
         android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/app_icon_main_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.synctax"
         android:enableOnBackInvokedCallback="true"
@@ -34,23 +35,104 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
+            android:exported="false"
             android:launchMode="singleTop"
             android:theme="@style/Theme.synctax">
+        </activity>
+
+        <!-- Activity Aliases for App Icon Switching -->
+        <!-- Default Icon (app_icon_main) -->
+        <activity-alias
+            android:name=".MainActivityDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/app_icon_main"
+            android:roundIcon="@mipmap/app_icon_main_round"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <!-- Vintage Icon (app_icon_2) -->
+        <activity-alias
+            android:name=".MainActivityVintage"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/app_icon_2"
+            android:roundIcon="@mipmap/app_icon_2_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Aqua Icon (app_icon_3) -->
+        <activity-alias
+            android:name=".MainActivityAqua"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/app_icon_3"
+            android:roundIcon="@mipmap/app_icon_3_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Premium Icon (app_icon_4) -->
+        <activity-alias
+            android:name=".MainActivityPremium"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/app_icon_4"
+            android:roundIcon="@mipmap/app_icon_4_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Turbo Icon (app_icon_5) -->
+        <activity-alias
+            android:name=".MainActivityTurbo"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/app_icon_5"
+            android:roundIcon="@mipmap/app_icon_5_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Neon Icon (app_icon_6) -->
+        <activity-alias
+            android:name=".MainActivityNeon"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/app_icon_6"
+            android:roundIcon="@mipmap/app_icon_6_round"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <service
-            android:name=".service.MusicService"
+            android:name=".core.service.MusicService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
         <receiver
-            android:name=".widget.MusicWidgetProvider"
+            android:name=".presentation.ui.widget.MusicWidgetProvider"
             android:exported="true"
             android:label="Music Player">
             <intent-filter>
@@ -66,7 +148,7 @@
         </receiver>
 
         <receiver
-            android:name=".widget.MusicInfoWidgetProvider"
+            android:name=".presentation.ui.widget.MusicInfoWidgetProvider"
             android:exported="true"
             android:label="Music Info">
             <intent-filter>
@@ -76,6 +158,16 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_metadata" />
         </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>
