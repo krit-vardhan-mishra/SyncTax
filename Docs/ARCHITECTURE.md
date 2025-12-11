@@ -72,7 +72,7 @@ presentation/
 ├── 📁 model/                   # ✅ UI models
 ├── 📁 utils/                   # ✅ UI utilities
 └── 📁 ui/                      # UI-specific packages
-    ├── 📁 theme/               # App theming (Color, Type, Theme, Dimensions)
+    ├── 📁 theme/               # App theming (Color, Type, Theme, Dimensions, ScalingProvider)
     ├── 📁 widget/              # App widgets (MusicWidgetProvider)
     └── 📁 adapter/             # ⚠️ Legacy RecyclerView adapter (FormatAdapter)
 ```

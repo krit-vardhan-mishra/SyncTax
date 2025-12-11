@@ -21,10 +21,11 @@ Before creating a release, ensure you have:
 Tag version: v3.5.0
 ```
 **Important Rules:**
-- Must start with `v` followed by the version number
+- Must start with `v` or `v-` followed by the version number
 - Version number must match exactly what's in `app/build.gradle.kts` `versionName`
-- Format: `v{major}.{minor}.{patch}` (e.g., `v3.5.0`, `v1.2.3`)
-- The app compares this tag to determine if an update is available
+- Format: `v{major}.{minor}.{patch}` (e.g., `v3.5.0`) or `v-{major}.{minor}.{patch}` (e.g., `v-3.5.0`)
+- The app handles both formats automatically
+- **Recommended**: Use `v` prefix without hyphen for consistency (e.g., `v3.5.0`)
 
 ### Step 3: Release Title
 ```

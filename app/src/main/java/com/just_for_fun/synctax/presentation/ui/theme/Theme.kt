@@ -123,6 +123,12 @@ fun SynctaxTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = {
+            // Wrap content with ResponsiveScalingProvider for automatic UI scaling
+            ResponsiveScalingProvider {
+                content()
+            }
+        }
     )
 }
+

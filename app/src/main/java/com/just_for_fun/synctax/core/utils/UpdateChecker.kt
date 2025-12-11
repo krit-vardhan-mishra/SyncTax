@@ -57,7 +57,8 @@ class UpdateChecker(private val context: Context) {
             val releaseJson = JSONObject(jsonResponse)
 
             val latestVersionTag = releaseJson.getString("tag_name")
-            val latestVersion = latestVersionTag.removePrefix("v") // Remove 'v' prefix if present
+            // Remove 'v-' or 'v' prefix if present (GitHub releases may use either format)
+            val latestVersion = latestVersionTag.removePrefix("v-").removePrefix("v")
 
             // Compare versions
             val isUpdateAvailable = compareVersions(currentVersion, latestVersion) < 0

@@ -20,8 +20,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -406,8 +409,9 @@ fun HomeScreen(
                                 }
 
                                 // Create options for the dialog
-                                val dialogOptions = remember(selectedSong) {
+                                val dialogOptions = remember(selectedSong, uiState.favoriteSongs) {
                                     selectedSong?.let { song ->
+                                        val isFavorite = uiState.favoriteSongs.any { it.id == song.id }
                                         mutableListOf<DialogOption>().apply {
                                             // Play option
                                             add(
@@ -428,6 +432,46 @@ fun HomeScreen(
                                                             song,
                                                             uiState.allSongs
                                                         )
+                                                    }
+                                                )
+                                            )
+                                            
+                                            // Add to Queue option
+                                            add(
+                                                DialogOption(
+                                                    id = "add_to_queue",
+                                                    title = "Add to Queue",
+                                                    subtitle = "Add to end of current queue",
+                                                    icon = {
+                                                        Icon(
+                                                            Icons.Filled.QueueMusic,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        playerViewModel.addToQueue(song)
+                                                    }
+                                                )
+                                            )
+                                            
+                                            // Add to Favorites option
+                                            add(
+                                                DialogOption(
+                                                    id = "toggle_favorite",
+                                                    title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                                                    subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                                                    icon = {
+                                                        Icon(
+                                                            if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                                            contentDescription = null,
+                                                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                    },
+                                                    onClick = {
+                                                        homeViewModel.toggleFavorite(song.id)
                                                     }
                                                 )
                                             )

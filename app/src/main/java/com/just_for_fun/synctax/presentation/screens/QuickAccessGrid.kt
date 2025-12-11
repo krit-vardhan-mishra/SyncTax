@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.rounded.LibraryMusic
@@ -63,7 +65,9 @@ fun QuickAccessGrid(
     onSongClick: (Song) -> Unit,
     modifier: Modifier = Modifier,
     currentSong: Song? = null,
-    onAddToQueue: ((Song) -> Unit)? = null
+    onAddToQueue: ((Song) -> Unit)? = null,
+    onToggleFavorite: ((String) -> Unit)? = null,
+    favoriteSongIds: Set<String> = emptySet()
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -98,7 +102,9 @@ fun QuickAccessGrid(
                         song = song,
                         onClick = { onSongClick(song) },
                         isPlaying = song.id == currentSong?.id,
-                        onAddToQueue = onAddToQueue
+                        onAddToQueue = onAddToQueue,
+                        onToggleFavorite = onToggleFavorite,
+                        isFavorite = favoriteSongIds.contains(song.id)
                     )
                 }
             }
@@ -113,7 +119,9 @@ private fun SpeedDialItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = false,
-    onAddToQueue: ((Song) -> Unit)? = null
+    onAddToQueue: ((Song) -> Unit)? = null,
+    onToggleFavorite: ((String) -> Unit)? = null,
+    isFavorite: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     var showOptionsDialog by remember { mutableStateOf(false) }
@@ -223,7 +231,7 @@ private fun SpeedDialItem(
     }
 
     // Create options for the dialog
-    val dialogOptions = remember(song, onAddToQueue, onClick) {
+    val dialogOptions = remember(song, onAddToQueue, onToggleFavorite, isFavorite, onClick) {
         mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
             // Play option
             add(
@@ -257,6 +265,23 @@ private fun SpeedDialItem(
                             )
                         },
                         onClick = { it(song) }
+                    ))
+            }
+            onToggleFavorite?.let {
+                add(
+                    com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                        id = "toggle_favorite",
+                        title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                        subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                        icon = {
+                            Icon(
+                                if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { it(song.id) }
                     ))
             }
         }
