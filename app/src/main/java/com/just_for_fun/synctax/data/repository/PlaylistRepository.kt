@@ -133,12 +133,26 @@ class PlaylistRepository(private val context: Context) {
             val python = Python.getInstance()
             val isSpotify = playlistUrl.contains("spotify.com") || playlistUrl.contains("spotify:")
             val module = if (isSpotify) {
-                python.getModule("spotify_playlist_importer")
+                val spotifyModule = python.getModule("spotify_playlist_importer")
+                // Log credentials info for debugging (without exposing full secrets)
+                val clientId = com.just_for_fun.synctax.BuildConfig.SPOTIFY_CLIENT_ID
+                val clientSecret = com.just_for_fun.synctax.BuildConfig.SPOTIFY_CLIENT_SECRET
+                Log.d(TAG, "Spotify credentials - ID length: ${clientId.length}, Secret length: ${clientSecret.length}")
+                Log.d(TAG, "Spotify credentials - ID starts with: ${clientId.take(8)}..., Secret starts with: ${clientSecret.take(4)}...")
+                
+                // Set Spotify credentials from BuildConfig
+                spotifyModule.callAttr(
+                    "set_spotify_credentials",
+                    clientId,
+                    clientSecret
+                )
+                spotifyModule
             } else {
                 python.getModule("yt_playlist_importer")
             }
 
             val functionName = if (isSpotify) "fetch_spotify_playlist" else "fetch_playlist"
+            Log.d(TAG, "Calling $functionName with URL: $playlistUrl")
 
             // Fetch playlist data
             val resultJson = module.callAttr(functionName, playlistUrl).toString()

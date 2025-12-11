@@ -698,36 +698,36 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Training indicator
-                AnimatedVisibility(
-                    visible = uiState.isTraining,
-                    enter = fadeIn() + slideInVertically { it },
-                    exit = fadeOut() + slideOutVertically { it },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                ) {
-                    Card(
-                        modifier = Modifier.padding(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = cardBackgroundColor
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                "Training ML models...",
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                }
+//                // Training indicator
+//                AnimatedVisibility(
+//                    visible = uiState.isTraining,
+//                    enter = fadeIn() + slideInVertically { it },
+//                    exit = fadeOut() + slideOutVertically { it },
+//                    modifier = Modifier.align(Alignment.BottomCenter)
+//                ) {
+//                    Card(
+//                        modifier = Modifier.padding(16.dp),
+//                        colors = CardDefaults.cardColors(
+//                            containerColor = cardBackgroundColor
+//                        )
+//                    ) {
+//                        Row(
+//                            modifier = Modifier.padding(16.dp),
+//                            verticalAlignment = Alignment.CenterVertically,
+//                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+//                        ) {
+//                            CircularProgressIndicator(
+//                                modifier = Modifier.size(24.dp),
+//                                strokeWidth = 2.dp,
+//                                color = MaterialTheme.colorScheme.onPrimaryContainer
+//                            )
+//                            Text(
+//                                "Training ML models...",
+//                                color = MaterialTheme.colorScheme.onPrimaryContainer
+//                            )
+//                        }
+//                    }
+//                }
 
                 // Guide Overlay
                 var showGuide by remember {

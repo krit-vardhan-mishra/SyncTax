@@ -163,7 +163,7 @@ fun PlaylistDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(detailState.playlist?.name ?: "Playlist") },
+                title = { Text(detailState.playlist?.name ?: "Playlist", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(

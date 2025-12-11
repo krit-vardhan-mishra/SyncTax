@@ -109,14 +109,19 @@ fun AppNavigationBar(
                 onClick = {
                     if (item.route == "library") {
                         val currentTime = System.currentTimeMillis()
+                        val isOnLibraryOrPlaylists = currentRoute == "library" || currentRoute == "playlists"
+                        
                         if (currentTime - lastLibraryClickTime < 300) {
+                            // Double-tap detected - show bottom sheet
                             showLibraryBottomSheet = true
-                        } else {
+                        } else if (!isOnLibraryOrPlaylists) {
+                            // Single tap and NOT already on library/playlists - navigate
                             navController.navigate(item.route) {
                                 popUpTo(navController.graph.findStartDestination().id)
                                 launchSingleTop = true
                             }
                         }
+                        // If already on library/playlists, single tap does nothing (wait for potential double-tap)
                         lastLibraryClickTime = currentTime
                     } else {
                         navController.navigate(item.route) {
