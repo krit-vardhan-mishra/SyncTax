@@ -38,7 +38,7 @@ import com.just_for_fun.synctax.data.local.entities.UserPreference
         RecommendationCache::class,
         RecommendationInteraction::class
     ],
-    version = 7,  // Incremented for adding Recommendation entities
+    version = 8,  // Incremented for isFavorite and userRating fields
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {

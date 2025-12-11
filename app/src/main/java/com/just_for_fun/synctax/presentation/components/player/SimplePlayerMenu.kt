@@ -1,10 +1,12 @@
 package com.just_for_fun.synctax.presentation.components.player
 
+import android.content.Intent
 import android.media.AudioManager
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +14,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,8 +30,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +46,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import androidx.compose.material.icons.filled.VolumeOff
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,6 +187,103 @@ fun SimplePlayerMenu(
                         imageVector = rightIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+            // Sleep Timer Section
+            val playerViewModel: PlayerViewModel = viewModel()
+            val sleepTimerRemaining by playerViewModel.sleepTimerRemaining.collectAsState()
+            
+            Text(
+                text = "Sleep Timer",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val timerOptions = listOf(15, 30, 45, 60)
+                timerOptions.forEach { minutes ->
+                    FilterChip(
+                        selected = sleepTimerRemaining != null && sleepTimerRemaining!! > 0,
+                        onClick = { playerViewModel.setSleepTimer(minutes) },
+                        label = { Text("${minutes}m") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            if (sleepTimerRemaining != null && sleepTimerRemaining!! > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val remainingMinutes = (sleepTimerRemaining!! / 60000).toInt()
+                        val remainingSeconds = ((sleepTimerRemaining!! % 60000) / 1000).toInt()
+                        Text(
+                            text = "${remainingMinutes}:${String.format("%02d", remainingSeconds)} remaining",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    TextButton(onClick = { playerViewModel.cancelSleepTimer() }) {
+                        Text("Cancel", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            // Share Section (for online songs)
+            if (song.id.startsWith("online:") || song.id.startsWith("youtube:")) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+
+                Text(
+                    text = "Share",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val videoId = song.id.removePrefix("online:").removePrefix("youtube:")
+                            val shareUrl = "https://music.youtube.com/watch?v=$videoId"
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, "${song.title} - ${song.artist}")
+                                putExtra(Intent.EXTRA_TEXT, "Check out this song: ${song.title} by ${song.artist}\n$shareUrl")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share song"))
+                        }
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Share")
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

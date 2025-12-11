@@ -19,7 +19,8 @@ import androidx.room.PrimaryKey
         Index(value = ["title"]),
         Index(value = ["artist"]),
         Index(value = ["album"]),
-        Index(value = ["genre"])
+        Index(value = ["genre"]),
+        Index(value = ["isFavorite"])
     ]
 )
 data class Song(
@@ -32,5 +33,6 @@ data class Song(
     val genre: String?,
     val releaseYear: Int?,
     val albumArtUri: String? = null, // URI to album art
-    val addedTimestamp: Long = System.currentTimeMillis()
+    val addedTimestamp: Long = System.currentTimeMillis(),
+    val isFavorite: Boolean = false // Whether song is marked as favorite
 )

@@ -2,13 +2,17 @@ package com.just_for_fun.synctax.core.utils
 
 import android.util.Log
 import com.just_for_fun.synctax.BuildConfig
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.net.URLEncoder
-import java.net.HttpURLConnection
-import java.net.URL
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 
 data class RecommendedSong(
     val title: String,

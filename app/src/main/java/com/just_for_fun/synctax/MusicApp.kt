@@ -60,6 +60,8 @@ import com.just_for_fun.synctax.presentation.screens.SettingsScreen
 import com.just_for_fun.synctax.presentation.screens.TrainingScreen
 import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputScreen
 import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
+import com.just_for_fun.synctax.presentation.screens.HistoryScreen
+import com.just_for_fun.synctax.presentation.screens.StatsScreen
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
@@ -271,7 +273,9 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 },
                                 onNavigateToPlaylists = { navController.navigate("playlists") },
                                 onNavigateToOnlineSongs = { navController.navigate("online_songs") },
-                                onNavigateToRecommendations = { navController.navigate("recommendations_detail") }
+                                onNavigateToRecommendations = { navController.navigate("recommendations_detail") },
+                                onNavigateToHistory = { navController.navigate("history") },
+                                onNavigateToStats = { navController.navigate("stats") }
                             )
                         }
                         composable(
@@ -450,6 +454,31 @@ fun MusicApp(userPreferences: UserPreferences) {
                             )
                         }
                         composable(
+                            "history",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            HistoryScreen(
+                                homeViewModel = homeViewModel,
+                                playerViewModel = playerViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            "stats",
+                            enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                            exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                            popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                            popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                        ) {
+                            StatsScreen(
+                                homeViewModel = homeViewModel,
+                                onNavigateBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
                             "recommendations_detail",
                             enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
                             exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
@@ -572,14 +601,7 @@ fun MusicApp(userPreferences: UserPreferences) {
                                 onShuffleClick = {
                                     val history = onlineSongsViewModel.uiState.value.history
                                     if (history.isNotEmpty()) {
-                                        val shuffledHistory = history.shuffled()
-                                        val firstSong = shuffledHistory.first()
-                                        playerViewModel.playUrl(
-                                            url = firstSong.watchUrl,
-                                            title = firstSong.title,
-                                            artist = firstSong.artist,
-                                            durationMs = 0L
-                                        )
+                                        playerViewModel.shufflePlayOnlineHistory(history)
                                     }
                                 }
                             )

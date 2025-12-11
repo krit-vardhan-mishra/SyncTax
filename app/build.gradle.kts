@@ -20,7 +20,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 4
-        versionName = "3.4.1"
+        versionName = "3.4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -184,10 +184,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // NewPipe extractor - used to decode signatureCipher-obfuscated stream URLs
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.24.8")
+    implementation(libs.newpipeextractor)
 
     // Progress bar dependency
-    implementation("ir.mahozad.multiplatform:wavy-slider:2.2.0")
+    implementation(libs.wavy.slider)
 
     // Retrofit for API calls (LRCLIB lyrics API)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -214,7 +214,7 @@ dependencies {
     // implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     // implementation("com.github.arthenica:ffmpeg-kit-full:4.5.1-1")
 
-    implementation("com.afollestad.material-dialogs:core:3.3.0")
+    implementation(libs.core)
 
     // For flow operators
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")

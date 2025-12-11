@@ -1,6 +1,8 @@
 package com.just_for_fun.synctax.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
 import com.just_for_fun.synctax.data.local.entities.ListeningHistory
 import kotlinx.coroutines.flow.Flow
 
@@ -26,4 +28,42 @@ interface ListeningHistoryDao {
 
     @Query("DELETE FROM listening_history WHERE songId IN (:songIds)")
     suspend fun deleteHistoryForSongs(songIds: List<String>)
+
+    // Get most played song IDs with play counts
+    @Query("""
+        SELECT songId, COUNT(*) as playCount 
+        FROM listening_history 
+        WHERE songId NOT LIKE 'online:%'
+        GROUP BY songId 
+        ORDER BY playCount DESC 
+        LIMIT :limit
+    """)
+    suspend fun getMostPlayedSongIds(limit: Int = 10): List<SongPlayCountResult>
+
+    // Update user rating for most recent play of a song
+    @Query("""
+        UPDATE listening_history 
+        SET userRating = :rating 
+        WHERE id = (
+            SELECT id FROM listening_history 
+            WHERE songId = :songId 
+            ORDER BY playTimestamp DESC 
+            LIMIT 1
+        )
+    """)
+    suspend fun updateUserRating(songId: String, rating: Int)
+
+    // Get all history for songs with positive ratings (for ML training)
+    @Query("SELECT * FROM listening_history WHERE userRating = 2")
+    suspend fun getLikedSongsHistory(): List<ListeningHistory>
+
+    // Get all history for songs with negative ratings (for ML training)
+    @Query("SELECT * FROM listening_history WHERE userRating = 1")
+    suspend fun getDislikedSongsHistory(): List<ListeningHistory>
 }
+
+// Data class for most played query result
+data class SongPlayCountResult(
+    val songId: String,
+    val playCount: Int
+)

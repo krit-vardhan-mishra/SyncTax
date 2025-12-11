@@ -41,7 +41,9 @@ import kotlinx.coroutines.flow.map
 import com.just_for_fun.synctax.core.player.PreloadManager
 import com.just_for_fun.synctax.core.player.StreamUrlCache
 import com.just_for_fun.synctax.core.utils.RecommendedSong
+import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.Format
+import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.PlayerPreferences
@@ -85,6 +87,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Track active download jobs for cancellation support
     private val activeDownloadJobs = mutableMapOf<String, Job>()
 
+    // Callback to notify when a download completes (for library refresh)
+    var onDownloadComplete: (() -> Unit)? = null
+
     // PlaybackCollector with cache invalidation callback
     private val playbackCollector = PlaybackCollector(
         repository = repository,
@@ -110,6 +115,101 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     // Track played recommendations for previous navigation
     private val playedRecommendationsHistory = mutableListOf<Song>()
+
+    // Sleep timer state
+    private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
+    val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
+    private var sleepTimerJob: Job? = null
+
+    /**
+     * Set a sleep timer to pause playback after the specified minutes
+     */
+    fun setSleepTimer(minutes: Int) {
+        cancelSleepTimer() // Cancel any existing timer
+        val totalMs = minutes * 60 * 1000L
+        _sleepTimerRemaining.value = totalMs
+        
+        sleepTimerJob = viewModelScope.launch {
+            var remaining = totalMs
+            while (remaining > 0) {
+                delay(1000L)
+                remaining -= 1000L
+                _sleepTimerRemaining.value = remaining
+            }
+            // Timer completed - pause playback
+            if (_uiState.value.isPlaying) {
+                togglePlayPause()
+            }
+            _sleepTimerRemaining.value = null
+            Log.d("PlayerViewModel", "⏰ Sleep timer completed, playback paused")
+        }
+        Log.d("PlayerViewModel", "⏰ Sleep timer set for $minutes minutes")
+    }
+
+    /**
+     * Cancel the active sleep timer
+     */
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerRemaining.value = null
+        Log.d("PlayerViewModel", "⏰ Sleep timer cancelled")
+    }
+
+    /**
+     * Rate the current song for ML training (1 = dislike, 2 = like)
+     */
+    fun rateSong(rating: Int) {
+        val currentSong = _uiState.value.currentSong ?: return
+        viewModelScope.launch(AppDispatchers.Database) {
+            try {
+                repository.updateUserRating(currentSong.id, rating)
+                Log.d("PlayerViewModel", "👍 Song rated: ${currentSong.title} = $rating")
+            } catch (e: Exception) {
+                Log.e("PlayerViewModel", "Failed to rate song: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Add a song to the end of the queue
+     */
+    fun addToQueue(song: Song) {
+        queueManager.addToQueue(listOf(song))
+        viewModelScope.launch {
+            _errorMessages.emit("Added to queue: ${song.title}")
+        }
+        Log.d("PlayerViewModel", "➕ Added to queue: ${song.title}")
+    }
+
+    /**
+     * Add multiple songs to the end of the queue
+     */
+    fun addToQueue(songs: List<Song>) {
+        queueManager.addToQueue(songs)
+        viewModelScope.launch {
+            _errorMessages.emit("Added ${songs.size} songs to queue")
+        }
+        Log.d("PlayerViewModel", "➕ Added ${songs.size} songs to queue")
+    }
+
+    /**
+     * Add an online song to the queue by creating a Song object
+     */
+    fun addOnlineSongToQueue(videoId: String, title: String, artist: String, thumbnailUrl: String? = null) {
+        val onlineSong = Song(
+            id = "online:$videoId",
+            title = title,
+            artist = artist,
+            album = null,
+            duration = 0L,
+            filePath = "https://music.youtube.com/watch?v=$videoId",
+            albumArtUri = thumbnailUrl,
+            genre = null,
+            releaseYear = null
+        )
+        addToQueue(onlineSong)
+    }
 
     private fun logSongDetails(song: Song) {
         // Simplified playback log; detailed metadata is logged when fetched via yt-dlp
@@ -436,8 +536,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Fetch recommendations for a video ID
      */
-    private fun fetchRecommendationsForVideoId(videoId: String) {
-        if (_uiState.value.upNextRecommendations.isEmpty() && playedRecommendationsHistory.isEmpty()) {
+    private fun fetchRecommendationsForVideoId(videoId: String, force: Boolean = false) {
+        if (force || (_uiState.value.upNextRecommendations.isEmpty() && playedRecommendationsHistory.isEmpty())) {
             _uiState.value = _uiState.value.copy(isLoadingRecommendations = true)
             originalRecommendationVideoId = videoId
 
@@ -449,8 +549,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         "PlayerViewModel",
                         "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
                     )
-                    // Convert RecommendedSong to Song
-                    val recommendedSongs = recommendations.map { rec ->
+                    // Convert RecommendedSong to Song, filtering out the current song
+                    val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
                         Song(
                             id = "youtube:${rec.videoId}",
                             title = rec.title,
@@ -484,6 +584,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentIndex = queueState.currentIndex
             )
         }
+    }
+
+    private fun refreshRecommendationsForCurrentSong() {
+        val currentSong = _uiState.value.currentSong ?: return
+        if (!currentSong.id.startsWith("online:") && !currentSong.id.startsWith("youtube:")) return
+
+        val videoId = currentSong.id.substringAfter("online:").substringAfter("youtube:")
+        // Clear current recommendations
+        _uiState.value = _uiState.value.copy(upNextRecommendations = emptyList())
+        // Fetch new recommendations
+        fetchRecommendationsForVideoId(videoId, force = true)
     }
 
     fun playSong(song: Song, playlist: List<Song> = listOf(song)) {
@@ -576,11 +687,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Record online listening history for YouTube songs
             if (url.contains("youtube.com") || url.contains("youtu.be")) {
                 val database =
-                    com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
+                    MusicDatabase.getDatabase(getApplication())
                 val finalThumbnailUrl =
                     thumbnailUrl ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
                 val onlineHistory =
-                    com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory(
+                    OnlineListeningHistory(
                         videoId = videoId,
                         title = title,
                         artist = artist ?: "Unknown Artist",
@@ -1830,12 +1941,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleShuffle() {
-        // Always reshuffle the playlist with current song at first position
         viewModelScope.launch {
-            val currentSong = _uiState.value.currentSong
+            val currentSong = _uiState.value.currentSong ?: return@launch
+
+            if (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) {
+                // For online songs, refresh recommendations
+                refreshRecommendationsForCurrentSong()
+                _uiState.value = _uiState.value.copy(shuffleEnabled = true)
+                return@launch
+            }
+
+            // Original logic for local songs
             val queueState = queueManager.queueState.value
 
-            if (currentSong != null && queueState.currentPlaylist.isNotEmpty()) {
+            if (queueState.currentPlaylist.isNotEmpty()) {
                 // Use queue manager to shuffle
                 queueManager.shuffle()
 
@@ -1902,6 +2021,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 playSong(firstSong, queueState.currentPlaylist)
             }
         }
+    }
+
+    /**
+     * Shuffle play online listening history
+     * Converts OnlineListeningHistory to Song objects and plays in shuffled order
+     */
+    fun shufflePlayOnlineHistory(history: List<com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory>) {
+        if (history.isEmpty()) return
+        
+        val shuffledHistory = history.shuffled()
+        val songs = shuffledHistory.map { historyItem ->
+            Song(
+                id = "online:${historyItem.videoId}",
+                title = historyItem.title,
+                artist = historyItem.artist,
+                album = "",
+                duration = 0L,
+                filePath = historyItem.watchUrl,
+                genre = null,
+                releaseYear = null,
+                albumArtUri = historyItem.thumbnailUrl
+            )
+        }
+        
+        _uiState.value = _uiState.value.copy(shuffleEnabled = true)
+        playOnlinePlaylist(songs, 0)
     }
 
     fun removeFromQueue(song: Song) {
@@ -2294,6 +2439,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "PlayerViewModel",
                             "📥 Direct Download: ✅ Download completed successfully"
                         )
+
+                        // Trigger library refresh callback for auto-scan
+                        onDownloadComplete?.invoke()
                     } else {
                         Log.e(
                             "PlayerViewModel",

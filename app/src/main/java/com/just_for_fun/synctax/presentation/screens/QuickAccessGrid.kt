@@ -73,6 +73,16 @@ fun QuickAccessGrid(
         if (songs.isEmpty()) {
             EmptyStateCard()
         } else {
+            Column {
+                Text(
+                    text = "Quick Access",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 modifier = Modifier
@@ -107,7 +117,7 @@ private fun SpeedDialItem(
 ) {
     val haptic = LocalHapticFeedback.current
     var showOptionsDialog by remember { mutableStateOf(false) }
-    
+
     // Use ElevatedCard for a nice pop off the background
     ElevatedCard(
         shape = MaterialTheme.shapes.medium,
@@ -211,44 +221,47 @@ private fun SpeedDialItem(
             }
         }
     }
-    
+
     // Create options for the dialog
     val dialogOptions = remember(song, onAddToQueue, onClick) {
         mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
             // Play option
-            add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
-                id = "play",
-                title = "Play",
-                subtitle = "Play this song",
-                icon = {
-                    Icon(
-                        Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                onClick = onClick
-            ))
-            onAddToQueue?.let {
-                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
-                    id = "add_to_queue",
-                    title = "Add to Queue",
-                    subtitle = "Add to current playlist",
+            add(
+                com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "play",
+                    title = "Play",
+                    subtitle = "Play this song",
                     icon = {
                         Icon(
-                            Icons.Filled.PlaylistAdd,
+                            Icons.Filled.PlayArrow,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                     },
-                    onClick = { it(song) }
-                ))
+                    onClick = onClick
+                )
+            )
+            onAddToQueue?.let {
+                add(
+                    com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                        id = "add_to_queue",
+                        title = "Add to Queue",
+                        subtitle = "Add to current playlist",
+                        icon = {
+                            Icon(
+                                Icons.Filled.PlaylistAdd,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { it(song) }
+                    ))
             }
         }
     }
-    
+
     // Bottom options dialog
     BottomOptionsDialog(
         song = song,

@@ -53,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -100,6 +101,7 @@ fun SearchScreen(
 
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     var isFocused by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var suggestionsJob by remember { mutableStateOf<Job?>(null) }
@@ -116,6 +118,7 @@ fun SearchScreen(
     fun performSearch() {
         if (searchQuery.isNotEmpty() && !uiState.isSearchingOnline) {
             keyboardController?.hide()
+            focusManager.clearFocus()
             homeViewModel.clearSearchSuggestions()
             homeViewModel.searchOnline(searchQuery, selectedFilter)
         }

@@ -66,6 +66,7 @@ import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSe
 import com.just_for_fun.synctax.presentation.components.section.SectionHeader
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.presentation.components.section.SpeedDialSection
+import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
 import com.just_for_fun.synctax.presentation.components.utils.SortOption
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.dynamic.DynamicGreetingSection
@@ -77,6 +78,41 @@ import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
+
+// Composable helper functions for consistent spacing
+@Composable
+private fun SectionSpacer() {
+    Spacer(modifier = Modifier.height(16.dp))
+}
+
+@Composable
+private fun SmallSpacer() {
+    Spacer(modifier = Modifier.height(8.dp))
+}
+
+@Composable
+private fun LargeSpacer() {
+    Spacer(modifier = Modifier.height(24.dp))
+}
+
+@Composable
+private fun ExtraLargeSpacer() {
+    Spacer(modifier = Modifier.height(25.dp))
+}
+
+@Composable
+private fun BottomPaddingSpacer() {
+    Spacer(modifier = Modifier.height(80.dp))
+}
+
+@Composable
+private fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 16.dp),
+        color = AppColors.divider,
+        thickness = 1.dp
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,7 +128,9 @@ fun HomeScreen(
     onNavigateToPlaylist: (Int) -> Unit = {},
     onNavigateToPlaylists: () -> Unit = {},
     onNavigateToOnlineSongs: () -> Unit = {},
-    onNavigateToRecommendations: () -> Unit = {}
+    onNavigateToRecommendations: () -> Unit = {},
+    onNavigateToHistory: () -> Unit = {},
+    onNavigateToStats: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -146,33 +184,6 @@ fun HomeScreen(
                     hasScrolledToBottom = false
                 }
             }
-    }
-
-    // Sort songs based on current sort option using derivedStateOf to prevent unnecessary recomposition
-    val sortedSongs by remember {
-        androidx.compose.runtime.derivedStateOf {
-            when (currentSortOption) {
-                SortOption.TITLE_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
-                SortOption.TITLE_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
-                SortOption.ARTIST_ASC -> uiState.allSongs.sortedBy { it.artist.lowercase() }
-                SortOption.ARTIST_DESC -> uiState.allSongs.sortedByDescending { it.artist.lowercase() }
-                SortOption.RELEASE_YEAR_DESC -> uiState.allSongs.sortedByDescending {
-                    it.releaseYear ?: 0
-                }
-
-                SortOption.RELEASE_YEAR_ASC -> uiState.allSongs.sortedBy { it.releaseYear ?: 0 }
-                SortOption.ADDED_TIMESTAMP_DESC -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
-                SortOption.ADDED_TIMESTAMP_ASC -> uiState.allSongs.sortedBy { it.addedTimestamp }
-                SortOption.DURATION_DESC -> uiState.allSongs.sortedByDescending { it.duration }
-                SortOption.DURATION_ASC -> uiState.allSongs.sortedBy { it.duration }
-                SortOption.NAME_ASC -> uiState.allSongs.sortedBy { it.title.lowercase() }
-                SortOption.NAME_DESC -> uiState.allSongs.sortedByDescending { it.title.lowercase() }
-                SortOption.ARTIST -> uiState.allSongs.sortedBy { it.artist.lowercase() }
-                SortOption.DATE_ADDED_OLDEST -> uiState.allSongs.sortedBy { it.addedTimestamp }
-                SortOption.DATE_ADDED_NEWEST -> uiState.allSongs.sortedByDescending { it.addedTimestamp }
-                SortOption.CUSTOM -> uiState.allSongs
-            }
-        }
     }
 
     // Animation states
@@ -233,6 +244,8 @@ fun HomeScreen(
                     onRefreshClick = { homeViewModel.scanMusic() },
                     onTrainClick = onTrainClick,
                     onOpenSettings = onOpenSettings,
+                    onNavigateToHistory = onNavigateToHistory,
+                    onNavigateToStats = onNavigateToStats,
                     userPreferences = userPreferences,
                     userName = userName,
                     userInitial = userInitial
@@ -322,7 +335,7 @@ fun HomeScreen(
 
                         if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
                             item {
-                                Spacer(modifier = Modifier.height(15.dp))
+                                SmallSpacer()
                             }
                         }
 
@@ -438,6 +451,14 @@ fun HomeScreen(
 
                         // Online Recommendations Section
                         if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                            item {
+                                SmallSpacer()
+                            }
+
+                            item {
+                                SectionDivider()
+                            }
+
                             item(
                                 key = "recommendations",
                                 contentType = "recommendations"
@@ -485,7 +506,15 @@ fun HomeScreen(
 
                         if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
                             item {
-                                Spacer(modifier = Modifier.height(15.dp))
+                                SmallSpacer()
+                            }
+
+                            item {
+                                SectionDivider()
+                            }
+
+                            item {
+                                SmallSpacer()
                             }
                         }
 
@@ -522,21 +551,41 @@ fun HomeScreen(
                             }
                         }
 
+                        // Most Played Section (only show if there are most played songs)
+                        if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.mostPlayedSongs.isNotEmpty()) {
+                            item {
+                                SmallSpacer()
+                            }
+
+                            item(
+                                key = "most_played",
+                                contentType = "section"
+                            ) {
+                                MostPlayedSection(
+                                    songs = uiState.mostPlayedSongs,
+                                    onSongClick = { song ->
+                                        playerViewModel.playSong(song, uiState.allSongs)
+                                    },
+                                    onSongLongClick = { _ ->
+                                        // Could add options dialog here if needed
+                                    }
+                                )
+                                SectionSpacer()
+                            }
+                        }
+
                         // Divider and Quick Access (only show if there are local songs)
                         if (selectedFilter == "All" && uiState.allSongs.isNotEmpty()) {
                             item {
-                                Spacer(modifier = Modifier.height(15.dp))
+                                SmallSpacer()
                             }
 
                             item {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = AppColors.divider
-                                )
+                                SectionDivider()
                             }
 
                             item {
-                                Spacer(modifier = Modifier.height(25.dp))
+                                SmallSpacer()
                             }
                         }
 
@@ -556,32 +605,26 @@ fun HomeScreen(
                             }
 
                             item {
-                                Spacer(modifier = Modifier.height(25.dp))
+                                ExtraLargeSpacer()
                             }
 
                             item {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = AppColors.divider
-                                )
+                                SectionDivider()
                             }
 
                             item {
-                                Spacer(modifier = Modifier.height(10.dp))
+                                SmallSpacer()
                             }
                         }
 
                         // Empty Music State - Show when no local songs available
                         if (uiState.allSongs.isEmpty()) {
                             item {
-                                Spacer(modifier = Modifier.height(20.dp))
+                                LargeSpacer()
                             }
 
                             item {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = AppColors.divider
-                                )
+                                SectionDivider()
                             }
 
                             item {
@@ -600,7 +643,7 @@ fun HomeScreen(
 
                         // Bottom padding for mini player
                         item {
-                            Spacer(modifier = Modifier.height(80.dp))
+                            BottomPaddingSpacer()
                         }
                     }
                 }

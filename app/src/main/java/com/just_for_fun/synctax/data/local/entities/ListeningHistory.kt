@@ -18,5 +18,6 @@ data class ListeningHistory(
     val skipped: Boolean,
     val timeOfDay: Int, // Hour of day (0-23)
     val dayOfWeek: Int, // 1-7
-    val repeatCount: Int = 0
+    val repeatCount: Int = 0,
+    val userRating: Int? = null // 1 = dislike (thumbs down), 2 = like (thumbs up), null = no rating
 )

@@ -726,4 +726,43 @@ class MusicRepository(private val context: Context) {
     suspend fun deleteSong(songId: String) = withContext(Dispatchers.IO) {
         songDao.deleteSongsByIds(listOf(songId))
     }
+
+    // ========== Favorites Functions ==========
+
+    /**
+     * Get all favorite songs
+     */
+    fun getFavoriteSongs(): Flow<List<Song>> = songDao.getFavoriteSongs()
+
+    /**
+     * Toggle favorite status for a song
+     */
+    suspend fun toggleFavorite(songId: String) = withContext(Dispatchers.IO) {
+        songDao.toggleFavorite(songId)
+    }
+
+    /**
+     * Set favorite status for a song
+     */
+    suspend fun setFavorite(songId: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
+        songDao.setFavorite(songId, isFavorite)
+    }
+
+    // ========== Most Played Functions ==========
+
+    /**
+     * Get most played songs based on listening history
+     */
+    suspend fun getMostPlayedSongs(limit: Int = 10): List<Song> = withContext(Dispatchers.IO) {
+        songDao.getMostPlayedSongs(limit)
+    }
+
+    // ========== User Rating Functions ==========
+
+    /**
+     * Update user rating for a song (1 = dislike, 2 = like)
+     */
+    suspend fun updateUserRating(songId: String, rating: Int) = withContext(Dispatchers.IO) {
+        historyDao.updateUserRating(songId, rating)
+    }
 }

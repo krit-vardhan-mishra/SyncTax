@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,6 +67,8 @@ fun SimpleDynamicMusicTopAppBar(
     onNavigateBack: (() -> Unit)? = null,
     onTrainClick: (() -> Unit)? = null,
     onOpenSettings: (() -> Unit)? = null,
+    onNavigateToHistory: (() -> Unit)? = null,
+    onNavigateToStats: (() -> Unit)? = null,
     userPreferences: UserPreferences? = null,
     userName: String? = null,
     userInitial: String? = null,
@@ -234,6 +238,38 @@ fun SimpleDynamicMusicTopAppBar(
                 onClick = {
                     showProfileDialog = false
                     showNameChangeDialog = true
+                }
+            ),
+            DialogOption(
+                id = "history",
+                title = "Listening History",
+                icon = {
+                    Icon(
+                        Icons.Default.History,
+                        contentDescription = null,
+                        tint = PlayerTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    showProfileDialog = false
+                    onNavigateToHistory?.invoke()
+                }
+            ),
+            DialogOption(
+                id = "stats",
+                title = "Listening Stats",
+                icon = {
+                    Icon(
+                        Icons.Default.BarChart,
+                        contentDescription = null,
+                        tint = PlayerTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    showProfileDialog = false
+                    onNavigateToStats?.invoke()
                 }
             )
         )

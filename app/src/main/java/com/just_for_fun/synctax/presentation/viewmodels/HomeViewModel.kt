@@ -80,6 +80,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         loadModelStatus()
         // Load saved playlists from YouTube Music
         loadSavedPlaylists()
+        // Load most played songs
+        loadMostPlayedSongs()
+        // Observe favorite songs
+        observeFavoriteSongs()
     }
 
     private fun observeListenAgain() {
@@ -96,6 +100,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             quickAccessManager.quickAccessSongs.collect { list ->
                 _uiState.value = _uiState.value.copy(quickAccessSongs = list)
+            }
+        }
+    }
+
+    private fun loadMostPlayedSongs() {
+        viewModelScope.launch(AppDispatchers.Database) {
+            try {
+                val mostPlayed = repository.getMostPlayedSongs(10)
+                _uiState.value = _uiState.value.copy(mostPlayedSongs = mostPlayed)
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Failed to load most played songs: ${e.message}")
+            }
+        }
+    }
+
+    private fun observeFavoriteSongs() {
+        viewModelScope.launch {
+            repository.getFavoriteSongs().collect { favorites ->
+                _uiState.value = _uiState.value.copy(favoriteSongs = favorites)
+            }
+        }
+    }
+
+    fun toggleFavorite(songId: String) {
+        viewModelScope.launch(AppDispatchers.Database) {
+            try {
+                repository.toggleFavorite(songId)
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Failed to toggle favorite: ${e.message}")
             }
         }
     }
@@ -1189,7 +1222,11 @@ data class HomeUiState(
     val currentTrainingPhase: String = "",
     val modelStatus: ModelTrainingStatus = ModelTrainingStatus(),
     val trainingStatistics: TrainingStatistics = TrainingStatistics(),
-    val trainingHistory: List<TrainingSession> = emptyList()
+    val trainingHistory: List<TrainingSession> = emptyList(),
+    // Most played songs
+    val mostPlayedSongs: List<Song> = emptyList(),
+    // Favorite songs
+    val favoriteSongs: List<Song> = emptyList()
 )
 
 // Training-related data classes

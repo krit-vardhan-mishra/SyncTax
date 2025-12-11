@@ -1,6 +1,14 @@
 package com.just_for_fun.synctax.presentation.components.card
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,9 +24,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +39,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +55,7 @@ import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.components.player.AnimatedWaveform
 import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
-import com.just_for_fun.synctax.presentation.components.player.createSongOptions
+import com.just_for_fun.synctax.presentation.components.player.DialogOption
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +63,11 @@ fun QuickPickCard(
     song: Song,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isPlaying: Boolean = false, // Defaulted to false for safety
-    onAddToQueue: ((Song) -> Unit)? = null
+    isPlaying: Boolean = false,
+    isFavorite: Boolean = false,
+    onAddToQueue: ((Song) -> Unit)? = null,
+    onToggleFavorite: ((Song) -> Unit)? = null,
+    onAddToPlaylist: ((Song) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     var isPressed by remember { mutableStateOf(false) }
@@ -80,14 +93,67 @@ fun QuickPickCard(
         label = "waveScale"
     )
 
-    // Create options for the dialog
-    val dialogOptions = remember(song, onAddToQueue) {
-        mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
+    // Create comprehensive options for the dialog
+    val dialogOptions = remember(song, onAddToQueue, onToggleFavorite, onAddToPlaylist, isFavorite) {
+        mutableListOf<DialogOption>().apply {
+            // Play Now option
+            add(DialogOption(
+                id = "play_now",
+                title = "Play Now",
+                subtitle = "Play this song immediately",
+                icon = {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = onClick
+            ))
+            
+            // Add to Queue option
             onAddToQueue?.let {
-                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                add(DialogOption(
                     id = "add_to_queue",
                     title = "Add to Queue",
-                    subtitle = "Add to current playlist",
+                    subtitle = "Add to end of current queue",
+                    icon = {
+                        Icon(
+                            Icons.Default.QueueMusic,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+            
+            // Toggle Favorite option
+            onToggleFavorite?.let {
+                add(DialogOption(
+                    id = "toggle_favorite",
+                    title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                    subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                    icon = {
+                        Icon(
+                            if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+            
+            // Add to Playlist option
+            onAddToPlaylist?.let {
+                add(DialogOption(
+                    id = "add_to_playlist",
+                    title = "Add to Playlist",
+                    subtitle = "Save to a playlist",
                     icon = {
                         Icon(
                             Icons.Default.PlaylistAdd,

@@ -73,7 +73,7 @@ fun LibraryScreen(
     val playerState by playerViewModel.uiState.collectAsState()
     val userName by userPreferences.userName.collectAsState()
     val userInitial = userPreferences.getUserInitial()
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { 4 }) // Added Favorites tab
     val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
@@ -154,7 +154,7 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // --- CUSTOM SEGMENTED/PILL TAB ROW ---
-                val tabs = listOf("Songs", "Artists", "Albums")
+                val tabs = listOf("Songs", "Artists", "Albums", "Favorites")
 
                 TabRow(
                     selectedTabIndex = pagerState.currentPage,
@@ -223,6 +223,7 @@ fun LibraryScreen(
                                 playerViewModel.playSong(song, queue)
                             },
                             homeViewModel = homeViewModel,
+                            playerViewModel = playerViewModel,
                             cardBackgroundColor = cardBackgroundColor,
                             sectionTitleColor = sectionTitleColor,
                             sectionSubtitleColor = sectionSubtitleColor
@@ -240,6 +241,20 @@ fun LibraryScreen(
                             onAlbumClick = { album, artist, albumSongs ->
                                 onNavigateToAlbum(album, artist, albumSongs)
                             }
+                        )
+
+                        3 -> SongsTab(
+                            songs = uiState.favoriteSongs,
+                            sortOption = sortOption,
+                            onSongClick = { song, queue ->
+                                playerViewModel.playSong(song, queue.ifEmpty { uiState.allSongs })
+                            },
+                            homeViewModel = homeViewModel,
+                            playerViewModel = playerViewModel,
+                            cardBackgroundColor = cardBackgroundColor,
+                            sectionTitleColor = sectionTitleColor,
+                            sectionSubtitleColor = sectionSubtitleColor,
+                            emptyMessage = "No favorites yet. Long-press a song to add it to favorites."
                         )
                     }
                 }

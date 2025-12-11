@@ -21,9 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,6 +90,9 @@ fun SongCard(
     onDelete: ((Song) -> Unit)? = null,
     onAddToPlaylist: ((Song) -> Unit)? = null,
     onAddNext: ((Song) -> Unit)? = null,
+    onAddToQueue: ((Song) -> Unit)? = null,
+    onToggleFavorite: ((Song) -> Unit)? = null,
+    isFavorite: Boolean = false,
     backgroundColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     titleColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
     artistColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -106,16 +112,33 @@ fun SongCard(
     )
 
     // Create options for the dialog
-    val dialogOptions = remember(song, onAddToPlaylist, onAddNext, onDelete) {
+    val dialogOptions = remember(song, onAddToPlaylist, onAddNext, onAddToQueue, onToggleFavorite, onDelete, isFavorite) {
         mutableListOf<com.just_for_fun.synctax.presentation.components.player.DialogOption>().apply {
-            onAddToPlaylist?.let {
+            // Play Now option
+            add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                id = "play_now",
+                title = "Play Now",
+                subtitle = "Play this song immediately",
+                icon = {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = onClick
+            ))
+            
+            // Add to Queue option
+            onAddToQueue?.let {
                 add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
-                    id = "add_to_playlist",
-                    title = "Add to Playlist",
-                    subtitle = "Save to a playlist",
+                    id = "add_to_queue",
+                    title = "Add to Queue",
+                    subtitle = "Add to end of current queue",
                     icon = {
                         Icon(
-                            Icons.Default.Add,
+                            Icons.Default.QueueMusic,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -124,6 +147,8 @@ fun SongCard(
                     onClick = { it(song) }
                 ))
             }
+            
+            // Play Next option
             onAddNext?.let {
                 add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
                     id = "add_next",
@@ -140,6 +165,44 @@ fun SongCard(
                     onClick = { it(song) }
                 ))
             }
+            
+            // Add to Favorites option
+            onToggleFavorite?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "toggle_favorite",
+                    title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                    subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                    icon = {
+                        Icon(
+                            if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+            
+            // Add to Playlist option
+            onAddToPlaylist?.let {
+                add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
+                    id = "add_to_playlist",
+                    title = "Add to Playlist",
+                    subtitle = "Save to a playlist",
+                    icon = {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(song) }
+                ))
+            }
+            
+            // Delete option
             onDelete?.let {
                 add(com.just_for_fun.synctax.presentation.components.player.DialogOption(
                     id = "delete",

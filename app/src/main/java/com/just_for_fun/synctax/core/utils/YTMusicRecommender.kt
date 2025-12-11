@@ -1,9 +1,13 @@
 package com.just_for_fun.synctax.core.utils
 
 import android.util.Log
-import com.chaquo.python.Python
 import com.chaquo.python.PyException
-import kotlinx.coroutines.*
+import com.chaquo.python.Python
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 

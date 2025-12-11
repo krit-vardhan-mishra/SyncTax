@@ -5,15 +5,17 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.di.AppModule
 import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
-import com.just_for_fun.synctax.data.local.entities.*
-import com.just_for_fun.synctax.data.repository.*
+import com.just_for_fun.synctax.data.local.entities.OnlineSong
+import com.just_for_fun.synctax.data.local.entities.Playlist
+import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.data.repository.PlaylistRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * UI state for playlist screen

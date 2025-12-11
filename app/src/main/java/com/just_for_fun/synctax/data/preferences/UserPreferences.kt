@@ -166,6 +166,32 @@ class UserPreferences(context: Context) {
         prefs.edit().putBoolean(KEY_DIRECTORY_SELECTION_SHOWN, shown).apply()
     }
 
+    // --- Sleep Timer preference ---
+    private val _sleepTimerMinutes = MutableStateFlow(getSleepTimerMinutes())
+    val sleepTimerMinutes: StateFlow<Int> = _sleepTimerMinutes.asStateFlow()
+
+    fun getSleepTimerMinutes(): Int {
+        return prefs.getInt(KEY_SLEEP_TIMER_MINUTES, 0) // 0 = disabled
+    }
+
+    fun setSleepTimerMinutes(minutes: Int) {
+        prefs.edit().putInt(KEY_SLEEP_TIMER_MINUTES, minutes).apply()
+        _sleepTimerMinutes.value = minutes
+    }
+
+    // --- Crossfade preference ---
+    private val _crossfadeEnabled = MutableStateFlow(isCrossfadeEnabled())
+    val crossfadeEnabled: StateFlow<Boolean> = _crossfadeEnabled.asStateFlow()
+
+    fun isCrossfadeEnabled(): Boolean {
+        return prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
+    }
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_CROSSFADE_ENABLED, enabled).apply()
+        _crossfadeEnabled.value = enabled
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -195,5 +221,11 @@ class UserPreferences(context: Context) {
         const val GUIDE_SEARCH = "search"
         const val GUIDE_LIBRARY = "library"
         const val GUIDE_QUICK_PICKS = "quick_picks"
+
+        // Sleep timer
+        private const val KEY_SLEEP_TIMER_MINUTES = "sleep_timer_minutes"
+
+        // Crossfade/gapless playback
+        private const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
     }
 }

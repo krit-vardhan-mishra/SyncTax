@@ -47,4 +47,29 @@ interface SongDao {
 
     @Query("DELETE FROM songs")
     suspend fun deleteAll()
+
+    // Favorites queries
+    @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY addedTimestamp DESC")
+    fun getFavoriteSongs(): Flow<List<Song>>
+
+    @Query("UPDATE songs SET isFavorite = NOT isFavorite WHERE id = :songId")
+    suspend fun toggleFavorite(songId: String)
+
+    @Query("UPDATE songs SET isFavorite = :isFavorite WHERE id = :songId")
+    suspend fun setFavorite(songId: String, isFavorite: Boolean)
+
+    // Most played songs query - joins with listening_history to get play counts
+    @Query("""
+        SELECT s.* FROM songs s
+        INNER JOIN (
+            SELECT songId, COUNT(*) as playCount 
+            FROM listening_history 
+            WHERE songId NOT LIKE 'online:%'
+            GROUP BY songId 
+            ORDER BY playCount DESC 
+            LIMIT :limit
+        ) h ON s.id = h.songId
+        ORDER BY h.playCount DESC
+    """)
+    suspend fun getMostPlayedSongs(limit: Int = 10): List<Song>
 }

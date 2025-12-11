@@ -24,8 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.components.card.SongCard
+import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
 import com.just_for_fun.synctax.presentation.components.utils.SortOption
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 
@@ -35,10 +37,30 @@ fun SongsTab(
     sortOption: SortOption,
     onSongClick: (Song, List<Song>) -> Unit,
     homeViewModel: HomeViewModel,
+    playerViewModel: PlayerViewModel,
     cardBackgroundColor: Color,
     sectionTitleColor: Color,
-    sectionSubtitleColor: Color
+    sectionSubtitleColor: Color,
+    emptyMessage: String = "No songs found. Scan your device to discover music.",
+    favoriteSongIds: Set<Long> = emptySet()
 ) {
+    // Show empty state if no songs
+    if (songs.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = emptyMessage,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        return
+    }
     val lazyListState = rememberLazyListState()
 
     // Memoized sorting - O(n log n) only when songs or sortOption changes
@@ -164,6 +186,13 @@ fun SongsTab(
                     // Remove from local database and refresh UI
                     homeViewModel.deleteSong(deletedSong)
                 },
+                onAddToQueue = { songToAdd ->
+                    playerViewModel.addToQueue(songToAdd)
+                },
+                onToggleFavorite = { songToFavorite ->
+                    homeViewModel.toggleFavorite(songToFavorite.id)
+                },
+                isFavorite = song.isFavorite || favoriteSongIds.contains(song.id.hashCode().toLong()),
                 backgroundColor = cardBackgroundColor,
                 titleColor = sectionTitleColor,
                 artistColor = sectionSubtitleColor
