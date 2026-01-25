@@ -1,66 +1,52 @@
 package com.just_for_fun.synctax.presentation.screens
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.data.local.entities.QuickPickSong
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.presentation.background.EnhancedEmptyQuickPicksState
-import com.just_for_fun.synctax.presentation.components.card.RecommendationCard
-import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
 import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
 import com.just_for_fun.synctax.presentation.components.player.DialogOption
-import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
-import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.guide.GuideContent
 import com.just_for_fun.synctax.presentation.guide.GuideOverlay
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.QuickPickViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickPicksScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
-    dynamicBgViewModel: DynamicBackgroundViewModel = viewModel()
-
+    dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
+    quickPickViewModel: QuickPickViewModel = viewModel()
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
+    val quickPickState by quickPickViewModel.uiState.collectAsState()
+    val selectedMode by quickPickViewModel.selectedMode.collectAsState()
     val context = LocalContext.current
     val userPreferences = remember(context) { UserPreferences(context) }
     var showGuide by remember { mutableStateOf(userPreferences.shouldShowGuide(UserPreferences.GUIDE_QUICK_PICKS)) }
@@ -70,17 +56,123 @@ fun QuickPicksScreen(
     // Bottom sheet state
     var showOptionsDialog by remember { mutableStateOf(false) }
     var selectedSong by remember { mutableStateOf<Song?>(null) }
-    val haptic = LocalHapticFeedback.current
+    
+    // Player Coordination: Pause unified player when entering Picks screen
+    // This prevents audio conflicts between unified player and motion player
+    var wasPlayingBeforeEntering by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        // Save current playback state and pause unified player when entering
+        wasPlayingBeforeEntering = playerState.isPlaying
+        if (playerState.isPlaying) {
+            playerViewModel.togglePlayPause()
+        }
+    }
+    
+    // Note: We don't auto-resume on exit because the Motion Player handles 
+    // its own song playback. User can resume manually if needed.
 
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
+    // Stable song list - only update when mode changes or initial load
+    // This prevents the pager from resetting when queue updates during playback
+    var stableSongList by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var lastMode by remember { mutableStateOf(selectedMode) }
+    
+    // Update stable list only on mode change or when list is empty
+    LaunchedEffect(selectedMode, quickPickState.offlineQueue, quickPickState.onlineQueueRaw, uiState.quickPicks) {
+        val newList = when (selectedMode) {
+            "Online" -> quickPickState.onlineQueueRaw.map { it.toSong() }
+            else -> {
+                if (quickPickState.offlineQueue.isNotEmpty()) {
+                    quickPickState.offlineQueue
+                } else {
+                    uiState.quickPicks
+                }
+            }
+        }
+        
+        // Check if mode actually changed
+        val modeChanged = selectedMode != lastMode
+        
+        // Update list if:
+        // 1. Mode changed
+        // 2. List is empty and we have new songs
+        // 3. Initial load (stableSongList is empty)
+        if (modeChanged || stableSongList.isEmpty() || newList.isNotEmpty() && stableSongList.isEmpty()) {
+            stableSongList = newList
+            lastMode = selectedMode
+            
+            // Preload stream URLs for online songs when queue updates
+            if (selectedMode == "Online" && newList.isNotEmpty()) {
+                quickPickViewModel.preloadOnlineQueue()
+            }
+            
+            // Auto-play first song when mode changes and we have songs
+            if (modeChanged && newList.isNotEmpty()) {
+                val firstSong = newList.first()
+                if (selectedMode == "Online") {
+                    // Stop current playback and play first online song
+                    val videoId = firstSong.id.removePrefix("online:")
+                    playerViewModel.playUrl(
+                        url = "https://www.youtube.com/watch?v=$videoId",
+                        title = firstSong.title,
+                        artist = firstSong.artist,
+                        durationMs = firstSong.duration,
+                        thumbnailUrl = firstSong.albumArtUri
+                    )
+                } else {
+                    // Play first offline song
+                    playerViewModel.playSong(firstSong, newList)
+                }
+            }
+        }
+    }
+    
+    // Use stable list for the player
+    val currentSongs = stableSongList
+
+    // Track which songs have been recorded to avoid duplicate tracking
+    var lastTrackedSongId by remember { mutableStateOf<String?>(null) }
+    
+    // Track song plays for Quick Pick seeding - only after minimum play time
+    // This prevents rapid tracking when swiping through songs
+    val currentSelectedMode by rememberUpdatedState(selectedMode)
+    val currentQuickPickState by rememberUpdatedState(quickPickState)
+    
+    LaunchedEffect(playerState.currentSong?.id, playerState.isPlaying) {
+        val song = playerState.currentSong ?: return@LaunchedEffect
+        
+        // Only track if song is playing and hasn't been tracked yet
+        if (playerState.isPlaying && song.id != lastTrackedSongId) {
+            // Wait for minimum play time (3 seconds) before tracking
+            // This prevents tracking when user is quickly swiping through songs
+            delay(3000L)
+            
+            // Check if same song is still playing after delay
+            if (playerState.currentSong?.id == song.id && playerState.isPlaying) {
+                lastTrackedSongId = song.id
+                
+                if (currentSelectedMode == "Online") {
+                    // For online mode, check if it's from our queue
+                    currentQuickPickState.onlineQueueRaw.find { it.songId == song.id }?.let {
+                        quickPickViewModel.onSongPlayedWithoutQueueRefresh(it)
+                    }
+                } else {
+                    // For offline mode, record the play
+                    quickPickViewModel.onOfflineSongPlayedWithoutQueueRefresh(song)
+                }
+            }
+        }
+    }
+
     // Full screen Motion Player
     Box(modifier = Modifier.fillMaxSize()) {
         MotionPlayerScreen(
-            songs = uiState.quickPicks,
-            currentSong = playerState.currentSong ?: uiState.quickPicks.firstOrNull(),
+            songs = currentSongs,
+            currentSong = playerState.currentSong ?: currentSongs.firstOrNull(),
             isPlaying = playerState.isPlaying,
             currentPosition = playerState.position,
             totalDuration = playerState.duration,
@@ -92,8 +184,30 @@ fun QuickPicksScreen(
             onNext = { playerViewModel.next() },
             onPrevious = { playerViewModel.previous() },
             onSongSelected = { song ->
-                    playerViewModel.playSong(song, uiState.quickPicks)
-            }
+                if (selectedMode == "Online") {
+                    // For online songs, play via URL
+                    // Extract videoId by removing "online:" prefix if present
+                    val videoId = song.id.removePrefix("online:")
+                    playerViewModel.playUrl(
+                        url = "https://www.youtube.com/watch?v=$videoId",
+                        title = song.title,
+                        artist = song.artist,
+                        durationMs = song.duration,
+                        thumbnailUrl = song.albumArtUri
+                    )
+                } else {
+                    // For offline songs, play normally
+                    playerViewModel.playSong(song, currentSongs)
+                }
+            },
+            onModeChanged = { mode ->
+                quickPickViewModel.setMode(mode)
+            },
+            onShuffle = {
+                // Shuffle regenerates the queue with new recommendations
+                quickPickViewModel.shuffle()
+            },
+            selectedMode = selectedMode
         )
 
         // Guide overlay
@@ -128,7 +242,18 @@ fun QuickPicksScreen(
                             )
                         },
                         onClick = {
-                            playerViewModel.playSong(song, uiState.quickPicks)
+                            if (selectedMode == "Online") {
+                                val videoId = song.id.removePrefix("online:")
+                                playerViewModel.playUrl(
+                                    url = "https://www.youtube.com/watch?v=$videoId",
+                                    title = song.title,
+                                    artist = song.artist,
+                                    durationMs = song.duration,
+                                    thumbnailUrl = song.albumArtUri
+                                )
+                            } else {
+                                playerViewModel.playSong(song, currentSongs)
+                            }
                         }
                     )
                 )
@@ -153,25 +278,27 @@ fun QuickPicksScreen(
                     )
                 )
                 
-                // Add to Favorites option
-                add(
-                    DialogOption(
-                        id = "toggle_favorite",
-                        title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
-                        subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
-                        icon = {
-                            Icon(
-                                if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                    contentDescription = null,
-                                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                        onClick = {
-                            homeViewModel.toggleFavorite(song.id)
-                        }
+                // Add to Favorites option (only for offline songs)
+                if (selectedMode == "Offline") {
+                    add(
+                        DialogOption(
+                            id = "toggle_favorite",
+                            title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                            subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                            icon = {
+                                Icon(
+                                    if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                        contentDescription = null,
+                                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                },
+                            onClick = {
+                                homeViewModel.toggleFavorite(song.id)
+                            }
+                        )
                     )
-                )
+                }
             }
         } ?: emptyList()
     }
@@ -184,5 +311,24 @@ fun QuickPicksScreen(
         options = dialogOptions,
         title = "Song Options",
         description = "Choose an action for this song"
+    )
+}
+
+/**
+ * Extension function to convert QuickPickSong to Song for playback
+ */
+private fun QuickPickSong.toSong(): Song {
+    // For online songs, use "online:" prefix to match PlayerViewModel's format
+    val effectiveId = if (source == "online") "online:$songId" else songId
+    return Song(
+        id = effectiveId,
+        title = title,
+        artist = artist,
+        album = null,
+        duration = duration,
+        filePath = filePath ?: "online:$songId",
+        genre = null,
+        releaseYear = null,
+        albumArtUri = thumbnailUrl
     )
 }

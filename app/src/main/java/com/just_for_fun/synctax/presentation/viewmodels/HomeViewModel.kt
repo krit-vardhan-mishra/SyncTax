@@ -324,7 +324,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             )
                         }
-                    results.addAll(mixedResults)
+                    
+                    // Sort the mixed results to prioritize Songs > Videos > Others
+                    val sortedResults = mixedResults.sortedBy { result ->
+                        when (result.type) {
+                            OnlineResultType.SONG -> 0
+                            OnlineResultType.VIDEO -> 1
+                            OnlineResultType.PODCAST, OnlineResultType.EPISODE -> 2
+                            else -> 3
+                        }
+                    }
+                    
+                    results.addAll(sortedResults)
                 } else {
                     // Specific filters
                     // Search for songs if filter is SONGS

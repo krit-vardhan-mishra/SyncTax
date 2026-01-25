@@ -12,6 +12,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +29,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BlurOff
@@ -131,7 +134,10 @@ fun MotionPlayerScreen(
     onBack: () -> Unit = {},
     onNext: () -> Unit = {},
     onPrevious: () -> Unit = {},
-    onSongSelected: (Song) -> Unit = {}
+    onSongSelected: (Song) -> Unit = {},
+    onModeChanged: (String) -> Unit = {},
+    onShuffle: () -> Unit = {},
+    selectedMode: String = "Offline"
 ) {
     if (songs.isEmpty() || currentSong == null) {
         Box(
@@ -145,6 +151,9 @@ fun MotionPlayerScreen(
         return
     }
 
+    // Track the last selected song to prevent duplicate selections
+    var lastSelectedSongId by remember { mutableStateOf(currentSong.id) }
+
     val initialIndex = remember(currentSong) {
         songs.indexOfFirst { it.id == currentSong.id }.coerceAtLeast(0)
     }
@@ -153,17 +162,22 @@ fun MotionPlayerScreen(
         pageCount = { songs.size }
     )
 
-    LaunchedEffect(currentSong) {
+    // Sync pager with current song changes (from external sources like next/previous buttons)
+    LaunchedEffect(currentSong.id) {
         val index = songs.indexOfFirst { it.id == currentSong.id }
         if (index >= 0 && index != pagerState.currentPage) {
+            lastSelectedSongId = currentSong.id
             pagerState.animateScrollToPage(index)
         }
     }
 
+    // Handle page changes - play song INSTANTLY when page settles
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }.collect { page ->
             val selectedSong = songs.getOrNull(page)
-            if (selectedSong != null && selectedSong.id != currentSong.id) {
+            if (selectedSong != null && selectedSong.id != lastSelectedSongId) {
+                // Instant song change - no debounce for responsive feel
+                lastSelectedSongId = selectedSong.id
                 onSongSelected(selectedSong)
             }
         }
@@ -171,7 +185,8 @@ fun MotionPlayerScreen(
 
     VerticalPager(
         state = pagerState,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        key = { index -> "${index}_${songs.getOrNull(index)?.id ?: index}" }
     ) { pageIndex ->
         val song = songs[pageIndex]
         MotionPlayerPage(
@@ -186,7 +201,10 @@ fun MotionPlayerScreen(
             onBack = onBack,
             onNext = onNext,
             onPrevious = onPrevious,
-            isCurrentSong = song.id == currentSong.id
+            isCurrentSong = song.id == currentSong.id,
+            onModeChanged = onModeChanged,
+            onShuffle = onShuffle,
+            selectedMode = selectedMode
         )
     }
 }
@@ -202,7 +220,10 @@ fun MotionPlayerPage(
     onBack: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
-    isCurrentSong: Boolean
+    isCurrentSong: Boolean,
+    onModeChanged: (String) -> Unit = {},
+    onShuffle: () -> Unit = {},
+    selectedMode: String = "Offline"
 ) {
     // --- State Setup ---
 
@@ -326,14 +347,24 @@ fun MotionPlayerPage(
                     )
                 }
 
-                // Title
-                Text(
-                    text = "NOW PLAYING",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.7f),
-                    letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing.times(1.2)
-                )
+                // Title Area with Capsule Switch
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    GlassCapsuleSwitch(
+                        selectedOption = selectedMode,
+                        onOptionSelected = { onModeChanged(it) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "NOW PLAYING",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.7f),
+                        letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing.times(1.2)
+                    )
+                }
 
                 // Blur Toggle (Top Right)
                 IconButton(
@@ -413,8 +444,8 @@ fun MotionPlayerPage(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Shuffle (Dummy)
-                    IconButton(onClick = { }) {
+                    // Shuffle - regenerates queue with new recommendations
+                    IconButton(onClick = onShuffle) {
                         Icon(Icons.Default.Shuffle, null, tint = Color.White.copy(alpha = 0.7f))
                     }
 
@@ -447,6 +478,66 @@ fun MotionPlayerPage(
                     IconButton(onClick = { }) {
                         Icon(Icons.Default.Repeat, null, tint = Color.White.copy(alpha = 0.7f))
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GlassCapsuleSwitch(
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit
+) {
+    val options = listOf("Offline", "Online")
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.15f),
+                        Color.White.copy(alpha = 0.05f)
+                    )
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.4f),
+                        Color.Transparent,
+                        Color.White.copy(alpha = 0.2f)
+                    ),
+                    start = Offset.Zero,
+                    end = Offset.Infinite
+                ),
+                shape = RoundedCornerShape(50)
+            )
+            .padding(4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            options.forEach { option ->
+                val isSelected = selectedOption == option
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent
+                        )
+                        .clickable { onOptionSelected(option) }
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = option,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f),
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
             }
         }

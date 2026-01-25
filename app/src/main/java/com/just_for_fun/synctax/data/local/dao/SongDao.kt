@@ -12,6 +12,9 @@ interface SongDao {
     @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC")
     fun getAllSongs(): Flow<List<Song>>
 
+    @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC")
+    suspend fun getAllSongsList(): List<Song>
+
     @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC LIMIT :limit OFFSET :offset")
     suspend fun getSongsPaginated(limit: Int, offset: Int): List<Song>
 

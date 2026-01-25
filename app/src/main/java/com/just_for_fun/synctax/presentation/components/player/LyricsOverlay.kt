@@ -100,6 +100,15 @@ fun LyricsOverlay(
     val showCustomSearchDialog = remember { mutableStateOf(false) }
     val customSongName = remember { mutableStateOf(song.title) }
     val customArtistName = remember { mutableStateOf(song.artist) }
+    
+    // Smart Lyrics Loading: Auto-fetch lyrics when overlay opens if not available
+    // This reduces user effort - lyrics are fetched automatically on first open
+    LaunchedEffect(song.id) {
+        if (lyrics.isNullOrEmpty() && !isFetchingLyrics && !hasFailedFetch) {
+            // Auto-trigger lyric fetch for better UX
+            onFetchLyrics()
+        }
+    }
 
     // Enhanced Glass Background with multiple layers for depth
     Box(

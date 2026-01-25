@@ -10,6 +10,7 @@ import com.just_for_fun.synctax.data.local.dao.OnlineSearchHistoryDao
 import com.just_for_fun.synctax.data.local.dao.OnlineSongDao
 import com.just_for_fun.synctax.data.local.dao.PlaylistDao
 import com.just_for_fun.synctax.data.local.dao.PlaylistSongDao
+import com.just_for_fun.synctax.data.local.dao.QuickPickDao
 import com.just_for_fun.synctax.data.local.dao.RecommendationCacheDao
 import com.just_for_fun.synctax.data.local.dao.RecommendationInteractionDao
 import com.just_for_fun.synctax.data.local.dao.SongDao
@@ -20,6 +21,8 @@ import com.just_for_fun.synctax.data.local.entities.OnlineSearchHistory
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Playlist
 import com.just_for_fun.synctax.data.local.entities.PlaylistSong
+import com.just_for_fun.synctax.data.local.entities.QuickPick
+import com.just_for_fun.synctax.data.local.entities.QuickPickSong
 import com.just_for_fun.synctax.data.local.entities.RecommendationCache
 import com.just_for_fun.synctax.data.local.entities.RecommendationInteraction
 import com.just_for_fun.synctax.data.local.entities.Song
@@ -36,9 +39,11 @@ import com.just_for_fun.synctax.data.local.entities.UserPreference
         OnlineSong::class,
         PlaylistSong::class,
         RecommendationCache::class,
-        RecommendationInteraction::class
+        RecommendationInteraction::class,
+        QuickPick::class,
+        QuickPickSong::class
     ],
-    version = 8,  // Incremented for isFavorite and userRating fields
+    version = 9,  // Incremented for QuickPick entities
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
@@ -52,6 +57,7 @@ abstract class MusicDatabase : RoomDatabase() {
     abstract fun playlistSongDao(): PlaylistSongDao
     abstract fun recommendationCacheDao(): RecommendationCacheDao
     abstract fun recommendationInteractionDao(): RecommendationInteractionDao
+    abstract fun quickPickDao(): QuickPickDao
 
     companion object {
         @Volatile

@@ -38,10 +38,7 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.synctax">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+
             <!-- Intent filter for opening audio files -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

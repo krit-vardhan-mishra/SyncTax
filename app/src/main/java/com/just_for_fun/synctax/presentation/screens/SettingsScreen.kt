@@ -64,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -236,8 +237,13 @@ private fun NumericalSetting(
     val activeColor = Color(0xFFFF0033)
     val inactiveColor = Color(0xFFE8DEF8) // Light Lavender
 
+    // Local state for smooth slider movement and live preview
+    // We initialize it with the DB value (currentValue)
+    var sliderValue by remember(currentValue) { mutableFloatStateOf(currentValue.toFloat()) }
+
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Text(label, style = MaterialTheme.typography.titleSmall)
+        // Label with live count update
+        Text("$label: ${sliderValue.toInt()}", style = MaterialTheme.typography.titleSmall)
         Text(
             description,
             style = MaterialTheme.typography.bodySmall,
@@ -250,8 +256,15 @@ private fun NumericalSetting(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Slider(
-                value = currentValue.toFloat(),
-                onValueChange = { onValueChange(it.toInt()) },
+                value = sliderValue,
+                onValueChange = { newValue ->
+                    // Update local state immediately for smooth UI
+                    sliderValue = newValue
+                },
+                onValueChangeFinished = {
+                    // Only write to DB when user releases the slider
+                    onValueChange(sliderValue.toInt())
+                },
                 valueRange = valueRange,
                 steps = (valueRange.endInclusive - valueRange.start).toInt() - 1,
                 modifier = Modifier.weight(1f),
@@ -285,13 +298,17 @@ private fun NumericalSetting(
             )
 
             OutlinedTextField(
-                value = currentValue.toString(),
+                value = sliderValue.toInt().toString(),
                 onValueChange = { input ->
                     val value = input.toIntOrNull()?.coerceIn(
                         valueRange.start.toInt(),
                         valueRange.endInclusive.toInt()
-                    ) ?: currentValue
-                    onValueChange(value)
+                    )
+                    
+                    if (value != null) {
+                        sliderValue = value.toFloat()
+                        onValueChange(value)
+                    }
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.width(80.dp),

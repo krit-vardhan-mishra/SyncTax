@@ -240,7 +240,7 @@ fun HomeScreen(
                     title = "Music",
                     albumColors = albumColors,
                     showShuffleButton = true,
-                    showRefreshButton = true,
+                    showRefreshButton = false,
                     showProfileButton = true,
                     onShuffleClick = {
                         if (uiState.allSongs.isNotEmpty()) {
