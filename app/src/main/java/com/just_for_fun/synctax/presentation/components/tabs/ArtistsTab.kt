@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.ViewModule
@@ -65,7 +66,7 @@ fun ArtistsTab(
                 onClick = { isGridView = !isGridView }
             ) {
                 Icon(
-                    imageVector = if (isGridView) Icons.Filled.List else Icons.Filled.ViewModule,
+                    imageVector = if (isGridView) Icons.AutoMirrored.Filled.List else Icons.Filled.ViewModule,
                     contentDescription = if (isGridView) "Switch to List View" else "Switch to Grid View",
                     tint = MaterialTheme.colorScheme.primary
                 )

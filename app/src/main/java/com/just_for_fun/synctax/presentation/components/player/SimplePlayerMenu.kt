@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeDown
@@ -136,9 +139,9 @@ fun SimplePlayerMenu(
                     } catch (_: Exception) { }
                 }) {
                     val leftIcon = when {
-                        currentVolume <= 0f -> Icons.Default.VolumeOff
-                        currentVolume < 0.5f -> Icons.Default.VolumeDown
-                        else -> Icons.Default.VolumeDown
+                        currentVolume <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                        currentVolume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                        else -> Icons.AutoMirrored.Filled.VolumeDown
                     }
                     Icon(
                         imageVector = leftIcon,
@@ -179,9 +182,9 @@ fun SimplePlayerMenu(
                     } catch (_: Exception) { }
                 }) {
                     val rightIcon = when {
-                        currentVolume <= 0f -> Icons.Default.VolumeOff
-                        currentVolume < 0.5f -> Icons.Default.VolumeDown
-                        else -> Icons.Default.VolumeUp
+                        currentVolume <= 0f -> Icons.AutoMirrored.Filled.VolumeOff
+                        currentVolume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                        else -> Icons.AutoMirrored.Filled.VolumeUp
                     }
                     Icon(
                         imageVector = rightIcon,

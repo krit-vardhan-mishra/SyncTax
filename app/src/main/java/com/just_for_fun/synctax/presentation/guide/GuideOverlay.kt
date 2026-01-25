@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
@@ -184,7 +186,7 @@ fun GuideOverlay(
                                     onClick = { currentStep-- }
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ArrowBack,
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = "Previous",
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -215,7 +217,7 @@ fun GuideOverlay(
                                 if (currentStep < steps.size - 1) {
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Icon(
-                                        imageVector = Icons.Default.ArrowForward,
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                         contentDescription = "Next",
                                         modifier = Modifier.size(18.dp)
                                     )

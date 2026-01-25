@@ -1,23 +1,15 @@
 package com.just_for_fun.synctax.presentation.components.player
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,7 +21,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -52,6 +43,10 @@ fun UnifiedPlayer(
     volume: Float = 1.0f,
     upNext: List<Song> = emptyList(),
     playHistory: List<Song> = emptyList(),
+    // Progress from AnchoredDraggable (0 = collapsed, 1 = expanded)
+    progress: Float,
+    miniControlsAlpha: Float,
+    fullControlsAlpha: Float,
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSelectSong: (Song) -> Unit = {},
@@ -70,94 +65,31 @@ fun UnifiedPlayer(
     val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
 
-    // Track drag offset for enhanced gesture handling
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-
-    // Enhanced expansion animation with spring for bouncy feedback
-    val expansionProgress by animateFloatAsState(
-        targetValue = if (isExpanded) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "expansion"
-    )
-
     var showUpNext by remember { mutableStateOf(false) }
 
-    // Album art scale with overshoot for bouncy feedback
-    val albumArtMiniScale by animateFloatAsState(
-        targetValue = if (isExpanded) {
-            PlayerSheetConstants.ALBUM_ART_EXPANDED_SCALE
-        } else {
-            PlayerSheetConstants.ALBUM_ART_MINI_SCALE
-        },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "albumArtMiniScale"
-    )
+    // Use progress directly from parent (AnchoredDraggable)
+    val expansionProgress = progress
 
-    // Alpha blending for content transitions
-    val miniPlayerAlpha by animateFloatAsState(
-        targetValue = if (isExpanded) 0f else 1f,
-        animationSpec = tween(
-            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "mini_alpha"
-    )
+    // Album art scale based on expansion progress
+    val albumArtMiniScale = if (expansionProgress > 0.5f) {
+        PlayerSheetConstants.ALBUM_ART_EXPANDED_SCALE
+    } else {
+        PlayerSheetConstants.ALBUM_ART_MINI_SCALE
+    }
 
-    val expandedAlpha by animateFloatAsState(
-        targetValue = if (isExpanded) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
-            delayMillis = PlayerSheetConstants.FADE_IN_DELAY_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "expanded_alpha"
-    )
+    // Use alpha values from parent for smoother phasing with drag
+    val miniPlayerAlpha = miniControlsAlpha
+    val expandedAlpha = fullControlsAlpha
 
     BackHandler(enabled = isExpanded) {
         onExpandedChange(false)
     }
 
-    // Main Container with enhanced drag gesture handling
+    // Main Container - uses full size since parent controls positioning
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            // Dynamic height with smooth interpolation
-            .height(
-                (PlayerSheetConstants.MINI_PLAYER_HEIGHT_DP +
-                        (expansionProgress * PlayerSheetConstants.MAX_EXPANSION_HEIGHT_DP)).dp
-            )
-            .pointerInput(isExpanded) {
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        dragOffset = 0f
-                    },
-                    onDragEnd = {
-                        val absOffset = kotlin.math.abs(dragOffset)
-                        if (absOffset > PlayerSheetConstants.DRAG_THRESHOLD_PX) {
-                            // Trigger state change based on drag direction
-                            if (dragOffset < 0 && !isExpanded) {
-                                // Swipe up to expand
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onExpandedChange(true)
-                            } else if (dragOffset > 0 && isExpanded) {
-                                // Swipe down to collapse
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onExpandedChange(false)
-                            }
-                        }
-                        dragOffset = 0f
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        dragOffset += dragAmount
-                    }
-                )
-            }
+            .fillMaxSize()
             .background(PlayerBackground)
     ) {
         // --- 1. ENHANCED ANIMATED BACKGROUND LAYER ---

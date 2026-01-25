@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,7 +73,6 @@ fun PlaylistScreen(
     playerViewModel: PlayerViewModel,
     dynamicBgViewModel: DynamicBackgroundViewModel,
     userPreferences: UserPreferences,
-    scaffoldState: BottomSheetScaffoldState,
     onOpenSettings: () -> Unit = {},
     onPlaylistClick: (Int) -> Unit = {},
     onImportClick: (String) -> Unit = {},
@@ -112,11 +110,6 @@ fun PlaylistScreen(
     // Update background when song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
-    }
-
-    // Ensure bottom sheet is partially expanded when on playlist screen
-    LaunchedEffect(Unit) {
-        scaffoldState.bottomSheetState.partialExpand()
     }
 
     // Collect error messages from player view model
@@ -274,7 +267,7 @@ fun PlaylistScreen(
                                     }
                                     IconButton(onClick = { cardType.value = CardType.SMALL }) {
                                         Icon(
-                                            Icons.Default.ViewList,
+                                            Icons.AutoMirrored.Filled.ViewList,
                                             contentDescription = "Small view",
                                             tint = if (cardType.value == CardType.SMALL) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
                                         )

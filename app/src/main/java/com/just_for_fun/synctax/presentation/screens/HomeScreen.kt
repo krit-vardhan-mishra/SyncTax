@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -476,7 +477,7 @@ fun HomeScreen(
                                                     subtitle = "Add to end of current queue",
                                                     icon = {
                                                         Icon(
-                                                            Icons.Filled.QueueMusic,
+                                                            Icons.AutoMirrored.Filled.QueueMusic,
                                                             contentDescription = null,
                                                             tint = MaterialTheme.colorScheme.primary,
                                                             modifier = Modifier.size(20.dp)

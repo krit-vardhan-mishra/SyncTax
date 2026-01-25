@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,7 +74,6 @@ import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 fun PlaylistDetailScreen(
     playlistId: Int,
     playlistViewModel: PlaylistViewModel,
-    scaffoldState: BottomSheetScaffoldState,
     onBackClick: () -> Unit,
     onSongClick: (OnlineSong) -> Unit,
     onPlayAll: () -> Unit,
@@ -88,11 +86,6 @@ fun PlaylistDetailScreen(
     // Load playlist details
     LaunchedEffect(playlistId) {
         playlistViewModel.loadPlaylistDetail(playlistId)
-    }
-
-    // Ensure bottom sheet is partially expanded
-    LaunchedEffect(Unit) {
-        scaffoldState.bottomSheetState.partialExpand()
     }
 
     // Clean up on leaving

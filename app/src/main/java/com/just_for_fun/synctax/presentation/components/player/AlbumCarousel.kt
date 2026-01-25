@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.MusicNote
@@ -352,7 +353,7 @@ fun AlbumArtCarousel(
                                 showVolume -> {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(
-                                            imageVector = Icons.Rounded.VolumeUp,
+                                            imageVector = Icons.AutoMirrored.Rounded.VolumeUp,
                                             contentDescription = null,
                                             modifier = Modifier.size(48.dp),
                                             tint = Color.White

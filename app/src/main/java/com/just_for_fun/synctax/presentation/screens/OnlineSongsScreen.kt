@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -48,7 +47,6 @@ fun OnlineSongsScreen(
     playerViewModel: PlayerViewModel,
     dynamicBgViewModel: DynamicBackgroundViewModel,
     userPreferences: UserPreferences,
-    scaffoldState: BottomSheetScaffoldState,
     onOpenSettings: () -> Unit = {},
     onShuffleClick: () -> Unit = {}
 ) {
@@ -68,11 +66,6 @@ fun OnlineSongsScreen(
     // Update background when song changes
     LaunchedEffect(playerState.currentSong?.albumArtUri) {
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
-    }
-
-    // Ensure bottom sheet is partially expanded
-    LaunchedEffect(Unit) {
-        scaffoldState.bottomSheetState.partialExpand()
     }
 
     // Collect error messages from player view model

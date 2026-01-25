@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Sort
@@ -276,7 +277,7 @@ fun LibraryScreen(
             val iconVector = when {
                 option.name.contains("ASC") -> Icons.Rounded.ArrowUpward
                 option.name.contains("DESC") -> Icons.Rounded.ArrowDownward
-                else -> Icons.Rounded.Sort
+                else -> Icons.AutoMirrored.Rounded.Sort
             }
             DialogOption(
                 id = option.name,

@@ -30,6 +30,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
@@ -334,7 +336,7 @@ private fun RecommendationSpeedDialItem(
                         subtitle = "Add to current playlist",
                         icon = {
                             Icon(
-                                Icons.Default.PlaylistAdd,
+                                Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -354,7 +356,7 @@ private fun RecommendationSpeedDialItem(
                         subtitle = "Save to a playlist",
                         icon = {
                             Icon(
-                                Icons.Rounded.QueueMusic,
+                                Icons.AutoMirrored.Rounded.QueueMusic,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -514,7 +516,7 @@ private fun RecommendationCarouselCard(
                         subtitle = "Add to current playlist",
                         icon = {
                             Icon(
-                                Icons.Default.PlaylistAdd,
+                                Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -534,7 +536,7 @@ private fun RecommendationCarouselCard(
                         subtitle = "Save to a playlist",
                         icon = {
                             Icon(
-                                Icons.Rounded.QueueMusic,
+                                Icons.AutoMirrored.Rounded.QueueMusic,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)

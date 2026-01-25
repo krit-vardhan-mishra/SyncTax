@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PlayCircle
@@ -66,7 +67,7 @@ fun AppNavigationBar(
         NavItem(
             "library",
             if (currentRoute == "playlists") "Playlists" else "Library",
-            { Icon(if (currentRoute == "playlists") Icons.Default.QueueMusic else Icons.Default.LibraryMusic, contentDescription = if (currentRoute == "playlists") "Playlists" else "Library") })
+            { Icon(if (currentRoute == "playlists") Icons.AutoMirrored.Filled.QueueMusic else Icons.Default.LibraryMusic, contentDescription = if (currentRoute == "playlists") "Playlists" else "Library") })
     )
 
     NavigationBar(

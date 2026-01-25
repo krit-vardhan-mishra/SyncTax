@@ -15,13 +15,10 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -97,6 +94,10 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
         viewModel()
     val recommendationViewModel: RecommendationViewModel = viewModel()
 
+    // Get current route to determine visibility
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
     val playerState by playerViewModel.uiState.collectAsState()
     val homeState by homeViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
@@ -119,33 +120,13 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
         }
     }
 
-    // --- HOISTED STATE ---
-    // Use ViewModel-managed player sheet state for better state management
-    // Manual expansion state - ONLY controlled by user actions (click/swipe on mini-player)
-    // This is completely independent from BottomSheetScaffold's internal state
-    var isPlayerExpanded by remember { mutableStateOf(false) }
-
-    // Simple scaffold state without confirmValueChange - we control expansion manually
-    val scaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
-        )
-    )
-
-    // Sync BottomSheet visual state with our manual state
-    // This only controls the animation, not the content rendering
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(isPlayerExpanded) {
-        if (isPlayerExpanded) {
-            scaffoldState.bottomSheetState.expand()
-        } else {
-            scaffoldState.bottomSheetState.partialExpand()
-        }
-    }
     // --- END HOISTED STATE ---
 
+    // Player expansion state - tracked by PlayerBottomSheet, used for nav bar visibility
+    var isPlayerExpanded by remember { mutableStateOf(false) }
+
     // Update check state
+    val scope = rememberCoroutineScope()
     var checkForUpdate by remember { mutableStateOf(false) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
 
@@ -234,7 +215,6 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f)) {
                 PlayerBottomSheet(
-                    scaffoldState = scaffoldState, // For visual animation only
                     song = playerState.currentSong,
                     isPlaying = playerState.isPlaying,
                     isBuffering = playerState.isBuffering,
@@ -254,10 +234,10 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                     onSelectSong = { song -> playerViewModel.playFromQueue(song) },
                     onPlaceNext = { song -> playerViewModel.placeNext(song) },
                     onRemoveFromQueue = { song -> playerViewModel.removeFromQueue(song) },
+
                     downloadPercent = playerState.downloadPercent,
-                    // Manual expansion control - only user actions can change this
-                    isExpanded = isPlayerExpanded,
-                    onExpandedChange = { isPlayerExpanded = it }
+                    onExpandedChange = { isPlayerExpanded = it },
+                    showPlayer = currentRoute != "quick_picks"
                 ) { innerPadding ->
                     // Provide bottom padding to all screens via CompositionLocal
                     NavHost(
@@ -352,7 +332,6 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 playerViewModel = playerViewModel,
                                 dynamicBgViewModel = dynamicBgViewModel,
                                 userPreferences = userPreferences,
-                                scaffoldState = scaffoldState,
                                 onOpenSettings = { navController.navigate("settings") },
                                 onPlaylistClick = { playlistId ->
                                     navController.navigate("playlist_detail/$playlistId")
@@ -409,7 +388,6 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                             PlaylistDetailScreen(
                                 playlistId = playlistId,
                                 playlistViewModel = playlistViewModel,
-                                scaffoldState = scaffoldState,
                                 onBackClick = { navController.popBackStack() },
                                 onSongClick = { song ->
                                     // Play individual song WITH recommendations for continuous playback
@@ -612,7 +590,6 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 playerViewModel = playerViewModel,
                                 dynamicBgViewModel = dynamicBgViewModel,
                                 userPreferences = userPreferences,
-                                scaffoldState = scaffoldState,
                                 onOpenSettings = { navController.navigate("settings") },
                                 onShuffleClick = {
                                     val history = onlineSongsViewModel.uiState.value.history
@@ -733,9 +710,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                 }
             }
 
-            // Get current route to determine navigation bar visibility
-            val navBackStackEntry by navController.currentBackStackEntryAsState()
-            val currentRoute = navBackStackEntry?.destination?.route
+
 
             AnimatedVisibility(
                 visible = !isPlayerExpanded && currentRoute != "train" && currentRoute != "settings",

@@ -1,6 +1,7 @@
 package com.just_for_fun.synctax.presentation.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -74,173 +76,26 @@ fun QuickPicksScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            SimpleDynamicMusicTopAppBar(
-                title = "Quick Picks",
-                albumColors = albumColors,
-                showShuffleButton = true,
-                onShuffleClick = {
-                    if (uiState.quickPicks.isNotEmpty()) {
-                        // QuickPicks screen uses smart shuffle by default
-                        playerViewModel.shufflePlayWithRecommendations(uiState.quickPicks)
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        DynamicAlbumBackground(
-            albumColors = albumColors,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(bottom = 96.dp)
-        ) {
-            OptimizedLazyColumn(
-                modifier = Modifier
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                if (uiState.isGeneratingRecommendations) {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillParentMaxSize()
-                                .padding(top = 64.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(48.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                text = "Generating Quick Picks...",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "x Listen to songs and we'll find your match.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 32.dp)
-                            )
-                        }
-                    }
-                } else if (uiState.quickPicks.isEmpty()) {
-                    item {
-                        EnhancedEmptyQuickPicksState(albumColors = albumColors, trainingDataSize = uiState.trainingDataSize)
-                    }
-                } else {
-                    // Display the list of recommendations
-                    itemsIndexed(uiState.quickPicks) { index, song ->
-                        val score = uiState.recommendationScores.find { it.songId == song.id }
-
-                        RecommendationCard(
-                            song = song,
-                            rank = index + 1,
-                            score = score?.score?.toFloat() ?: 0f,
-                            confidence = score?.confidence,
-                            reason = score?.reason,
-                            onClick = {
-                                playerViewModel.playSong(song, uiState.quickPicks)
-                            },
-                            onLongClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedSong = song
-                                showOptionsDialog = true
-                            }
-                        )
-                        Divider(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            thickness = 0.5.dp
-                        )
-                    }
-                }
+    // Full screen Motion Player
+    Box(modifier = Modifier.fillMaxSize()) {
+        MotionPlayerScreen(
+            songs = uiState.quickPicks,
+            currentSong = playerState.currentSong ?: uiState.quickPicks.firstOrNull(),
+            isPlaying = playerState.isPlaying,
+            currentPosition = playerState.position,
+            totalDuration = playerState.duration,
+            onPlayPause = { playerViewModel.togglePlayPause() },
+            onSeek = { fraction ->
+                playerViewModel.seekTo((fraction * playerState.duration).toLong())
+            },
+            onBack = { /* No navigation controller available here yet */ },
+            onNext = { playerViewModel.next() },
+            onPrevious = { playerViewModel.previous() },
+            onSongSelected = { song ->
+                    playerViewModel.playSong(song, uiState.quickPicks)
             }
-        }
-    
-        // Create options for the dialog
-        val dialogOptions = remember(selectedSong, uiState.favoriteSongs) {
-            selectedSong?.let { song ->
-                val isFavorite = uiState.favoriteSongs.any { it.id == song.id }
-                mutableListOf<DialogOption>().apply {
-                    // Play option
-                    add(
-                        DialogOption(
-                            id = "play",
-                            title = "Play",
-                            subtitle = "Play this song",
-                            icon = {
-                                Icon(
-                                    Icons.Filled.PlayArrow,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                            onClick = {
-                                playerViewModel.playSong(song, uiState.quickPicks)
-                            }
-                        )
-                    )
-                    
-                    // Add to Queue option
-                    add(
-                        DialogOption(
-                            id = "add_to_queue",
-                            title = "Add to Queue",
-                            subtitle = "Add to end of current queue",
-                            icon = {
-                                Icon(
-                                    Icons.Filled.QueueMusic,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                            onClick = {
-                                playerViewModel.addToQueue(song)
-                            }
-                        )
-                    )
-                    
-                    // Add to Favorites option
-                    add(
-                        DialogOption(
-                            id = "toggle_favorite",
-                            title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
-                            subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
-                            icon = {
-                                Icon(
-                                    if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                    contentDescription = null,
-                                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                            onClick = {
-                                homeViewModel.toggleFavorite(song.id)
-                            }
-                        )
-                    )
-                }
-            } ?: emptyList()
-        }
-
-        // Bottom options dialog
-        BottomOptionsDialog(
-            song = selectedSong,
-            isVisible = showOptionsDialog,
-            onDismiss = { showOptionsDialog = false },
-            options = dialogOptions,
-            title = "Song Options",
-            description = "Choose an action for this song"
         )
-    
+
         // Guide overlay
         if (showGuide) {
             GuideOverlay(
@@ -252,4 +107,82 @@ fun QuickPicksScreen(
             )
         }
     }
+
+    // Create options for the dialog
+    val dialogOptions = remember(selectedSong, uiState.favoriteSongs) {
+        selectedSong?.let { song ->
+            val isFavorite = uiState.favoriteSongs.any { it.id == song.id }
+            mutableListOf<DialogOption>().apply {
+                // Play option
+                add(
+                    DialogOption(
+                        id = "play",
+                        title = "Play",
+                        subtitle = "Play this song",
+                        icon = {
+                            Icon(
+                                Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            playerViewModel.playSong(song, uiState.quickPicks)
+                        }
+                    )
+                )
+                
+                // Add to Queue option
+                add(
+                    DialogOption(
+                        id = "add_to_queue",
+                        title = "Add to Queue",
+                        subtitle = "Add to end of current queue",
+                        icon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = {
+                            playerViewModel.addToQueue(song)
+                        }
+                    )
+                )
+                
+                // Add to Favorites option
+                add(
+                    DialogOption(
+                        id = "toggle_favorite",
+                        title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                        subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                        icon = {
+                            Icon(
+                                if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                        onClick = {
+                            homeViewModel.toggleFavorite(song.id)
+                        }
+                    )
+                )
+            }
+        } ?: emptyList()
+    }
+
+    // Bottom options dialog
+    BottomOptionsDialog(
+        song = selectedSong,
+        isVisible = showOptionsDialog,
+        onDismiss = { showOptionsDialog = false },
+        options = dialogOptions,
+        title = "Song Options",
+        description = "Choose an action for this song"
+    )
 }
