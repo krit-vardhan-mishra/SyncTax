@@ -64,14 +64,15 @@ def _get_image_size(image_path):
         return None
 
 
+"""
 def crop_center_thumbnail(orig_thumb, out_dir, base):
-    """Crop thumbnail to 720x720 from center.
+    Crop thumbnail to 720x720 from center.
     
     Extracts the center 2x2 grid from a 4x4 grid (center 50% of image),
     removing the outer 25% on each edge, then scales to 720x720.
 
     Returns the path to the cropped thumbnail on success, else None.
-    """
+    
     if not orig_thumb or not os.path.exists(orig_thumb):
         return None
 
@@ -92,6 +93,8 @@ def crop_center_thumbnail(orig_thumb, out_dir, base):
         return cropped
     # If cropping failed, return None
     return None
+"""
+
 
 
 def choose_audio_format(info):
@@ -208,9 +211,11 @@ def download_and_embed(url, out_dir=".", format_str=None):
     if os.path.exists(thumb):
         orig_thumb = thumb
         # crop center 720x720 and prefer cropped image for embedding
+        """
         cropped = crop_center_thumbnail(orig_thumb, out_dir, base)
         if cropped:
             thumb = cropped
+        """
 
     final_file = None
 

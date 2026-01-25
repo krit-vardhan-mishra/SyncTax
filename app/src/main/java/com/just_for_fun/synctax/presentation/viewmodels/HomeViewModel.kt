@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
+import com.just_for_fun.synctax.core.init.AppInitializer
 import com.just_for_fun.synctax.data.cache.ListenAgainManager
 import com.just_for_fun.synctax.data.cache.QuickAccessManager
 import com.just_for_fun.synctax.data.cache.SpeedDialManager
@@ -39,6 +40,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         const val PAGE_SIZE = 30  // Load 30 songs at a time
+        private const val TAG = "HomeViewModel"
     }
 
     private val repository = MusicRepository(application)
@@ -58,32 +60,72 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     // Track current search job to cancel it when a new search starts
     private var currentSearchJob: Job? = null
+    
+    // Cache for search results to support filtering without re-fetching
+    private var cachedAllSearchResults: List<OnlineSearchResult> = emptyList()
+    private var lastSearchQuery: String = ""
 
     // Callback for refreshing downloaded songs check
     var onSongsRefreshed: ((List<Song>) -> Unit)? = null
 
     init {
-        loadData()
-        // Auto-scan on app open to keep library in sync with device
-        scanMusic()
-        observeListeningHistoryForTraining()
-        observeListenAgain()
-        loadOnlineHistory()
-        loadSearchHistory()  // Load search history on init
-        observeRecommendationsCount()
-        // Start periodic refresh for deleted songs check
-        startPeriodicRefresh()
-        // Refresh album art for songs without embedded art
-        refreshAlbumArtForSongs()
-        // Load training-related data
-        loadTrainingStatistics()
-        loadModelStatus()
-        // Load saved playlists from YouTube Music
-        loadSavedPlaylists()
-        // Load most played songs
-        loadMostPlayedSongs()
-        // Observe favorite songs
-        observeFavoriteSongs()
+        // Check if AppInitializer has pre-computed data from splash screen
+        val preComputedData = AppInitializer.getInitializedData()
+        
+        if (preComputedData != null) {
+            Log.d(TAG, "Using pre-computed data from AppInitializer")
+            
+            // Apply pre-computed data immediately
+            _uiState.value = _uiState.value.copy(
+                allSongs = preComputedData.songs,
+                mostPlayedSongs = preComputedData.mostPlayedSongs,
+                listenAgain = preComputedData.listenAgain,
+                quickAccessSongs = preComputedData.quickAccessSongs,
+                favoriteSongs = preComputedData.favoriteSongs,
+                searchHistory = preComputedData.searchHistory,
+                onlineHistory = preComputedData.onlineHistory,
+                savedPlaylists = preComputedData.savedPlaylists,
+                trainingStatistics = preComputedData.trainingStatistics ?: TrainingStatistics(),
+                modelStatus = preComputedData.modelStatus ?: ModelTrainingStatus(),
+                trainingDataSize = preComputedData.trainingDataSize,
+                isLoading = false,
+                scanComplete = true
+            )
+            
+            // Clear the pre-computed data to free memory
+            AppInitializer.clearData()
+            
+            // Only start the lightweight continuous observers and periodic tasks
+            observeListeningHistoryForTraining()
+            observeListenAgain()
+            observeRecommendationsCount()
+            startPeriodicRefresh()
+            observeFavoriteSongs()
+            
+            // Generate quick picks based on pre-loaded songs
+            if (preComputedData.songs.isNotEmpty()) {
+                viewModelScope.launch(AppDispatchers.MachineLearning) {
+                    generateQuickPicks()
+                }
+            }
+        } else {
+            Log.d(TAG, "No pre-computed data, running full initialization")
+            // Fall back to full initialization (e.g., after process death)
+            loadData()
+            scanMusic()
+            observeListeningHistoryForTraining()
+            observeListenAgain()
+            loadOnlineHistory()
+            loadSearchHistory()
+            observeRecommendationsCount()
+            startPeriodicRefresh()
+            refreshAlbumArtForSongs()
+            loadTrainingStatistics()
+            loadModelStatus()
+            loadSavedPlaylists()
+            loadMostPlayedSongs()
+            observeFavoriteSongs()
+        }
     }
 
     private fun observeListenAgain() {
@@ -226,6 +268,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun searchOnline(query: String, filterType: SearchFilterType = SearchFilterType.ALL) {
+        // Optimization: If query hasn't changed and we have cached ALL results, filter locally
+        if (query == lastSearchQuery && cachedAllSearchResults.isNotEmpty()) {
+            val filteredResults = when (filterType) {
+                SearchFilterType.ALL -> cachedAllSearchResults
+                SearchFilterType.SONGS -> cachedAllSearchResults.filter { it.type == OnlineResultType.SONG }
+                SearchFilterType.ALBUMS -> cachedAllSearchResults.filter { it.type == OnlineResultType.ALBUM }
+                SearchFilterType.ARTISTS -> cachedAllSearchResults.filter { it.type == OnlineResultType.ARTIST }
+                SearchFilterType.VIDEOS -> cachedAllSearchResults.filter { it.type == OnlineResultType.VIDEO }
+                // For PODCAST/EPISODE, we might not have a specific filter tab unless added, but we can filter if needed
+                else -> cachedAllSearchResults 
+            }
+            _uiState.value = _uiState.value.copy(
+                searchQuery = query,
+                selectedFilter = filterType,
+                onlineSearchResults = filteredResults,
+                isSearchingOnline = false
+            )
+            return
+        }
+
         // Cancel any existing search job before starting a new one
         currentSearchJob?.cancel()
 
@@ -242,125 +304,187 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val results = mutableListOf<OnlineSearchResult>()
 
                 // Use suspendCancellableCoroutine to properly await async results
-                // Search for songs if filter is ALL or SONGS
-                if (filterType == SearchFilterType.ALL ||
-                    filterType == SearchFilterType.SONGS
-                ) {
-
-                    val songResults =
+                if (filterType == SearchFilterType.ALL) {
+                    // Use new mixed search for "ALL"
+                     val mixedResults =
                         suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
-                            YTMusicRecommender.searchSongs(
+                            YTMusicRecommender.searchAll(
                                 query = query,
-                                limit = 15,
-                                onResult = { songs ->
-                                    val mapped = songs.map { song ->
-                                        OnlineSearchResult(
-                                            id = song.videoId,
-                                            title = song.title,
-                                            author = song.artist,
-                                            duration = 0L,
-                                            thumbnailUrl = song.thumbnail,
-                                            streamUrl = null,
-                                            type = OnlineResultType.SONG
-                                        )
-                                    }
+                                limit = 20,
+                                onResult = { items ->
                                     if (continuation.isActive) {
-                                        continuation.resume(mapped) {}
+                                        continuation.resume(items) {}
                                     }
                                 },
                                 onError = { error ->
-                                    Log.e("HomeViewModel", "Song search failed: $error")
+                                    Log.e("HomeViewModel", "Mixed search failed: $error")
                                     if (continuation.isActive) {
                                         continuation.resume(emptyList()) {}
                                     }
                                 }
                             )
                         }
-                    results.addAll(songResults)
-                }
+                    results.addAll(mixedResults)
+                } else {
+                    // Specific filters
+                    // Search for songs if filter is SONGS
+                    if (filterType == SearchFilterType.SONGS) {
+                        val songResults =
+                            suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
+                                YTMusicRecommender.searchSongs(
+                                    query = query,
+                                    limit = 20,
+                                    onResult = { songs ->
+                                        val mapped = songs.map { song ->
+                                            OnlineSearchResult(
+                                                id = song.videoId,
+                                                title = song.title,
+                                                author = song.artist,
+                                                duration = 0L,
+                                                thumbnailUrl = song.thumbnail,
+                                                streamUrl = null,
+                                                type = OnlineResultType.SONG
+                                            )
+                                        }
+                                        if (continuation.isActive) {
+                                            continuation.resume(mapped) {}
+                                        }
+                                    },
+                                    onError = { error ->
+                                        Log.e("HomeViewModel", "Song search failed: $error")
+                                        if (continuation.isActive) {
+                                            continuation.resume(emptyList()) {}
+                                        }
+                                    }
+                                )
+                            }
+                        results.addAll(songResults)
+                    }
 
-                // Search for albums if filter is ALL or ALBUMS
-                if (filterType == SearchFilterType.ALL ||
-                    filterType == SearchFilterType.ALBUMS
-                ) {
+                    // Search for albums if filter is ALBUMS
+                    if (filterType == SearchFilterType.ALBUMS) {
+                        val albumResults =
+                            suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
+                                YTMusicRecommender.searchAlbums(
+                                    query = query,
+                                    limit = 20,
+                                    onResult = { albums ->
+                                        val mapped = albums.map { album ->
+                                            OnlineSearchResult(
+                                                id = album.browseId,
+                                                title = album.title,
+                                                author = album.artist,
+                                                duration = null,
+                                                thumbnailUrl = album.thumbnail,
+                                                streamUrl = null,
+                                                type = OnlineResultType.ALBUM,
+                                                year = album.year,
+                                                browseId = album.browseId
+                                            )
+                                        }
+                                        if (continuation.isActive) {
+                                            continuation.resume(mapped) {}
+                                        }
+                                    },
+                                    onError = { error ->
+                                        Log.e("HomeViewModel", "Album search failed: $error")
+                                        if (continuation.isActive) {
+                                            continuation.resume(emptyList()) {}
+                                        }
+                                    }
+                                )
+                            }
+                        results.addAll(albumResults)
+                    }
 
-                    val albumResults =
-                        suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
-                            YTMusicRecommender.searchAlbums(
-                                query = query,
-                                limit = 10,
-                                onResult = { albums ->
-                                    val mapped = albums.map { album ->
-                                        OnlineSearchResult(
-                                            id = album.browseId,
-                                            title = album.title,
-                                            author = album.artist,
-                                            duration = null,
-                                            thumbnailUrl = album.thumbnail,
-                                            streamUrl = null,
-                                            type = OnlineResultType.ALBUM,
-                                            year = album.year,
-                                            browseId = album.browseId
-                                        )
+                    // Search for artists if filter is ARTISTS
+                    if (filterType == SearchFilterType.ARTISTS) {
+                        val artistResults =
+                            suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
+                                YTMusicRecommender.searchArtists(
+                                    query = query,
+                                    limit = 20,
+                                    onResult = { artists ->
+                                        val mapped = artists.map { artist ->
+                                            OnlineSearchResult(
+                                                id = artist.browseId,
+                                                title = artist.name,
+                                                author = artist.subscribers,
+                                                duration = null,
+                                                thumbnailUrl = artist.thumbnail,
+                                                streamUrl = null,
+                                                type = OnlineResultType.ARTIST,
+                                                year = null,
+                                                browseId = artist.browseId
+                                            )
+                                        }
+                                        if (continuation.isActive) {
+                                            continuation.resume(mapped) {}
+                                        }
+                                    },
+                                    onError = { error ->
+                                        Log.e("HomeViewModel", "Artist search failed: $error")
+                                        if (continuation.isActive) {
+                                            continuation.resume(emptyList()) {}
+                                        }
                                     }
-                                    if (continuation.isActive) {
-                                        continuation.resume(mapped) {}
-                                    }
-                                },
-                                onError = { error ->
-                                    Log.e("HomeViewModel", "Album search failed: $error")
-                                    if (continuation.isActive) {
-                                        continuation.resume(emptyList()) {}
-                                    }
-                                }
-                            )
-                        }
-                    results.addAll(albumResults)
-                }
+                                )
+                            }
+                        results.addAll(artistResults)
+                    }
 
-                // Search for artists if filter is ALL or ARTISTS
-                if (filterType == SearchFilterType.ALL ||
-                    filterType == SearchFilterType.ARTISTS
-                ) {
-
-                    val artistResults =
-                        suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
-                            YTMusicRecommender.searchArtists(
-                                query = query,
-                                limit = 10,
-                                onResult = { artists ->
-                                    val mapped = artists.map { artist ->
-                                        OnlineSearchResult(
-                                            id = artist.browseId,
-                                            title = artist.name,
-                                            author = artist.subscribers,
-                                            duration = null,
-                                            thumbnailUrl = artist.thumbnail,
-                                            streamUrl = null,
-                                            type = OnlineResultType.ARTIST,
-                                            year = null,
-                                            browseId = artist.browseId
-                                        )
+                    // Search for videos if filter is VIDEOS
+                    if (filterType == SearchFilterType.VIDEOS) {
+                        val videoResults =
+                            suspendCancellableCoroutine<List<OnlineSearchResult>> { continuation ->
+                                YTMusicRecommender.searchVideos(
+                                    query = query,
+                                    limit = 20,
+                                    onResult = { videos ->
+                                        val mapped = videos.map { video ->
+                                            OnlineSearchResult(
+                                                id = video.videoId,
+                                                title = video.title,
+                                                author = video.artist,
+                                                duration = 0L,
+                                                thumbnailUrl = video.thumbnail,
+                                                streamUrl = null,
+                                                type = OnlineResultType.VIDEO
+                                            )
+                                        }
+                                        if (continuation.isActive) {
+                                            continuation.resume(mapped) {}
+                                        }
+                                    },
+                                    onError = { error ->
+                                        Log.e("HomeViewModel", "Video search failed: $error")
+                                        if (continuation.isActive) {
+                                            continuation.resume(emptyList()) {}
+                                        }
                                     }
-                                    if (continuation.isActive) {
-                                        continuation.resume(mapped) {}
-                                    }
-                                },
-                                onError = { error ->
-                                    Log.e("HomeViewModel", "Artist search failed: $error")
-                                    if (continuation.isActive) {
-                                        continuation.resume(emptyList()) {}
-                                    }
-                                }
-                            )
-                        }
-                    results.addAll(artistResults)
+                                )
+                            }
+                        results.addAll(videoResults)
+                    }
                 }
 
                 _uiState.value = _uiState.value.copy(
                     isSearchingOnline = false,
                     onlineSearchResults = results
                 )
+
+                // Cache results if it was a full search
+                if (filterType == SearchFilterType.ALL) {
+                    cachedAllSearchResults = results
+                    lastSearchQuery = query
+                } else {
+                    // Just update query, invalidating previous cache for different query
+                    // But if query is same (e.g. redundant search), we don't clear.
+                    // Actually if we searched specific type, we don't have ALL data anymore.
+                    cachedAllSearchResults = emptyList()
+                    lastSearchQuery = query
+                }
+
             } catch (e: CancellationException) {
                 // Coroutine cancellation is expected, don't show as error
                 _uiState.value = _uiState.value.copy(isSearchingOnline = false)

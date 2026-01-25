@@ -1,5 +1,5 @@
 [versions]
-agp = "8.13.1"
+agp = "8.12.1"
 composeMultiplatformPager = "1.2.0"
 core = "3.3.0"
 kotlin = "2.1.0"
@@ -14,6 +14,7 @@ material3 = "1.5.0-alpha10"
 material3WindowSizeClassMultiplatform = "1.3.0"
 newpipeextractor = "v0.24.8"
 wavySlider = "2.2.0"
+foundationVersion = "1.10.1"
 
 
 [libraries]
@@ -31,6 +32,7 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 material3-window-size-class1-multiplatform = { module = "io.github.fornewid:material3-window-size-class-multiplatform", version.ref = "material3WindowSizeClassMultiplatform" }
 newpipeextractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "newpipeextractor" }
 wavy-slider = { module = "ir.mahozad.multiplatform:wavy-slider", version.ref = "wavySlider" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundationVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

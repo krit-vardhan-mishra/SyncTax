@@ -1,12 +1,13 @@
 package com.just_for_fun.synctax
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -23,10 +24,9 @@ import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,39 +43,39 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.just_for_fun.synctax.core.utils.UpdateChecker
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.app.AppNavigationBar
 import com.just_for_fun.synctax.presentation.components.player.PlayerBottomSheet
 import com.just_for_fun.synctax.presentation.screens.AlbumDetailScreen
 import com.just_for_fun.synctax.presentation.screens.ArtistDetailScreen
+import com.just_for_fun.synctax.presentation.screens.CreatePlaylistScreen
+import com.just_for_fun.synctax.presentation.screens.HistoryScreen
 import com.just_for_fun.synctax.presentation.screens.HomeScreen
 import com.just_for_fun.synctax.presentation.screens.ImportPlaylistScreen
 import com.just_for_fun.synctax.presentation.screens.LibraryScreen
+import com.just_for_fun.synctax.presentation.screens.OnlineSongsScreen
 import com.just_for_fun.synctax.presentation.screens.PlaylistDetailScreen
 import com.just_for_fun.synctax.presentation.screens.PlaylistScreen
-import com.just_for_fun.synctax.presentation.screens.OnlineSongsScreen
 import com.just_for_fun.synctax.presentation.screens.QuickPicksScreen
+import com.just_for_fun.synctax.presentation.screens.RecommendationsDetailScreen
 import com.just_for_fun.synctax.presentation.screens.SearchScreen
 import com.just_for_fun.synctax.presentation.screens.SettingsScreen
+import com.just_for_fun.synctax.presentation.screens.StatsScreen
 import com.just_for_fun.synctax.presentation.screens.TrainingScreen
 import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputScreen
 import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
-import com.just_for_fun.synctax.presentation.screens.HistoryScreen
-import com.just_for_fun.synctax.presentation.screens.StatsScreen
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
-import com.just_for_fun.synctax.core.utils.UpdateChecker
-import com.just_for_fun.synctax.presentation.screens.CreatePlaylistScreen
-import com.just_for_fun.synctax.presentation.screens.RecommendationsDetailScreen
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MusicApp(userPreferences: UserPreferences) {
+fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     val context = LocalContext.current
     val isFirstLaunch by userPreferences.isFirstLaunch.collectAsState()
     val userName by userPreferences.userName.collectAsState()
@@ -101,7 +101,23 @@ fun MusicApp(userPreferences: UserPreferences) {
     val homeState by homeViewModel.uiState.collectAsState()
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var searchResetTrigger by remember { mutableStateOf(0) }
+    var searchResetTrigger by remember { mutableIntStateOf(0) }
+
+    // Handle initial media URI (Open With intent)
+    LaunchedEffect(initialMediaUri) {
+        initialMediaUri?.let { uri ->
+            // Extract a displayable name if possible
+            val fileName = uri.lastPathSegment ?: "External Audio"
+            
+            // Play using the URI
+            playerViewModel.playUrl(
+                url = uri.toString(),
+                title = fileName,
+                artist = "External File",
+                durationMs = 0L // Duration will be determined by player
+            )
+        }
+    }
 
     // --- HOISTED STATE ---
     // Use ViewModel-managed player sheet state for better state management

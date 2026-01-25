@@ -263,7 +263,7 @@ fun SearchScreen(
                             homeViewModel.updateSelectedFilter(filter)
                             // LaunchedEffect(searchQuery, selectedFilter) will handle the search
                         },
-                        showVideos = false // Only show Songs/Albums filters
+                        showVideos = true // Show Videos filter to find songs classified as videos
                     )
                 }
 
@@ -608,9 +608,55 @@ fun SearchScreen(
                                                         )
                                                     }
                                                 }
+                                                
+                                                OnlineResultType.PODCAST -> {
+                                                    // Treat Podcast series like an Album/Playlist? Or Artist?
+                                                    // For now, if it has a browseId, maybe try to fetch it as an album?
+                                                    // Typically podcasts are playlists or albums in YT Music structure.
+                                                    // Let's try to fetch as album first.
+                                                     coroutineScope.launch {
+                                                        homeViewModel.fetchAlbumDetails(
+                                                            browseId = res.browseId ?: res.id,
+                                                            onResult = { albumDetails ->
+                                                                if (albumDetails != null && albumDetails.songs.isNotEmpty()) {
+                                                                    // Convert to Songs
+                                                                    val songs =
+                                                                        albumDetails.songs.map { track ->
+                                                                            Song(
+                                                                                id = "youtube:${track.videoId}",
+                                                                                title = track.title,
+                                                                                artist = track.artist,
+                                                                                album = albumDetails.title,
+                                                                                duration = 0L,
+                                                                                filePath = track.watchUrl,
+                                                                                genre = "Podcast",
+                                                                                releaseYear = albumDetails.year.toIntOrNull(),
+                                                                                albumArtUri = albumDetails.thumbnail
+                                                                            )
+                                                                        }
+                                                                    homeViewModel.setSelectedOnlineAlbum(
+                                                                        albumDetails
+                                                                    )
+                                                                    onNavigateToAlbum(
+                                                                        albumDetails.title,
+                                                                        albumDetails.artist,
+                                                                        songs
+                                                                    )
+                                                                } else {
+                                                                     // Fallback: try to play if it has an ID, but usually Podcasts need to be opened
+                                                                     SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Podcast support is experimental")
+                                                                }
+                                                            },
+                                                            onError = { 
+                                                                 // Failed to load as album
+                                                                 SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, "Could not open podcast")
+                                                            }
+                                                        )
+                                                     }
+                                                }
 
                                                 else -> {
-                                                    // Play online song - construct YouTube URL from videoId
+                                                    // Play online song/video/episode - construct YouTube URL from videoId
                                                     val youtubeUrl =
                                                         "https://www.youtube.com/watch?v=${res.id}"
                                                     playerViewModel.playUrl(

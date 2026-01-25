@@ -3,6 +3,7 @@ package com.just_for_fun.synctax.core.utils
 import android.util.Log
 import com.chaquo.python.PyException
 import com.chaquo.python.Python
+import com.just_for_fun.synctax.core.network.OnlineSearchResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,6 +11,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import com.just_for_fun.synctax.core.network.OnlineResultType
+
 
 /**
  * YouTube Music Recommender using ytmusicapi
@@ -126,6 +129,48 @@ object YTMusicRecommender {
                 Log.e(TAG, "searchAlbums failed", e)
                 withContext(Dispatchers.Main) {
                     onError("Album search failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Search for videos
+     * @param query Search query
+     * @param limit Maximum number of results (default 20)
+     * @param onResult Callback with list of videos (as RecommendedSong)
+     * @param onError Error callback
+     */
+    fun searchVideos(
+        query: String,
+        limit: Int = 20,
+        onResult: (List<RecommendedSong>) -> Unit,
+        onError: (String) -> Unit = { Log.e(TAG, it) }
+    ) {
+        scope.launch {
+            try {
+                Log.d(TAG, "searchVideos: query='$query', limit=$limit")
+                
+                val python = Python.getInstance()
+                val module = python.getModule("ytmusic_recommender")
+                val jsonResult = module.callAttr("search_videos", query, limit).toString()
+                
+                // We can reuse song parser as the Python function returns compatible JSON structure
+                val videos = parseSongsFromJson(jsonResult)
+                Log.d(TAG, "Found ${videos.size} videos for query: $query")
+                
+                withContext(Dispatchers.Main) {
+                    onResult(videos)
+                }
+            } catch (e: PyException) {
+                Log.e(TAG, "Python search_videos failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Video search failed: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "searchVideos failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Video search failed: ${e.message}")
                 }
             }
         }
@@ -556,6 +601,114 @@ object YTMusicRecommender {
             Log.e(TAG, "Failed to parse artist details JSON", e)
             return null
         }
+    }
+    /**
+     * Search for all types of content (Songs, Videos, Albums, Artists, Podcasts)
+     * @param query Search query
+     * @param limit Maximum number of results (default 20)
+     * @param onResult Callback with list of mixed results
+     * @param onError Error callback
+     */
+    fun searchAll(
+        query: String,
+        limit: Int = 20,
+        onResult: (List<OnlineSearchResult>) -> Unit,
+        onError: (String) -> Unit = { Log.e(TAG, it) }
+    ) {
+        scope.launch {
+            try {
+                Log.d(TAG, "searchAll: query='$query', limit=$limit")
+
+                val python = Python.getInstance()
+                val module = python.getModule("ytmusic_recommender")
+                val jsonResult = module.callAttr("search_all", query, limit).toString()
+
+                val results = parseMixedResultsFromJson(jsonResult)
+                Log.d(TAG, "Found ${results.size} mixed results for query: $query")
+
+                withContext(Dispatchers.Main) {
+                    onResult(results)
+                }
+            } catch (e: PyException) {
+                Log.e(TAG, "Python search_all failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Search failed: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "searchAll failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Search failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun parseMixedResultsFromJson(jsonString: String): List<OnlineSearchResult> {
+        val results = mutableListOf<OnlineSearchResult>()
+
+        try {
+            val jsonArray = JSONArray(jsonString)
+
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val typeStr = obj.optString("resultType", "unknown")
+
+                val type = when (typeStr) {
+                    "song" -> OnlineResultType.SONG
+                    "video" -> OnlineResultType.VIDEO
+                    "album" -> OnlineResultType.ALBUM
+                    "artist" -> OnlineResultType.ARTIST
+                    "podcast" -> OnlineResultType.PODCAST
+                    "episode" -> OnlineResultType.EPISODE
+                    else -> continue // Skip unknown types
+                }
+
+                // ID handling depends on type
+                val id = when (type) {
+                    OnlineResultType.ALBUM, OnlineResultType.ARTIST, OnlineResultType.PODCAST -> obj.optString("browseId", "")
+                    else -> obj.optString("videoId", "")
+                }
+
+                if (id.isEmpty()) continue
+
+                val result = OnlineSearchResult(
+                    id = id,
+                    title = obj.optString("title", "Unknown Title"),
+                    author = obj.optString("artist", "Unknown Artist"), // Normalized to 'artist' in Python
+                    duration = if (type == OnlineResultType.SONG || type == OnlineResultType.VIDEO || type == OnlineResultType.EPISODE) {
+                        parseDuration(obj.optString("duration", "0:00"))
+                    } else null,
+                    thumbnailUrl = obj.optString("thumbnail", ""),
+                    streamUrl = null,
+                    type = type,
+                    year = obj.optString("year", null),
+                    browseId = if (type == OnlineResultType.ALBUM || type == OnlineResultType.ARTIST || type == OnlineResultType.PODCAST) id else null
+                )
+                results.add(result)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse mixed results JSON", e)
+        }
+        return results
+    }
+
+    private fun parseDuration(durationStr: String): Long {
+        try {
+            val parts = durationStr.split(":")
+            if (parts.size == 2) {
+                val min = parts[0].toLongOrNull() ?: 0L
+                val sec = parts[1].toLongOrNull() ?: 0L
+                return (min * 60 + sec) * 1000
+            } else if (parts.size == 3) {
+                val hr = parts[0].toLongOrNull() ?: 0L
+                val min = parts[1].toLongOrNull() ?: 0L
+                val sec = parts[2].toLongOrNull() ?: 0L
+                return (hr * 3600 + min * 60 + sec) * 1000
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing duration: $durationStr", e)
+        }
+        return 0L
     }
 }
 

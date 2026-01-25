@@ -268,7 +268,7 @@ fun WelcomeScreen(
                             label = {
                                 Text(
                                     "Your Name",
-                                    color = textHintColor
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             placeholder = {

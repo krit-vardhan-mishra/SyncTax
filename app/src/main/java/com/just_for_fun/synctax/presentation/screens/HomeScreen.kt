@@ -37,6 +37,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -273,15 +276,44 @@ fun HomeScreen(
                 LaunchedEffect(Unit) {
                     isVisible = true
                 }
+                
+                // Pull-to-refresh state
+                var isRefreshing by remember { mutableStateOf(false) }
+                val pullToRefreshState = rememberPullToRefreshState()
+                
+                // Update isRefreshing when scanning completes
+                LaunchedEffect(uiState.isScanning) {
+                    if (!uiState.isScanning && isRefreshing) {
+                        isRefreshing = false
+                    }
+                }
+                
                 AnimatedVisibility(
                     visible = isVisible,
                     enter = fadeIn(animationSpec = tween(600)) +
                             slideInVertically(animationSpec = tween(600)) { it / 4 }
                 ) {
-                    OptimizedLazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize()
+                    PullToRefreshBox(
+                        isRefreshing = isRefreshing,
+                        onRefresh = {
+                            isRefreshing = true
+                            homeViewModel.forceRefreshLibrary()
+                        },
+                        state = pullToRefreshState,
+                        modifier = Modifier.fillMaxSize(),
+                        indicator = {
+                            androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                                state = pullToRefreshState,
+                                isRefreshing = isRefreshing,
+                                modifier = Modifier.align(Alignment.TopCenter),
+                                color = Color(0xFFFF0033) // Red color matching app theme
+                            )
+                        }
                     ) {
+                        OptimizedLazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
                         // Greeting Section with dynamic colors
                         if (userName.isNotEmpty()) {
                             item(
@@ -499,8 +531,18 @@ fun HomeScreen(
                                 SmallSpacer()
                             }
 
-                            item {
-                                SectionDivider()
+                            // Only show divider if recommendations will be displayed
+                            val shouldShowRecommendations = when {
+                                isLoadingRecommendations -> true
+                                recommendations != null -> true
+                                hasEnoughHistory -> true
+                                else -> false
+                            }
+
+                            if (shouldShowRecommendations) {
+                                item {
+                                    SectionDivider()
+                                }
                             }
 
                             item(
@@ -553,8 +595,11 @@ fun HomeScreen(
                                 SmallSpacer()
                             }
 
-                            item {
-                                SectionDivider()
+                            // Only show divider if Speed Dial section will be displayed
+                            if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.speedDialSongs.isNotEmpty()) {
+                                item {
+                                    SectionDivider()
+                                }
                             }
 
                             item {
@@ -619,7 +664,7 @@ fun HomeScreen(
                         }
 
                         // Divider and Quick Access (only show if there are local songs)
-                        if (selectedFilter == "All" && uiState.allSongs.isNotEmpty()) {
+                        if (selectedFilter == "All" && uiState.allSongs.isNotEmpty() && uiState.quickAccessSongs.isNotEmpty()) {
                             item {
                                 SmallSpacer()
                             }
@@ -650,14 +695,6 @@ fun HomeScreen(
 
                             item {
                                 ExtraLargeSpacer()
-                            }
-
-                            item {
-                                SectionDivider()
-                            }
-
-                            item {
-                                SmallSpacer()
                             }
                         }
 
@@ -690,6 +727,7 @@ fun HomeScreen(
                             BottomPaddingSpacer()
                         }
                     }
+                    }  // End PullToRefreshBox
                 }
             }
 

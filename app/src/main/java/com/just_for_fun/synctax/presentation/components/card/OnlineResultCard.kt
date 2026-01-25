@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -73,6 +74,7 @@ fun OnlineResultCard(
                             imageVector = when (result.type) {
                                 OnlineResultType.ALBUM -> Icons.Default.Album
                                 OnlineResultType.ARTIST -> Icons.Default.Person
+                                OnlineResultType.PODCAST, OnlineResultType.EPISODE -> Icons.Default.Mic
                                 else -> Icons.Default.MusicNote
                             },
                             contentDescription = null,
@@ -101,25 +103,25 @@ fun OnlineResultCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    
-                    // Show type badge for albums and artists
-                    if (result.type == OnlineResultType.ALBUM || result.type == OnlineResultType.ARTIST) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Text(
-                                text = when (result.type) {
-                                    OnlineResultType.ALBUM -> "Album${if (!result.year.isNullOrEmpty()) " • ${result.year}" else ""}"
-                                    OnlineResultType.ARTIST -> "Artist"
-                                    else -> ""
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                    // Show type badge for all result types
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = when (result.type) {
+                                OnlineResultType.SONG -> "Song"
+                                OnlineResultType.ALBUM -> "Album${if (!result.year.isNullOrEmpty()) " • ${result.year}" else ""}"
+                                OnlineResultType.ARTIST -> "Artist"
+                                OnlineResultType.VIDEO -> "Video"
+                                OnlineResultType.PODCAST -> "Podcast"
+                                OnlineResultType.EPISODE -> "Episode"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
             }

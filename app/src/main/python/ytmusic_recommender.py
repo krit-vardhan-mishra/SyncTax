@@ -102,6 +102,43 @@ class YTMusicRecommender:
             logger.error(f"Album search failed for query '{query}': {e}")
             return []
     
+    def search_videos(self, query, limit=20):
+        """
+        Search for videos
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default 20)
+            
+        Returns:
+            List of video dictionaries with keys: videoId, title, artist, duration, thumbnail
+        """
+        if not self.yt:
+            logger.error("YTMusic client not initialized")
+            return []
+        
+        try:
+            results = self.yt.search(query, filter='videos', limit=limit)
+            videos = []
+            
+            for item in results:
+                video = {
+                    'videoId': item.get('videoId', ''),
+                    'title': item.get('title', 'Unknown Title'),
+                    'artist': ', '.join([a['name'] for a in item.get('artists', [])]) or 'Unknown Artist',
+                    'duration': item.get('duration', '0:00'),
+                    'thumbnail': item.get('thumbnails', [{}])[-1].get('url', '') if item.get('thumbnails') else '',
+                    'views': item.get('views', '')
+                }
+                videos.append(video)
+            
+            logger.info(f"Found {len(videos)} videos for query: {query}")
+            return videos
+            
+        except Exception as e:
+            logger.error(f"Video search failed for query '{query}': {e}")
+            return []
+
     def search_artists(self, query, limit=10):
         """
         Search for artists on YouTube Music
@@ -330,6 +367,71 @@ class YTMusicRecommender:
             return []
 
 
+    def search_all(self, query, limit=20):
+        """
+        Search for all types of content (songs, videos, albums, artists, podcasts)
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default 20)
+            
+        Returns:
+            List of dictionaries with result details including 'resultType'
+        """
+        if not self.yt:
+            logger.error("YTMusic client not initialized")
+            return []
+        
+        try:
+            # Search without filter to get mixed results
+            results = self.yt.search(query, limit=limit)
+            items = []
+            
+            for item in results:
+                result_type = item.get('resultType', 'unknown')
+                
+                # Base structure
+                entry = {
+                    'resultType': result_type,
+                    'title': item.get('title', 'Unknown Title'),
+                    'thumbnail': item.get('thumbnails', [{}])[-1].get('url', '') if item.get('thumbnails') else ''
+                }
+                
+                # Extract type-specific fields
+                if result_type in ['song', 'video']:
+                    entry['videoId'] = item.get('videoId', '')
+                    entry['artist'] = ', '.join([a['name'] for a in item.get('artists', [])]) or 'Unknown Artist'
+                    entry['album'] = item.get('album', {}).get('name', '') if item.get('album') else ''
+                    entry['duration'] = item.get('duration', '0:00')
+                    
+                elif result_type == 'album':
+                    entry['browseId'] = item.get('browseId', '')
+                    entry['artist'] = ', '.join([a['name'] for a in item.get('artists', [])]) or 'Unknown Artist'
+                    entry['year'] = item.get('year', '')
+                    
+                elif result_type == 'artist':
+                    entry['browseId'] = item.get('browseId', '')
+                    entry['artist'] = item.get('artist', '') # Sometimes just artist name
+                    entry['subscribers'] = item.get('subscribers', '')
+                    
+                elif result_type in ['podcast', 'episode']:
+                    entry['browseId'] = item.get('browseId', '') if result_type == 'podcast' else item.get('videoId', '')
+                    # For episode, browseId is videoId usually
+                    if result_type == 'episode':
+                        entry['videoId'] = item.get('videoId', '')
+                    
+                    entry['artist'] = ', '.join([a['name'] for a in item.get('artists', [])]) if 'artists' in item else item.get('author', 'Unknown Author')
+                    entry['duration'] = item.get('duration', '')
+                
+                items.append(entry)
+            
+            logger.info(f"Found {len(items)} mixed results for query: {query}")
+            return items
+            
+        except Exception as e:
+            logger.error(f"Mixed search failed for query '{query}': {e}")
+            return []
+
 # Module-level functions for easy calling from Kotlin via Chaquopy
 
 _recommender = None
@@ -344,6 +446,23 @@ def initialize():
     except Exception as e:
         logger.error(f"Initialization failed: {e}")
         return f"Initialization failed: {e}"
+
+
+def search_all(query, limit=20):
+    """
+    Mixed search for all types
+    Returns JSON string of mixed list
+    """
+    global _recommender
+    if not _recommender:
+        initialize()
+    
+    try:
+        results = _recommender.search_all(query, limit)
+        return json.dumps(results)
+    except Exception as e:
+        logger.error(f"search_all error: {e}")
+        return json.dumps([])
 
 
 def search_songs(query, limit=20):

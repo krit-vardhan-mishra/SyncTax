@@ -192,6 +192,32 @@ class UserPreferences(context: Context) {
         _crossfadeEnabled.value = enabled
     }
 
+    // --- Offline Songs Cache preference ---
+    private val _offlineCacheEnabled = MutableStateFlow(isOfflineCacheEnabled())
+    val offlineCacheEnabled: StateFlow<Boolean> = _offlineCacheEnabled.asStateFlow()
+
+    private val _offlineCacheCount = MutableStateFlow(getOfflineCacheCount())
+    val offlineCacheCount: StateFlow<Int> = _offlineCacheCount.asStateFlow()
+
+    fun isOfflineCacheEnabled(): Boolean {
+        return prefs.getBoolean(KEY_OFFLINE_CACHE_ENABLED, false)
+    }
+
+    fun setOfflineCacheEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_OFFLINE_CACHE_ENABLED, enabled).apply()
+        _offlineCacheEnabled.value = enabled
+    }
+
+    fun getOfflineCacheCount(): Int {
+        return prefs.getInt(KEY_OFFLINE_CACHE_COUNT, 50)
+    }
+
+    fun setOfflineCacheCount(count: Int) {
+        val clamped = count.coerceIn(0, 500)
+        prefs.edit().putInt(KEY_OFFLINE_CACHE_COUNT, clamped).apply()
+        _offlineCacheCount.value = clamped
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -227,5 +253,9 @@ class UserPreferences(context: Context) {
 
         // Crossfade/gapless playback
         private const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
+
+        // Offline songs cache
+        private const val KEY_OFFLINE_CACHE_ENABLED = "offline_cache_enabled"
+        private const val KEY_OFFLINE_CACHE_COUNT = "offline_cache_count"
     }
 }

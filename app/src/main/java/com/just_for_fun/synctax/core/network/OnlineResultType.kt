@@ -7,5 +7,7 @@ enum class OnlineResultType {
     SONG,   // Individual songs/tracks
     ALBUM,  // Albums (collection of songs)
     VIDEO,  // Music videos (future support)
-    ARTIST  // Artist profiles
+    ARTIST, // Artist profiles
+    PODCAST, // Podcasts
+    EPISODE, // Podcast episodes
 }

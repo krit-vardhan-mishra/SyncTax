@@ -37,6 +37,7 @@ object NewPipeAudioDownloader {
      * Extracts the center 2x2 grid from a 4x4 grid (center 50% of image),
      * removing the outer 25% on each edge, then scales to 720x720.
      */
+    /*
     private fun cropCenterThumbnail(origThumb: File, outDir: File, base: String): File? {
         if (!origThumb.exists()) return null
 
@@ -54,10 +55,10 @@ object NewPipeAudioDownloader {
 
             Log.d(TAG, "🎨 Cropping thumbnail with filter: $vf")
             val cmd = arrayOf("ffmpeg", "-y", "-i", origThumb.absolutePath, "-vf", vf, cropped.absolutePath)
-            
+
             val process = Runtime.getRuntime().exec(cmd)
             val exitCode = process.waitFor()
-            
+
             return if (exitCode == 0 && cropped.exists() && cropped.length() > 1024) {
                 cropped
             } else {
@@ -70,6 +71,7 @@ object NewPipeAudioDownloader {
             return null
         }
     }
+    */
 
     /**
      * Get image dimensions using ffprobe
@@ -252,7 +254,17 @@ object NewPipeAudioDownloader {
             val finalFile = webmFile
             
             // Clean up thumbnail file
-            thumbnailFile?.delete()
+            if (thumbnailFile != null && thumbnailFile.exists()) {
+                Log.d(TAG, "🧹 Cleaning up thumbnail file: ${thumbnailFile.absolutePath} (${thumbnailFile.length()} bytes)")
+                val deleted = thumbnailFile.delete()
+                if (deleted) {
+                    Log.d(TAG, "✅ Thumbnail file deleted successfully")
+                } else {
+                    Log.w(TAG, "⚠️ Failed to delete thumbnail file: ${thumbnailFile.absolutePath}")
+                }
+            } else {
+                Log.d(TAG, "🧹 No thumbnail file to clean up")
+            }
             
             try {
                 progressCallback?.invoke(100)
@@ -285,7 +297,15 @@ object NewPipeAudioDownloader {
 
             // Cleanup on failure
             webmFile?.delete()
-            thumbnailFile?.delete()
+            if (thumbnailFile != null && thumbnailFile.exists()) {
+                Log.d(TAG, "🧹 Cleaning up thumbnail file after failure: ${thumbnailFile.absolutePath}")
+                val deleted = thumbnailFile.delete()
+                if (deleted) {
+                    Log.d(TAG, "✅ Thumbnail file deleted after failure")
+                } else {
+                    Log.w(TAG, "⚠️ Failed to delete thumbnail file after failure: ${thumbnailFile.absolutePath}")
+                }
+            }
 
             DownloadResult(
                 success = false,
@@ -572,12 +592,13 @@ object NewPipeAudioDownloader {
             ydl.callAttr("download", py.builtins.callAttr("list", arrayOf(url)))
             
             // Find the output file
-            val expectedFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.opus")
-            val m4aFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.m4a")
-            val webmFile = File(outputDir, "${sanitizedArtist} - ${sanitizedTitle}.webm")
+            val expectedFile = File(outputDir, "$sanitizedArtist - ${sanitizedTitle}.opus")
+            val m4aFile = File(outputDir, "$sanitizedArtist - ${sanitizedTitle}.m4a")
+            val webmFile = File(outputDir, "$sanitizedArtist - ${sanitizedTitle}.webm")
             
+            val baseName = "$sanitizedArtist - $sanitizedTitle"
             // Crop thumbnail to 720x720 if FFmpeg is available
-            val baseName = "${sanitizedArtist} - ${sanitizedTitle}"
+            /*
             var croppedThumb: File? = null
             if (ffmpegAvailable) {
                 val origThumb = listOf(".jpg", ".webp", ".png", ".jpeg", ".jpg.webp").map { ext ->
@@ -602,6 +623,7 @@ object NewPipeAudioDownloader {
                     }
                 }
             }
+            */
             
             val finalFile = when {
                 expectedFile.exists() -> expectedFile
@@ -610,7 +632,7 @@ object NewPipeAudioDownloader {
                 else -> {
                     // Search for any matching file
                     outputDir.listFiles()?.find { 
-                        it.name.startsWith("${sanitizedArtist} - ${sanitizedTitle}") 
+                        it.name.startsWith("$sanitizedArtist - $sanitizedTitle")
                     }
                 }
             }

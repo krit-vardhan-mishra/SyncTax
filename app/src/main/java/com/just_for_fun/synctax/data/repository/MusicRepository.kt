@@ -61,6 +61,16 @@ class MusicRepository(private val context: Context) {
             // First, scan app's download directory directly (not relying on MediaStore)
             scanDirectoryDirectly(appMusicDir, songs)
 
+            // Also scan standard Downloads directory as requested
+            try {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (downloadsDir.exists() && downloadsDir.isDirectory) {
+                    scanDirectoryDirectly(downloadsDir, songs)
+                }
+            } catch (e: Exception) {
+                Log.e("MusicRepository", "Error scanning Downloads directory", e)
+            }
+
             // Then scan user-selected directories using SAF
             selectedPaths.forEach { uriString ->
                 try {
