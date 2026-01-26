@@ -52,7 +52,6 @@ fun UnifiedPlayer(
     volume: Float = 1.0f,
     upNext: List<Song> = emptyList(),
     playHistory: List<Song> = emptyList(),
-    // Progress from AnchoredDraggable (0 = collapsed, 1 = expanded)
     progress: Float,
     miniControlsAlpha: Float,
     fullControlsAlpha: Float,
@@ -244,12 +243,12 @@ fun UnifiedPlayer(
         // --- 3. MORPHING ALBUM ART LAYER ---
         // This renders the album art growing from mini-player position to full-player position
         if (progress > 0.01f && fullControlsAlpha < 1f) {
-            val startSize = 48.dp
-            val targetSize = 320.dp // Approximate full player size
+            val startSize = 40.dp
+            val targetSize = maxWidth - 48.dp // Match full width of Carousel (screen width - 24dp*2 padding)
             
             // Coordinates based on MiniPlayerContent layout
-            // MiniPlayer: Vertically centered in 80dp (top ~16dp), Left padding 16dp + 8dp inner = 24dp
-            val startTop = 16.dp 
+            // MiniPlayer: Vertically centered in 80dp (top ~13dp), Left padding 16dp + 8dp inner = 24dp
+            val startTop = 13.dp 
             val startStart = 24.dp
             
             // FullPlayer: Centered horizontally, Top offset approx 100dp

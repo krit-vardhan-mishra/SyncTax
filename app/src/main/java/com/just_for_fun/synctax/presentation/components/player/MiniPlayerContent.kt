@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -129,16 +130,21 @@ fun MiniPlayerContent(
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .offset(x = albumArtOffsetX.dp)
-                            .pointerInput(song.id) {
-                                detectTapGestures(onTap = { onClick() })
-                            }
-                            .pointerInput(song.id) {
-                                var totalDragX = 0f
-                                var isHorizontalDrag = false
+                            .clip(RectangleShape)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .offset(x = albumArtOffsetX.dp)
+                                .pointerInput(song.id) {
+                                    detectTapGestures(onTap = { onClick() })
+                                }
+                                .pointerInput(song.id) {
+                                    var totalDragX = 0f
+                                    var isHorizontalDrag = false
 
                                 detectHorizontalDragGestures(
                                     onDragStart = {
@@ -158,6 +164,9 @@ fun MiniPlayerContent(
                                         change.consume()
                                         totalDragX += dragAmount
                                         albumArtOffsetX += dragAmount
+                                    },
+                                    onDragCancel = {
+                                        albumArtOffsetX = 0f
                                     }
                                 )
                                 // Note: Vertical drags are NOT consumed here,
@@ -230,7 +239,8 @@ fun MiniPlayerContent(
                                 AnimatedWaveform()
                             }
                         }
-                    }
+                            }
+                        }
 
                     // Controls
                     Row(
