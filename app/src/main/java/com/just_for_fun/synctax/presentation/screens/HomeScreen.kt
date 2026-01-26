@@ -69,6 +69,7 @@ import com.just_for_fun.synctax.presentation.components.section.EmptyRecommendat
 import com.just_for_fun.synctax.presentation.components.section.OnlineHistorySection
 import com.just_for_fun.synctax.presentation.components.section.RecommendationsSection
 import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
+import com.just_for_fun.synctax.presentation.components.section.QuickAccessGrid
 import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSection
 import com.just_for_fun.synctax.presentation.components.section.SectionHeader
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar

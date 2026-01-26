@@ -218,6 +218,82 @@ class UserPreferences(context: Context) {
         _offlineCacheCount.value = clamped
     }
 
+    // --- Last Played Song for preloading on splash screen ---
+    
+    /**
+     * Data class representing the last played song for restoration
+     */
+    data class LastPlayedSong(
+        val songId: String?,
+        val isOnline: Boolean,
+        val videoId: String?,
+        val title: String?,
+        val artist: String?,
+        val thumbnailUrl: String?,
+        val watchUrl: String?
+    )
+    
+    /**
+     * Saves the last played song info for restoration on next app launch
+     */
+    fun saveLastPlayedSong(
+        songId: String?,
+        isOnline: Boolean,
+        videoId: String? = null,
+        title: String? = null,
+        artist: String? = null,
+        thumbnailUrl: String? = null,
+        watchUrl: String? = null
+    ) {
+        prefs.edit().apply {
+            putString(KEY_LAST_SONG_ID, songId)
+            putBoolean(KEY_LAST_SONG_IS_ONLINE, isOnline)
+            putString(KEY_LAST_SONG_VIDEO_ID, videoId)
+            putString(KEY_LAST_SONG_TITLE, title)
+            putString(KEY_LAST_SONG_ARTIST, artist)
+            putString(KEY_LAST_SONG_THUMBNAIL, thumbnailUrl)
+            putString(KEY_LAST_SONG_WATCH_URL, watchUrl)
+            apply()
+        }
+    }
+    
+    /**
+     * Gets the last played song info for preloading during splash
+     */
+    fun getLastPlayedSong(): LastPlayedSong? {
+        val songId = prefs.getString(KEY_LAST_SONG_ID, null)
+        val isOnline = prefs.getBoolean(KEY_LAST_SONG_IS_ONLINE, false)
+        
+        // Return null if no song was saved
+        if (songId == null && !isOnline) return null
+        
+        return LastPlayedSong(
+            songId = songId,
+            isOnline = isOnline,
+            videoId = prefs.getString(KEY_LAST_SONG_VIDEO_ID, null),
+            title = prefs.getString(KEY_LAST_SONG_TITLE, null),
+            artist = prefs.getString(KEY_LAST_SONG_ARTIST, null),
+            thumbnailUrl = prefs.getString(KEY_LAST_SONG_THUMBNAIL, null),
+            watchUrl = prefs.getString(KEY_LAST_SONG_WATCH_URL, null)
+        )
+    }
+    
+    /**
+     * Clears the last played song (e.g., when user explicitly stops music)
+     */
+    fun clearLastPlayedSong() {
+        prefs.edit().apply {
+            remove(KEY_LAST_SONG_ID)
+            remove(KEY_LAST_SONG_IS_ONLINE)
+            remove(KEY_LAST_SONG_VIDEO_ID)
+            remove(KEY_LAST_SONG_TITLE)
+            remove(KEY_LAST_SONG_ARTIST)
+            remove(KEY_LAST_SONG_THUMBNAIL)
+            remove(KEY_LAST_SONG_WATCH_URL)
+            apply()
+        }
+    }
+
     companion object {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
@@ -257,5 +333,14 @@ class UserPreferences(context: Context) {
         // Offline songs cache
         private const val KEY_OFFLINE_CACHE_ENABLED = "offline_cache_enabled"
         private const val KEY_OFFLINE_CACHE_COUNT = "offline_cache_count"
+        
+        // Last played song for splash screen preloading
+        private const val KEY_LAST_SONG_ID = "last_song_id"
+        private const val KEY_LAST_SONG_IS_ONLINE = "last_song_is_online"
+        private const val KEY_LAST_SONG_VIDEO_ID = "last_song_video_id"
+        private const val KEY_LAST_SONG_TITLE = "last_song_title"
+        private const val KEY_LAST_SONG_ARTIST = "last_song_artist"
+        private const val KEY_LAST_SONG_THUMBNAIL = "last_song_thumbnail"
+        private const val KEY_LAST_SONG_WATCH_URL = "last_song_watch_url"
     }
 }

@@ -2,6 +2,11 @@ package com.just_for_fun.synctax.core.init
 
 import android.content.Context
 import android.util.Log
+import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
+import com.just_for_fun.synctax.core.network.YouTubeInnerTubeClient
+import com.just_for_fun.synctax.core.service.ListeningAnalyticsService
+import com.just_for_fun.synctax.core.service.RecommendationService
+import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
 import com.just_for_fun.synctax.data.local.entities.OnlineSearchHistory
 import com.just_for_fun.synctax.data.local.entities.Playlist
@@ -12,8 +17,8 @@ import com.just_for_fun.synctax.data.repository.PlaylistRepository
 import com.just_for_fun.synctax.presentation.viewmodels.ModelTrainingStatus
 import com.just_for_fun.synctax.presentation.viewmodels.SongPlayCount
 import com.just_for_fun.synctax.presentation.viewmodels.TrainingStatistics
-import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +45,11 @@ object AppInitializer {
     /**
      * Pre-computed data for HomeViewModel to consume
      */
+    /**
+     * Minimum splash screen duration in milliseconds to ensure smooth progress bar animation
+     */
+    private const val MIN_SPLASH_DURATION_MS = 2000L
+    
     data class InitializedData(
         val songs: List<Song>,
         val mostPlayedSongs: List<Song>,
@@ -51,7 +61,11 @@ object AppInitializer {
         val savedPlaylists: List<Playlist>,
         val trainingStatistics: TrainingStatistics?,
         val modelStatus: ModelTrainingStatus?,
-        val trainingDataSize: Int
+        val trainingDataSize: Int,
+        // New fields for preloading
+        val recommendations: RecommendationService.RecommendationResult?,
+        val lastPlayedSong: UserPreferences.LastPlayedSong?,
+        val lastPlayedStreamUrl: String?
     )
     
     private val _progress = MutableStateFlow(InitProgress("Initializing...", 0f))
@@ -106,6 +120,7 @@ object AppInitializer {
         
         withContext(Dispatchers.IO) {
             try {
+                val startTime = System.currentTimeMillis()
                 val repository = MusicRepository(context)
                 val playlistRepository = PlaylistRepository(context)
                 val userPreferences = UserPreferences(context)
@@ -233,8 +248,8 @@ object AppInitializer {
                 }
                 Log.d(TAG, "Phase 9 complete: Loaded training statistics")
                 
-                // Phase 10: Load model status (5%)
-                updateProgress("Checking models...", 0.95f)
+                // Phase 10: Load model status (3%)
+                updateProgress("Checking models...", 0.70f)
                 val modelStatus = try {
                     val status = recommendationManager.getModelStatus()
                     ModelTrainingStatus(
@@ -251,6 +266,66 @@ object AppInitializer {
                 }
                 Log.d(TAG, "Phase 10 complete: Loaded model status")
                 
+                // Phase 11: Load online recommendations (15%)
+                updateProgress("Loading recommendations...", 0.75f)
+                val recommendations = try {
+                    val db = MusicDatabase.getDatabase(context)
+                    val historyDao = db.onlineListeningHistoryDao()
+                    val cacheDao = db.recommendationCacheDao()
+                    val analyticsService = ListeningAnalyticsService(historyDao)
+                    val ytClient = YouTubeInnerTubeClient()
+                    val recommendationService = RecommendationService(
+                        analyticsService, ytClient, historyDao, cacheDao
+                    )
+                    
+                    // Check if user has enough history before loading
+                    val hasHistory = analyticsService.hasEnoughHistory(3)
+                    if (hasHistory) {
+                        recommendationService.generateRecommendations()
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to load recommendations: ${e.message}")
+                    null
+                }
+                Log.d(TAG, "Phase 11 complete: Loaded recommendations (${recommendations != null})")
+                
+                // Phase 12: Preload last played song stream (10%)
+                updateProgress("Preloading last song...", 0.90f)
+                val playerPreferences = com.just_for_fun.synctax.data.preferences.PlayerPreferences(context)
+                val onlineSongState = playerPreferences.getOnlineSongState()
+                var lastPlayedStreamUrl: String? = null
+                
+                // Also get last played song info for InitializedData
+                val lastPlayedSong = if (playerPreferences.isOnlineSong() && onlineSongState != null) {
+                    UserPreferences.LastPlayedSong(
+                        songId = "online:${onlineSongState.videoId}",
+                        isOnline = true,
+                        videoId = onlineSongState.videoId,
+                        title = onlineSongState.title,
+                        artist = onlineSongState.artist,
+                        thumbnailUrl = onlineSongState.thumbnailUrl,
+                        watchUrl = onlineSongState.watchUrl
+                    )
+                } else {
+                    userPreferences.getLastPlayedSong()
+                }
+                
+                if (onlineSongState != null && onlineSongState.videoId.isNotEmpty()) {
+                    updateProgress("Fetching stream...", 0.92f)
+                    lastPlayedStreamUrl = try {
+                        val ytClient = YouTubeInnerTubeClient()
+                        ytClient.getStreamUrl(onlineSongState.videoId)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to preload stream URL: ${e.message}")
+                        null
+                    }
+                    Log.d(TAG, "Phase 12 complete: Preloaded stream URL for ${onlineSongState.title}")
+                } else {
+                    Log.d(TAG, "Phase 12 complete: No online song to preload")
+                }
+                
                 // Store the pre-computed data
                 _initializedData = InitializedData(
                     songs = songs,
@@ -263,8 +338,25 @@ object AppInitializer {
                     savedPlaylists = savedPlaylists,
                     trainingStatistics = trainingStatistics,
                     modelStatus = modelStatus,
-                    trainingDataSize = recentHistory.size
+                    trainingDataSize = recentHistory.size,
+                    recommendations = recommendations,
+                    lastPlayedSong = lastPlayedSong,
+                    lastPlayedStreamUrl = lastPlayedStreamUrl
                 )
+                
+                // Phase 13: Ensure minimum splash duration for smooth progress bar
+                updateProgress("Almost ready...", 0.95f)
+                val elapsed = System.currentTimeMillis() - startTime
+                if (elapsed < MIN_SPLASH_DURATION_MS) {
+                    val remaining = MIN_SPLASH_DURATION_MS - elapsed
+                    // Animate progress smoothly during wait
+                    val steps = (remaining / 100).toInt().coerceAtLeast(1)
+                    val progressPerStep = (1f - 0.95f) / steps
+                    repeat(steps) { i ->
+                        delay(remaining / steps)
+                        updateProgress("Almost ready...", 0.95f + (progressPerStep * (i + 1)))
+                    }
+                }
                 
                 _isInitialized = true
                 updateProgress("Ready", 1f, isComplete = true)

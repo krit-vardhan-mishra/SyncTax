@@ -685,56 +685,7 @@ fun RecommendationSkeleton(
     }
 }
 
-/**
- * Empty state prompt when no recommendations available.
- */
-@Composable
-fun EmptyRecommendationsPrompt(
-    onExploreClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Default.Explore,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Start listening to get personalized recommendations",
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Play some songs and we'll suggest music you'll love",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(onClick = onExploreClick) {
-                Text("Explore Music")
-            }
-        }
-    }
-}
+// EmptyRecommendationsPrompt has been moved to its own file: EmptyRecommendationsPrompt.kt
 
 /**
  * Song list item for shuffle batch display.

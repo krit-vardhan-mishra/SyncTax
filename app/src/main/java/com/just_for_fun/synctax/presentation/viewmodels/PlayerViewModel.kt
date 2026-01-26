@@ -523,9 +523,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Update notification
             updateNotification()
 
-            // Preload the current song's stream URL for instant playback when user presses play
-            Log.d("PlayerViewModel", "🚀 Preloading stream for restored song: ${onlineSong.title}")
-            preloadManager.preloadSong(onlineSong)
+            // Check if AppInitializer has preloaded stream URL from splash screen
+            val preloadedData = com.just_for_fun.synctax.core.init.AppInitializer.getInitializedData()
+            if (preloadedData?.lastPlayedStreamUrl != null) {
+                // Use preloaded stream URL for instant playback
+                Log.d("PlayerViewModel", "✅ Using preloaded stream URL from splash screen for instant playback")
+                StreamUrlCache.put(onlineState.videoId, preloadedData.lastPlayedStreamUrl)
+            } else {
+                // Fallback: Preload the current song's stream URL for instant playback when user presses play
+                Log.d("PlayerViewModel", "🚀 Preloading stream for restored song: ${onlineSong.title}")
+                preloadManager.preloadSong(onlineSong)
+            }
 
             // Fetch recommendations for the restored song
             if (onlineState.videoId.isNotEmpty()) {
