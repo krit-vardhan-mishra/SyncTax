@@ -7,7 +7,6 @@ import kotlin.math.pow
 
 /**
  * Statistical-based recommendation using weighted scoring
- * Similar to Tier-0 Agent in OD-MAS
  */
 class StatisticalAgent {
 

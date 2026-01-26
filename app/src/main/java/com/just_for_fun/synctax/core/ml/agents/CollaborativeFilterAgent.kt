@@ -7,7 +7,6 @@ import com.just_for_fun.synctax.core.utils.VectorDatabase
 
 /**
  * Collaborative filtering using vector similarity
- * Similar to Tier-1 Agent in OD-MAS
  */
 class CollaborativeFilteringAgent(
     private val vectorDb: VectorDatabase

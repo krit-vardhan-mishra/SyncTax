@@ -3,42 +3,85 @@ package com.just_for_fun.synctax.core.ml.agents
 import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 
 /**
- * Fuses results from multiple agents
- * Similar to Fusion Agent in OD-MAS
+ * Fuses results from multiple agents.
+ * 
+ * Enhanced with sequence-based recommendations (from RECOMMENDATION_LOGIC_NEW.md):
+ * - Statistical Agent: Feature-based scoring (40% base)
+ * - Collaborative Agent: Vector similarity (30% base)
+ * - Sequence Agent: Markov chain transitions (new)
+ * - Python ML Agent: Ensemble learning (bonus when confident)
  */
 class FusionAgent {
 
     fun fuseRecommendations(
         statisticalResult: RecommendationResult,
         collaborativeResult: RecommendationResult,
-        pythonMlResult: RecommendationResult? = null
+        pythonMlResult: RecommendationResult? = null,
+        sequenceResult: RecommendationResult? = null
     ): RecommendationResult {
 
         // If Python ML is available and confident, give it more weight
         return if (pythonMlResult != null && pythonMlResult.confidence > 80f) {
-            fusWithPythonML(statisticalResult, collaborativeResult, pythonMlResult)
+            fuseWithPythonML(statisticalResult, collaborativeResult, pythonMlResult, sequenceResult)
+        } else if (sequenceResult != null && sequenceResult.confidence > 60f) {
+            fuseWithSequence(statisticalResult, collaborativeResult, sequenceResult)
         } else {
             fuseKotlinAgents(statisticalResult, collaborativeResult)
         }
     }
 
-    private fun fusWithPythonML(
+    private fun fuseWithPythonML(
         statistical: RecommendationResult,
         collaborative: RecommendationResult,
-        pythonMl: RecommendationResult
+        pythonMl: RecommendationResult,
+        sequence: RecommendationResult?
     ): RecommendationResult {
-        // Python ML gets 50%, others split remaining 50%
-        val fusedScore = pythonMl.score * 0.5 +
-                statistical.score * 0.2 +
-                collaborative.score * 0.3
+        // Python ML gets 40%, sequence 20% (if available), others split remaining
+        val sequenceScore = sequence?.score ?: 0.0
+        val sequenceWeight = if (sequence != null) 0.20 else 0.0
+        
+        val fusedScore = pythonMl.score * 0.40 +
+                statistical.score * 0.15 +
+                collaborative.score * 0.25 +
+                sequenceScore * sequenceWeight
 
-        val avgConfidence = (pythonMl.confidence + statistical.confidence + collaborative.confidence) / 3
+        val avgConfidence = listOfNotNull(
+            pythonMl.confidence,
+            statistical.confidence,
+            collaborative.confidence,
+            sequence?.confidence
+        ).average().toFloat()
+
+        val reason = buildString {
+            append("Multi-agent fusion with ML")
+            if (sequence != null) append(" + Sequential")
+        }
 
         return RecommendationResult(
             songId = statistical.songId,
             score = fusedScore,
             confidence = avgConfidence,
-            reason = "Multi-agent fusion with ML"
+            reason = reason
+        )
+    }
+
+    private fun fuseWithSequence(
+        statistical: RecommendationResult,
+        collaborative: RecommendationResult,
+        sequence: RecommendationResult
+    ): RecommendationResult {
+        // Sequence gets 35%, Statistical 25%, Collaborative 40%
+        val fusedScore = statistical.score * 0.25 + 
+                collaborative.score * 0.40 + 
+                sequence.score * 0.35
+
+        val avgConfidence = (statistical.confidence + collaborative.confidence + sequence.confidence) / 3
+
+        return RecommendationResult(
+            songId = statistical.songId,
+            score = fusedScore,
+            confidence = avgConfidence,
+            reason = "Statistical + Collaborative + Sequential fusion"
         )
     }
 

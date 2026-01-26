@@ -6,7 +6,6 @@ import kotlin.math.exp
 
 /**
  * Policy agent for final recommendation decisions
- * Similar to Policy Agent in OD-MAS
  */
 class RecommendationAgent {
 

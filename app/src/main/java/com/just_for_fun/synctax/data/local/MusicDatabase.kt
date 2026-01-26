@@ -14,6 +14,7 @@ import com.just_for_fun.synctax.data.local.dao.QuickPickDao
 import com.just_for_fun.synctax.data.local.dao.RecommendationCacheDao
 import com.just_for_fun.synctax.data.local.dao.RecommendationInteractionDao
 import com.just_for_fun.synctax.data.local.dao.SongDao
+import com.just_for_fun.synctax.data.local.dao.SongTransitionDao
 import com.just_for_fun.synctax.data.local.dao.UserPreferenceDao
 import com.just_for_fun.synctax.data.local.entities.ListeningHistory
 import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
@@ -26,6 +27,7 @@ import com.just_for_fun.synctax.data.local.entities.QuickPickSong
 import com.just_for_fun.synctax.data.local.entities.RecommendationCache
 import com.just_for_fun.synctax.data.local.entities.RecommendationInteraction
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.data.local.entities.SongTransition
 import com.just_for_fun.synctax.data.local.entities.UserPreference
 
 @Database(
@@ -41,9 +43,10 @@ import com.just_for_fun.synctax.data.local.entities.UserPreference
         RecommendationCache::class,
         RecommendationInteraction::class,
         QuickPick::class,
-        QuickPickSong::class
+        QuickPickSong::class,
+        SongTransition::class
     ],
-    version = 9,  // Incremented for QuickPick entities
+    version = 10,  // Incremented for SongTransition entity
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
@@ -58,6 +61,7 @@ abstract class MusicDatabase : RoomDatabase() {
     abstract fun recommendationCacheDao(): RecommendationCacheDao
     abstract fun recommendationInteractionDao(): RecommendationInteractionDao
     abstract fun quickPickDao(): QuickPickDao
+    abstract fun songTransitionDao(): SongTransitionDao
 
     companion object {
         @Volatile

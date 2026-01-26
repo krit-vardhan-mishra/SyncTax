@@ -6,12 +6,14 @@ import com.just_for_fun.synctax.core.chaquopy.ModelStatus
 import com.just_for_fun.synctax.core.ml.agents.CollaborativeFilteringAgent
 import com.just_for_fun.synctax.core.ml.agents.FusionAgent
 import com.just_for_fun.synctax.core.ml.agents.RecommendationAgent
+import com.just_for_fun.synctax.core.ml.agents.SequenceRecommenderAgent
 import com.just_for_fun.synctax.core.ml.agents.StatisticalAgent
 import com.just_for_fun.synctax.core.ml.models.QuickPicksResult
 import com.just_for_fun.synctax.core.ml.models.RecommendationResult
 import com.just_for_fun.synctax.core.ml.models.SongFeatures
 import com.just_for_fun.synctax.core.utils.VectorDatabase
 import com.just_for_fun.synctax.data.local.MusicDatabase
+import com.just_for_fun.synctax.data.local.entities.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,20 +31,32 @@ import java.util.Calendar
 
 /**
  * Manager that orchestrates the recommendation pipeline.
- * It coordinates several agents (Statistical, Collaborative, Fusion) and uses the ChaquopyPython
+ * It coordinates several agents (Statistical, Collaborative, Sequence, Fusion) and uses ChaquopyPython
  * analyzer for additional ML-based scoring. Responsible for training models and generating
  * final quick picks presented in the UI.
+ * 
+ * New Features (based on RECOMMENDATION_LOGIC_NEW.md):
+ * - Markov Chain for sequential recommendations (SequenceRecommenderAgent)
+ * - Skip handling and real-time adaptation (SkipHandler)
+ * - Intelligent shuffle with diversity (IntelligentShuffleEngine)
+ * - Song transition graph for learning user patterns
  */
 class MusicRecommendationManager(private val context: Context) {
 
     private val database = MusicDatabase.getDatabase(context)
     private val vectorDb = VectorDatabase(context)
 
+    // Core recommendation agents
     private val statisticalAgent = StatisticalAgent()
     private val collaborativeAgent = CollaborativeFilteringAgent(vectorDb)
     private val fusionAgent = FusionAgent()
     private val recommendationAgent = RecommendationAgent()
     private val chaquopyAnalyzer = ChaquopyMusicAnalyzer.getInstance(context)
+
+    // New agents for enhanced recommendations
+    val sequenceAgent = SequenceRecommenderAgent(database.songTransitionDao())
+    val skipHandler = SkipHandler(database, sequenceAgent)
+    val intelligentShuffleEngine = IntelligentShuffleEngine(database, collaborativeAgent, sequenceAgent)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -141,12 +155,146 @@ class MusicRecommendationManager(private val context: Context) {
 
                 // Train Python ML model
                 chaquopyAnalyzer.trainModel(songFeaturesList)
+                
+                // Perform maintenance on sequence agent (prune old transitions)
+                sequenceAgent.performMaintenance()
 
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
+
+    // ==================== NEW METHODS FOR ENHANCED RECOMMENDATIONS ====================
+
+    /**
+     * Record a song transition when user plays song B after song A
+     * This builds the Markov chain for sequential recommendations
+     */
+    suspend fun recordSongTransition(
+        fromSongId: String,
+        toSongId: String,
+        completionRate: Float = 1.0f
+    ) {
+        withContext(Dispatchers.IO) {
+            sequenceAgent.recordTransition(fromSongId, toSongId, completionRate)
+        }
+    }
+
+    /**
+     * Handle song skip - updates preferences and transitions
+     */
+    suspend fun handleSongSkip(
+        skippedSongId: String,
+        previousSongId: String?,
+        listenDuration: Long,
+        totalDuration: Long
+    ) {
+        withContext(Dispatchers.IO) {
+            skipHandler.onSongSkipped(skippedSongId, previousSongId, listenDuration, totalDuration)
+        }
+    }
+
+    /**
+     * Get sequence-based recommendations (what to play after current song)
+     */
+    suspend fun getSequenceBasedRecommendations(
+        currentSongId: String,
+        excludeSongIds: Set<String> = emptySet(),
+        limit: Int = 10
+    ): List<RecommendationResult> {
+        return withContext(Dispatchers.Default) {
+            sequenceAgent.getNextSongCandidates(currentSongId, excludeSongIds, limit)
+        }
+    }
+
+    /**
+     * Generate intelligent shuffle queue
+     * This is the main method for the new shuffle algorithm
+     */
+    suspend fun generateIntelligentShuffleQueue(
+        songs: List<Song>,
+        currentSongId: String? = null,
+        recentlyPlayed: List<String> = emptyList()
+    ): List<Song> {
+        return withContext(Dispatchers.Default) {
+            intelligentShuffleEngine.generateIntelligentQueue(
+                songs = songs,
+                currentSongId = currentSongId,
+                recentlyPlayed = recentlyPlayed
+            )
+        }
+    }
+
+    /**
+     * Adapt queue when skip pattern is detected
+     */
+    suspend fun adaptQueueForSkipPattern(
+        pattern: SkipPattern,
+        currentQueue: List<Song>,
+        currentIndex: Int,
+        allSongs: List<Song>
+    ): List<Song> {
+        return withContext(Dispatchers.Default) {
+            intelligentShuffleEngine.adaptQueueForPattern(pattern, currentQueue, currentIndex, allSongs)
+        }
+    }
+
+    /**
+     * Get hybrid recommendations combining all agents including sequence
+     */
+    suspend fun getHybridRecommendations(
+        currentSongId: String,
+        candidateSongs: List<Song>,
+        limit: Int = 20
+    ): List<RecommendationResult> = withContext(Dispatchers.Default) {
+        val recentHistory = database.listeningHistoryDao().getRecentHistory(100).first()
+        val userPreferences = database.userPreferenceDao().getTopPreferences(50).first()
+
+        // Get sequence-based recommendations
+        val sequenceRecs = sequenceAgent.getNextSongCandidates(
+            currentSongId, 
+            emptySet(), 
+            limit = 50
+        ).associateBy { it.songId }
+
+        // Process candidates with all agents
+        val results = candidateSongs.take(limit * 3).map { song ->
+            async {
+                val features = extractSongFeatures(song.id, recentHistory, userPreferences)
+                val baseResult = processWithAgents(features, userPreferences.map { pref ->
+                    extractSongFeatures(pref.songId, recentHistory, userPreferences)
+                })
+                
+                // Enhance with sequence score if available
+                val sequenceBonus = sequenceRecs[song.id]?.score?.times(0.3) ?: 0.0
+                baseResult.copy(
+                    score = baseResult.score + sequenceBonus,
+                    reason = if (sequenceRecs.containsKey(song.id)) {
+                        "${baseResult.reason} + Sequential pattern"
+                    } else baseResult.reason
+                )
+            }
+        }.awaitAll()
+
+        results.sortedByDescending { it.score }.take(limit)
+    }
+
+    /**
+     * Get skip statistics for analytics
+     */
+    fun getSkipStatistics(): SkipStatistics {
+        return skipHandler.getSkipStatistics()
+    }
+
+    /**
+     * Set callback for skip pattern detection
+     */
+    fun setSkipPatternCallback(callback: (SkipPattern) -> Unit) {
+        skipHandler.onSkipPatternDetected = callback
+    }
+
+    // ==================== END NEW METHODS ====================
 
     /**
      * Clear model data (in-memory vectors, python model state, recent recommendations)
@@ -160,6 +308,9 @@ class MusicRecommendationManager(private val context: Context) {
 
                 // Clear recommendation history used for diversity filtering
                 recommendationAgent.clearRecommendationHistory()
+                
+                // Reset skip handler tracking
+                skipHandler.resetSkipTracking()
 
                 // Reset python ML model via Chaquopy analyzer
                 val reset = chaquopyAnalyzer.resetModel()
