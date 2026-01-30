@@ -20,8 +20,8 @@ android {
         applicationId = "com.just_for_fun.synctax"
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
-        versionName = "4.0.16"
+        versionCode = 5
+        versionName = "4.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

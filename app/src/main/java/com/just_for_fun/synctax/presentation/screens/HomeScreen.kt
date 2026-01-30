@@ -53,10 +53,11 @@ import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDial
 import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
 import com.just_for_fun.synctax.presentation.components.section.EmptyRecommendationsPrompt
-import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
 import com.just_for_fun.synctax.presentation.components.section.HistorySection
+import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
 import com.just_for_fun.synctax.presentation.components.section.QuickAccessGrid
 import com.just_for_fun.synctax.presentation.components.section.QuickShortcutsRow
+import com.just_for_fun.synctax.presentation.components.section.RecentlyAddedSection
 import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
 import com.just_for_fun.synctax.presentation.components.section.RecommendationsSection
 import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSection
@@ -463,6 +464,36 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                            
+                            // Quick Picks Section - Now empty, can be removed or repurposed
+                            if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                                // History section moved to after Artist section
+                                if (uiState.onlineHistory.isNotEmpty()) {
+                                    item(key = "history", contentType = "history") {
+                                        HistorySection(
+                                            history = uiState.onlineHistory,
+                                            onHistoryClick = { history ->
+                                                playerViewModel.playUrl(
+                                                    url = history.watchUrl,
+                                                    title = history.title,
+                                                    artist = history.artist,
+                                                    durationMs = 0L
+                                                )
+                                            },
+                                            onViewAllClick = onNavigateToOnlineSongs,
+                                            currentVideoId = if (playerState.currentSong?.id?.startsWith(
+                                                    "online:"
+                                                ) == true
+                                            )
+                                                playerState.currentSong?.id?.removePrefix("online:")
+                                            else null,
+                                            onRemoveFromHistory = { history ->
+                                                homeViewModel.deleteOnlineHistory(history.videoId)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
 
                             // Album Section
                             if (uiState.albums.isNotEmpty()) {
@@ -482,7 +513,10 @@ fun HomeScreen(
                                             AlbumCard(
                                                 album = album,
                                                 onClick = {
-                                                    onNavigateToAlbumDetail(album.name, album.artist)
+                                                    onNavigateToAlbumDetail(
+                                                        album.name,
+                                                        album.artist
+                                                    )
                                                 }
                                             )
                                         }
@@ -490,29 +524,23 @@ fun HomeScreen(
                                 }
                             }
 
-                            // Quick Picks Section - Now shows online listening history
-                            if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                                item {
-                                    HistorySection(
-                                        history = uiState.onlineHistory,
-                                        onHistoryClick = { history ->
-                                            playerViewModel.playUrl(
-                                                url = history.watchUrl,
-                                                title = history.title,
-                                                artist = history.artist,
-                                                durationMs = 0L
-                                            )
+                            // Recently Added Section (Standard)
+                            if (uiState.allSongs.isNotEmpty()) {
+                                item(
+                                    key = "recently_added_standard",
+                                    contentType = "recently_added"
+                                ) {
+                                    // Get recently added songs (last 20 songs, sorted by date added if available, otherwise by title)
+                                    val recentlyAddedSongs = uiState.allSongs
+                                        .sortedByDescending { it.title } // This could be improved with actual date added
+                                        .take(20)
+
+                                    RecentlyAddedSection(
+                                        songs = recentlyAddedSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(song, uiState.allSongs)
                                         },
-                                        onViewAllClick = onNavigateToOnlineSongs,
-                                        currentVideoId = if (playerState.currentSong?.id?.startsWith(
-                                                "online:"
-                                            ) == true
-                                        )
-                                            playerState.currentSong?.id?.removePrefix("online:")
-                                        else null,
-                                        onRemoveFromHistory = { history ->
-                                            homeViewModel.deleteOnlineHistory(history.videoId)
-                                        }
+                                        onViewAllClick = null // Could navigate to a dedicated recently added screen
                                     )
                                 }
                             }

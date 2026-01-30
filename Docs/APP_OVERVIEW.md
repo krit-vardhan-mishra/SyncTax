@@ -254,7 +254,52 @@
 3. **Sleep Timer**: Auto-stop playback
 4. **Model Persistence**: Save trained ML weights across app restarts
 
-## Recent Updates (December 2025)
+## Recent Updates (January 2026 - v4.1.0)
+
+### ✨ New Features
+
+#### Update System
+- **Automatic Update Checking**: Check for app updates directly from Settings
+- **Library Version Tracking**: Monitor NewPipe Extractor library versions
+- **Background Update Checks**: Periodic checks with notifications (every 12 hours)
+- **Beta Channel Support**: Opt-in to pre-release versions
+- **Direct APK Download**: Download and install updates directly from GitHub
+- **Changelog Viewer**: Browse full release history with detailed notes
+- **Smart Version Comparison**: Handles stable/beta versions intelligently
+
+#### Music Management & Discovery
+- **Improved Recommendation Logic**: Enhanced ML-based song recommendations with better accuracy
+- **Advanced Search**: Proper searching across local and online songs with filter chips
+- **Song History Tracking**: Complete history of played songs with timestamps
+- **Improved Song Saving**: Proper metadata preservation when downloading songs
+- **Pull-to-Refresh**: Refresh content by pulling down on lists (songs, history, recommendations)
+
+#### UI/UX Improvements
+- **Navigation Bar Animations**: Smooth scale animations on tab selection
+- **Recently Added Section**: New section on Home screen showing latest songs
+- **Quick Screen Enhancement**: Now supports both local and online songs
+- **Artist Photo Caching**: Improved artist photo loading with caching
+- **Offline Mode Detection**: Graceful handling of offline scenarios
+- **Enhanced Spacing**: Refined UI spacing for better readability
+
+#### Performance Optimizations
+- **Splash Screen Optimization**: Heavy components (Python, ML) initialized during splash
+- **Artist Photo Preloading**: Preload top 10 artist photos during app initialization
+- **Conditional Network Operations**: Skip network-dependent operations in offline mode
+- **Improved App Initialization**: Faster startup with phased initialization
+
+### 🐛 Bug Fixes
+- Fixed lyrics overlay display issues
+- Resolved activity lifecycle issues
+- Improved recommendation logic stability
+- Fixed create playlist functionality
+
+### 📚 Documentation
+- Added comprehensive [UPDATE_SYSTEM.md](UPDATE_SYSTEM.md) documentation
+- Updated architecture guides with new components
+- Enhanced release process documentation
+
+### Previous Updates (December 2025 - v4.0.16)
 
 - ✅ **Playlist Management**: Create, import, and manage playlists
 - ✅ **Responsive UI Scaling**: Automatic UI scaling across different screen sizes
@@ -270,5 +315,5 @@
 
 ---
 
-**Version**: 3.1.0  
-**Last Updated**: December 2025
+**Version**: 4.1.0  
+**Last Updated**: January 30, 2026

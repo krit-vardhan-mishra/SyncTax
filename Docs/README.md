@@ -12,6 +12,7 @@ Comprehensive documentation for the SyncTax music player app.
 | [APP_OVERVIEW.md](APP_OVERVIEW.md) | App overview, features, and tech stack |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Project structure and architecture guide |
 | [RELEASE_GUIDE.md](RELEASE_GUIDE.md) | GitHub release process |
+| [UPDATE_SYSTEM.md](UPDATE_SYSTEM.md) | Automatic update system documentation |
 
 ### Machine Learning
 | Document | Description |
@@ -54,11 +55,11 @@ Comprehensive documentation for the SyncTax music player app.
 
 | Property | Value |
 |----------|-------|
-| Version | 3.0.0 |
+| Version | 4.1.0 |
 | Min SDK | Android 10 (API 29) |
 | Target SDK | Android 15 (API 36) |
 | APK Size | ~136 MB |
 
 ---
 
-*Last Updated: December 2025*
+*Last Updated: January 30, 2026*

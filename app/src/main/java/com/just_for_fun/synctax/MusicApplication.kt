@@ -35,6 +35,10 @@ class MusicApplication : Application(), ImageLoaderFactory {
     var isFFmpegInitialized = false
         private set
 
+    // Heavy components initialization status
+    var areHeavyComponentsInitialized = false
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -48,9 +52,10 @@ class MusicApplication : Application(), ImageLoaderFactory {
         }
 
         // Initialize Python runtime on background thread to avoid blocking main thread
-        applicationScope.launch {
-            initializePython()
-        }
+        // NOTE: Now moved to splash screen for better UX
+        // applicationScope.launch {
+        //     initializePython()
+        // }
 
         // Initialize YoutubeDL and SpotDL on background thread
         applicationScope.launch {
@@ -117,9 +122,21 @@ class MusicApplication : Application(), ImageLoaderFactory {
                 // Initialize YTMusicRecommender for song-only recommendations
                 YTMusicRecommender.initialize()
                 Log.d(TAG, "YTMusicRecommender initialized")
+                
+                areHeavyComponentsInitialized = true
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize Python runtime", e)
+        }
+    }
+
+    /**
+     * Initialize heavy components if not already done.
+     * This is called from splash screen now.
+     */
+    fun initializeHeavyComponentsIfNeeded() {
+        if (!areHeavyComponentsInitialized) {
+            initializePython()
         }
     }
 

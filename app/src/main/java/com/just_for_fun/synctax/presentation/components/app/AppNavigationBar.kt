@@ -1,5 +1,8 @@
 package com.just_for_fun.synctax.presentation.components.app
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,8 +29,10 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -36,6 +41,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 import com.just_for_fun.synctax.presentation.utils.AlbumColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +52,8 @@ fun AppNavigationBar(
 ) {
     var lastLibraryClickTime by remember { mutableLongStateOf(0L) }
     var showLibraryBottomSheet by remember { mutableStateOf(false) }
+    var animatingItems by remember { mutableStateOf(setOf<String>()) }
+    val coroutineScope = rememberCoroutineScope()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -81,6 +90,13 @@ fun AppNavigationBar(
                 else -> currentRoute == item.route
             }
 
+            val isAnimating = animatingItems.contains(item.route)
+            val scale by animateFloatAsState(
+                targetValue = if (isAnimating) 0.8f else 1.0f,
+                animationSpec = spring(dampingRatio = 0.5f, stiffness = 1000f),
+                label = "iconScale"
+            )
+
             NavigationBarItem(
                 // 1. Custom Icon Composable with Glow Effect
                 icon = {
@@ -101,13 +117,23 @@ fun AppNavigationBar(
                                     )
                             )
                         }
-                        // Render the actual icon on top
-                        item.icon()
+                        // Render the actual icon on top with scale animation
+                        Box(modifier = Modifier.scale(scale)) {
+                            item.icon()
+                        }
                     }
                 },
                 label = { Text(item.label) },
                 selected = isSelected,
                 onClick = {
+                    // Trigger animation
+                    animatingItems = animatingItems + item.route
+                    // Reset animation after delay
+                    coroutineScope.launch {
+                        delay(150)
+                        animatingItems = animatingItems - item.route
+                    }
+
                     if (item.route == "library") {
                         val currentTime = System.currentTimeMillis()
                         val isOnLibraryOrPlaylists = currentRoute == "library" || currentRoute == "playlists"

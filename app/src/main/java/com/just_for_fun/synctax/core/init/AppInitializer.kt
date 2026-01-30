@@ -1,7 +1,11 @@
 package com.just_for_fun.synctax.core.init
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.util.Log
+import com.just_for_fun.synctax.MusicApplication
+import com.just_for_fun.synctax.core.chaquopy.ChaquopyMusicAnalyzer
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.network.YouTubeInnerTubeClient
 import com.just_for_fun.synctax.core.service.ListeningAnalyticsService
@@ -102,6 +106,17 @@ object AppInitializer {
         _isInitialized = false
         _progress.value = InitProgress("Initializing...", 0f)
         Log.d(TAG, "Reset initializer state")
+    }
+    
+    /**
+     * Check if the device has internet connectivity
+     */
+    private fun isOnline(context: Context): Boolean {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
     
     /**
@@ -266,33 +281,66 @@ object AppInitializer {
                 }
                 Log.d(TAG, "Phase 10 complete: Loaded model status")
                 
-                // Phase 11: Load online recommendations (15%)
-                updateProgress("Loading recommendations...", 0.75f)
-                val recommendations = try {
-                    val db = MusicDatabase.getDatabase(context)
-                    val historyDao = db.onlineListeningHistoryDao()
-                    val cacheDao = db.recommendationCacheDao()
-                    val analyticsService = ListeningAnalyticsService(historyDao)
-                    val ytClient = YouTubeInnerTubeClient()
-                    val recommendationService = RecommendationService(
-                        analyticsService, ytClient, historyDao, cacheDao
-                    )
+                // Phase 11: Initialize heavy components (15%)
+                updateProgress("Initializing components...", 0.75f)
+                try {
+                    // Initialize heavy components through MusicApplication
+                    val musicApp = context.applicationContext as MusicApplication
+                    musicApp.initializeHeavyComponentsIfNeeded()
+                    Log.d(TAG, "Heavy components initialized during splash")
                     
-                    // Check if user has enough history before loading
-                    val hasHistory = analyticsService.hasEnoughHistory(3)
-                    if (hasHistory) {
-                        recommendationService.generateRecommendations()
-                    } else {
+                    // Initialize ChaquopyMusicAnalyzer
+                    ChaquopyMusicAnalyzer.getInstance(context)
+                    Log.d(TAG, "ChaquopyMusicAnalyzer initialized during splash")
+                    
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize heavy components: ${e.message}")
+                }
+                
+                // Phase 12: Load online recommendations (10%)
+                updateProgress("Loading recommendations...", 0.80f)
+                val recommendations = if (isOnline(context)) {
+                    try {
+                        val db = MusicDatabase.getDatabase(context)
+                        val historyDao = db.onlineListeningHistoryDao()
+                        val cacheDao = db.recommendationCacheDao()
+                        val analyticsService = ListeningAnalyticsService(historyDao)
+                        val ytClient = YouTubeInnerTubeClient()
+                        val recommendationService = RecommendationService(
+                            analyticsService, ytClient, historyDao, cacheDao
+                        )
+                        
+                        // Check if user has enough history before loading
+                        val hasHistory = analyticsService.hasEnoughHistory(3)
+                        if (hasHistory) {
+                            recommendationService.generateRecommendations()
+                        } else {
+                            null
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to load recommendations: ${e.message}")
                         null
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to load recommendations: ${e.message}")
+                } else {
+                    Log.d(TAG, "Skipping recommendations - offline mode")
                     null
                 }
-                Log.d(TAG, "Phase 11 complete: Loaded recommendations (${recommendations != null})")
+                Log.d(TAG, "Phase 12 complete: Loaded recommendations (${recommendations != null})")
                 
-                // Phase 12: Preload last played song stream (10%)
-                updateProgress("Preloading last song...", 0.90f)
+                // Phase 13: Preload artist photos (5%)
+                updateProgress("Loading artist photos...", 0.85f)
+                if (isOnline(context)) {
+                    try {
+                        val homeViewModel = com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel(context as android.app.Application)
+                        val uniqueArtists = songs.map { it.artist }.distinct().take(10) // Preload first 10 artists
+                        homeViewModel.fetchAllArtistPhotos(uniqueArtists)
+                        Log.d(TAG, "Phase 13 complete: Started preloading artist photos for ${uniqueArtists.size} artists")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to preload artist photos: ${e.message}")
+                    }
+                } else {
+                    Log.d(TAG, "Skipping artist photo preloading - offline mode")
+                }
                 val playerPreferences = com.just_for_fun.synctax.data.preferences.PlayerPreferences(context)
                 val onlineSongState = playerPreferences.getOnlineSongState()
                 var lastPlayedStreamUrl: String? = null
@@ -313,17 +361,22 @@ object AppInitializer {
                 }
                 
                 if (onlineSongState != null && onlineSongState.videoId.isNotEmpty()) {
-                    updateProgress("Fetching stream...", 0.92f)
-                    lastPlayedStreamUrl = try {
-                        val ytClient = YouTubeInnerTubeClient()
-                        ytClient.getStreamUrl(onlineSongState.videoId)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to preload stream URL: ${e.message}")
-                        null
+                    if (isOnline(context)) {
+                        updateProgress("Fetching stream...", 0.87f)
+                        lastPlayedStreamUrl = try {
+                            val ytClient = YouTubeInnerTubeClient()
+                            ytClient.getStreamUrl(onlineSongState.videoId)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to preload stream URL: ${e.message}")
+                            null
+                        }
+                        Log.d(TAG, "Phase 14 complete: Preloaded stream URL for ${onlineSongState.title}")
+                    } else {
+                        Log.d(TAG, "Skipping stream preloading - offline mode")
+                        lastPlayedStreamUrl = null
                     }
-                    Log.d(TAG, "Phase 12 complete: Preloaded stream URL for ${onlineSongState.title}")
                 } else {
-                    Log.d(TAG, "Phase 12 complete: No online song to preload")
+                    Log.d(TAG, "Phase 14 complete: No online song to preload")
                 }
                 
                 // Store the pre-computed data
@@ -344,27 +397,26 @@ object AppInitializer {
                     lastPlayedStreamUrl = lastPlayedStreamUrl
                 )
 
-                // Phase 13: Schedule library update checks
-                updateProgress("Setting up updates...", 0.95f)
+                // Phase 15: Schedule library update checks
+                updateProgress("Setting up updates...", 0.92f)
                 try {
                     com.just_for_fun.synctax.core.service.LibraryUpdateCheckWorker.schedulePeriodicCheck(context)
-                    Log.d(TAG, "Phase 13 complete: Scheduled library update checks")
+                    Log.d(TAG, "Phase 15 complete: Scheduled library update checks")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to schedule library update checks: ${e.message}")
                 }
 
-                // Phase 14: Ensure minimum splash duration for smooth progress bar
-                updateProgress("Almost ready...", 0.97f)
+                // Phase 16: Ensure minimum splash duration for smooth progress bar
                 updateProgress("Almost ready...", 0.95f)
                 val elapsed = System.currentTimeMillis() - startTime
                 if (elapsed < MIN_SPLASH_DURATION_MS) {
                     val remaining = MIN_SPLASH_DURATION_MS - elapsed
                     // Animate progress smoothly during wait
                     val steps = (remaining / 100).toInt().coerceAtLeast(1)
-                    val progressPerStep = (1f - 0.97f) / steps
+                    val progressPerStep = (1f - 0.95f) / steps
                     repeat(steps) { i ->
                         delay(remaining / steps)
-                        updateProgress("Almost ready...", 0.97f + (progressPerStep * (i + 1)))
+                        updateProgress("Almost ready...", 0.95f + (progressPerStep * (i + 1)))
                     }
                 }
                 

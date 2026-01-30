@@ -45,8 +45,26 @@ fun ListenedArtistScreen(
     }
 
     // Processing data
-    val offlineArtists = remember(uiState.artists) {
-        uiState.artists.map { ArtistUiModel(it.name, it.songCount, isOnline = false, imageUrl = it.imageUrl) }
+    val offlineArtists = remember(uiState.artists, uiState.artistPhotos) {
+        uiState.artists.map { 
+            ArtistUiModel(
+                name = it.name, 
+                songCount = it.songCount, 
+                isOnline = false, 
+                imageUrl = it.imageUrl ?: uiState.artistPhotos[it.name] // Use cached photo if local image is null
+            )
+        }
+    }
+
+    // Fetch artist photos for offline artists that don't have images
+    val artistsWithoutImages = remember(offlineArtists) {
+        offlineArtists.filter { it.imageUrl.isNullOrEmpty() }.map { it.name }
+    }
+    
+    LaunchedEffect(artistsWithoutImages) {
+        if (artistsWithoutImages.isNotEmpty()) {
+            homeViewModel.fetchAllArtistPhotos(artistsWithoutImages)
+        }
     }
 
     val onlineArtists = remember(uiState.onlineHistory) {
@@ -100,7 +118,8 @@ fun ListenedArtistScreen(
             }
             if (offlineArtists.isNotEmpty()) {
                 items(offlineArtists) { artist ->
-                    ArtistListItem(artist) { onArtistClick(artist.name) }
+                    val isLoadingImage = uiState.isLoadingArtistPhotos && artist.imageUrl.isNullOrEmpty()
+                    ArtistListItem(artist, isLoadingImage) { onArtistClick(artist.name) }
                 }
             } else {
                 item { Text("No offline artists found", style = MaterialTheme.typography.bodyMedium) }
@@ -126,7 +145,11 @@ fun ListenedArtistScreen(
 }
 
 @Composable
-fun ArtistListItem(artist: ArtistUiModel, onClick: () -> Unit) {
+fun ArtistListItem(
+    artist: ArtistUiModel, 
+    isLoadingImage: Boolean = false,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -141,7 +164,13 @@ fun ArtistListItem(artist: ArtistUiModel, onClick: () -> Unit) {
              modifier = Modifier.size(50.dp)
          ) {
              Box(contentAlignment = Alignment.Center) {
-                 if (!artist.imageUrl.isNullOrEmpty()) {
+                 if (isLoadingImage) {
+                     CircularProgressIndicator(
+                         modifier = Modifier.size(24.dp),
+                         color = MaterialTheme.colorScheme.primary,
+                         strokeWidth = 2.dp
+                     )
+                 } else if (!artist.imageUrl.isNullOrEmpty()) {
                       coil.compose.AsyncImage(
                           model = artist.imageUrl,
                           contentDescription = null,
