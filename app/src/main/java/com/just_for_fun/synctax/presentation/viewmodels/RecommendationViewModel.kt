@@ -69,6 +69,7 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     
     /**
      * Checks if user has enough listening history and loads recommendations.
+     * First checks AppInitializer for preloaded data from splash screen.
      */
     private fun checkHistoryAndLoad() {
         viewModelScope.launch(AppDispatchers.Database) {
@@ -76,8 +77,26 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
             _hasEnoughHistory.value = hasHistory
             
             if (hasHistory) {
-                withContext(AppDispatchers.Network) {
-                    loadRecommendations()
+                // First check if AppInitializer has preloaded recommendations
+                val preloadedData = com.just_for_fun.synctax.core.init.AppInitializer.getInitializedData()
+                if (preloadedData?.recommendations != null) {
+                    val result = preloadedData.recommendations
+                    _recommendations.value = result
+                    
+                    // Prepare shuffle pool
+                    allAvailableSongs = (result.artistBased + result.similarSongs + 
+                                        result.discovery + result.trending)
+                        .distinctBy { it.id }
+                        .shuffled()
+                    currentBatchIndex = 0
+                    _currentShuffleBatch.value = emptyList()
+                    
+                    android.util.Log.d("RecommendationViewModel", "Used preloaded recommendations from splash")
+                } else {
+                    // Fall back to network request
+                    withContext(AppDispatchers.Network) {
+                        loadRecommendations()
+                    }
                 }
             }
         }

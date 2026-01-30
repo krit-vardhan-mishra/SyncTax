@@ -22,14 +22,11 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ViewList
-import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,7 +71,6 @@ fun PlaylistScreen(
     playerViewModel: PlayerViewModel,
     dynamicBgViewModel: DynamicBackgroundViewModel,
     userPreferences: UserPreferences,
-    scaffoldState: BottomSheetScaffoldState,
     onOpenSettings: () -> Unit = {},
     onPlaylistClick: (Int) -> Unit = {},
     onImportClick: (String) -> Unit = {},
@@ -85,7 +81,6 @@ fun PlaylistScreen(
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
     val userName by userPreferences.userName.collectAsState()
     val userInitial = userPreferences.getUserInitial()
-    val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val fabActions = remember {
         listOf(
@@ -114,20 +109,14 @@ fun PlaylistScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
-    // Ensure bottom sheet is partially expanded when on playlist screen
-    LaunchedEffect(Unit) {
-        scaffoldState.bottomSheetState.partialExpand()
-    }
-
-    // Collect error messages from player view model
-    LaunchedEffect(Unit) {
-        playerViewModel.errorMessages.collect { message ->
-            SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
-        }
-    }
+    // Collect error messages from player view model - moved to global level
+    // LaunchedEffect(Unit) {
+    //     playerViewModel.errorMessages.collect { message ->
+    //         SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
+    //     }
+    // }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             SimpleDynamicMusicTopAppBar(
                 title = "Playlists",
@@ -161,130 +150,80 @@ fun PlaylistScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            if (uiState.playlists.isEmpty() && !uiState.isLoading) {
-                // Empty state
-                EmptyPlaylistsState(onImportClick = {
-                    Log.d(TAG, "Empty state Import clicked")
-                    onImportClick("youtube")
-                })
-            } else {
-                if (cardType.value == CardType.MEDIUM) {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 8.dp,
-                            bottom = 150.dp
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        item(span = { GridItemSpan(2) }) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${uiState.playlists.size} playlists",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Spacer(modifier = Modifier.weight(1f))
-                                Row {
-                                    IconButton(onClick = { cardType.value = CardType.LARGE }) {
-                                        Icon(
-                                            Icons.Default.Menu,
-                                            contentDescription = "Large view",
-                                            tint = if (cardType.value == CardType.LARGE) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    IconButton(onClick = { cardType.value = CardType.MEDIUM }) {
-                                        Icon(
-                                            Icons.Default.GridView,
-                                            contentDescription = "Medium view",
-                                            tint = if (cardType.value == CardType.MEDIUM) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    IconButton(onClick = { cardType.value = CardType.SMALL }) {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.ViewList,
-                                            contentDescription = "Small view",
-                                            tint = if (cardType.value == CardType.SMALL) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        items(uiState.playlists, key = { it.playlistId }) { playlist ->
-                            PlaylistCardMedium(
-                                playlist = playlist,
-                                onClick = {
-                                    Log.d(
-                                        TAG,
-                                        "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})"
-                                    )
-                                    onPlaylistClick(playlist.playlistId)
-                                }
-                            )
-                        }
-                        item(span = { GridItemSpan(2) }) {
-                            Spacer(modifier = Modifier.height(80.dp))
-                        }
-                    }
+            val pullToRefreshState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = uiState.isLoading,
+                onRefresh = { playlistViewModel.reloadPlaylists() },
+                state = pullToRefreshState,
+                modifier = Modifier.fillMaxSize(),
+                indicator = {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = uiState.isLoading,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        color = Color(0xFFFF0033)
+                    )
+                }
+            ) {
+                if (uiState.playlists.isEmpty() && !uiState.isLoading) {
+                    // Empty state
+                    EmptyPlaylistsState(onImportClick = {
+                        Log.d(TAG, "Empty state Import clicked")
+                        onImportClick("youtube")
+                    })
                 } else {
-                    OptimizedLazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
-                            top = 8.dp,
-                            bottom = 150.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        item {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${uiState.playlists.size} playlists",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                                Spacer(modifier = Modifier.weight(1f))
-                                Row {
-                                    IconButton(onClick = { cardType.value = CardType.LARGE }) {
-                                        Icon(
-                                            Icons.Default.Menu,
-                                            contentDescription = "Large view",
-                                            tint = if (cardType.value == CardType.LARGE) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    IconButton(onClick = { cardType.value = CardType.MEDIUM }) {
-                                        Icon(
-                                            Icons.Default.GridView,
-                                            contentDescription = "Medium view",
-                                            tint = if (cardType.value == CardType.MEDIUM) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    IconButton(onClick = { cardType.value = CardType.SMALL }) {
-                                        Icon(
-                                            Icons.Default.ViewList,
-                                            contentDescription = "Small view",
-                                            tint = if (cardType.value == CardType.SMALL) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                    if (cardType.value == CardType.MEDIUM) {
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = 150.dp
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            item(span = { GridItemSpan(2) }) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${uiState.playlists.size} playlists",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Row {
+                                        IconButton(onClick = { cardType.value = CardType.LARGE }) {
+                                            Icon(
+                                                Icons.Default.Menu,
+                                                contentDescription = "Large view",
+                                                tint = if (cardType.value == CardType.LARGE) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        IconButton(onClick = { cardType.value = CardType.MEDIUM }) {
+                                            Icon(
+                                                Icons.Default.GridView,
+                                                contentDescription = "Medium view",
+                                                tint = if (cardType.value == CardType.MEDIUM) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        IconButton(onClick = { cardType.value = CardType.SMALL }) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.ViewList,
+                                                contentDescription = "Small view",
+                                                tint = if (cardType.value == CardType.SMALL) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        items(uiState.playlists, key = { it.playlistId }) { playlist ->
-                            when (cardType.value) {
-                                CardType.LARGE -> PlaylistCardLarger(
+                            items(uiState.playlists, key = { it.playlistId }) { playlist ->
+                                PlaylistCardMedium(
                                     playlist = playlist,
                                     onClick = {
                                         Log.d(
@@ -294,21 +233,87 @@ fun PlaylistScreen(
                                         onPlaylistClick(playlist.playlistId)
                                     }
                                 )
-                                CardType.SMALL -> PlaylistCardSmall(
-                                    playlist = playlist,
-                                    onClick = {
-                                        Log.d(
-                                            TAG,
-                                            "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})"
-                                        )
-                                        onPlaylistClick(playlist.playlistId)
-                                    }
-                                )
-                                else -> {} // MEDIUM handled above
+                            }
+                            item(span = { GridItemSpan(2) }) {
+                                Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
-                        item {
-                            Spacer(modifier = Modifier.height(80.dp))
+                    } else {
+                        OptimizedLazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = 150.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            item {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${uiState.playlists.size} playlists",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Row {
+                                        IconButton(onClick = { cardType.value = CardType.LARGE }) {
+                                            Icon(
+                                                Icons.Default.Menu,
+                                                contentDescription = "Large view",
+                                                tint = if (cardType.value == CardType.LARGE) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        IconButton(onClick = { cardType.value = CardType.MEDIUM }) {
+                                            Icon(
+                                                Icons.Default.GridView,
+                                                contentDescription = "Medium view",
+                                                tint = if (cardType.value == CardType.MEDIUM) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        IconButton(onClick = { cardType.value = CardType.SMALL }) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.ViewList,
+                                                contentDescription = "Small view",
+                                                tint = if (cardType.value == CardType.SMALL) Color.Red else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            items(uiState.playlists, key = { it.playlistId }) { playlist ->
+                                when (cardType.value) {
+                                    CardType.LARGE -> PlaylistCardLarger(
+                                        playlist = playlist,
+                                        onClick = {
+                                            Log.d(
+                                                TAG,
+                                                "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})"
+                                            )
+                                            onPlaylistClick(playlist.playlistId)
+                                        }
+                                    )
+                                    CardType.SMALL -> PlaylistCardSmall(
+                                        playlist = playlist,
+                                        onClick = {
+                                            Log.d(
+                                                TAG,
+                                                "Playlist card clicked: ${playlist.name} (id: ${playlist.playlistId})"
+                                            )
+                                            onPlaylistClick(playlist.playlistId)
+                                        }
+                                    )
+                                    else -> {} // MEDIUM handled above
+                                }
+                            }
+                            item {
+                                Spacer(modifier = Modifier.height(80.dp))
+                            }
                         }
                     }
                 }

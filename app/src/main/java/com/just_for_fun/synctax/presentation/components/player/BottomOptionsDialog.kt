@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
@@ -332,21 +334,11 @@ private fun OptionItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (option.destructive) {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                } else {
-                    PlayerTextSecondary.copy(alpha = 0.1f)
-                },
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier.size(40.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    option.icon()
-                }
+                option.icon()
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -423,7 +415,7 @@ fun createSongOptions(
             subtitle = "Add to current playlist",
             icon = {
                 Icon(
-                    Icons.Rounded.QueueMusic,
+                    Icons.AutoMirrored.Rounded.QueueMusic,
                     contentDescription = null,
                     tint = PlayerTextPrimary,
                     modifier = Modifier.size(20.dp)
@@ -438,7 +430,7 @@ fun createSongOptions(
             subtitle = "Save to a playlist",
             icon = {
                 Icon(
-                    Icons.Rounded.PlaylistAdd,
+                    Icons.AutoMirrored.Rounded.PlaylistAdd,
                     contentDescription = null,
                     tint = PlayerTextPrimary,
                     modifier = Modifier.size(20.dp)

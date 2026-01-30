@@ -89,8 +89,8 @@ class PlaylistRepository(private val context: Context) {
 
                 return@withContext ValidationResult(
                     isValid = result.optBoolean("isValid", false),
-                    platform = result.optString("platform", null),
-                    playlistId = result.optString("playlistId", null)
+                    platform = result.optString("platform", null as String?),
+                    playlistId = result.optString("playlistId", null as String?)
                 )
             }
 
@@ -102,8 +102,8 @@ class PlaylistRepository(private val context: Context) {
 
             ValidationResult(
                 isValid = result.optBoolean("isValid", false),
-                platform = result.optString("platform", null),
-                playlistId = result.optString("playlistId", null)
+                platform = result.optString("platform", null as String?),
+                playlistId = result.optString("playlistId", null as String?)
             )
         } catch (e: Exception) {
             Log.e(TAG, "URL validation failed", e)
@@ -274,8 +274,8 @@ class PlaylistRepository(private val context: Context) {
                     videoId = track.getString("videoId"),
                     title = track.optString("title", "Unknown Title"),
                     artist = track.optString("artist", "Unknown Artist"),
-                    album = track.optString("album", null),
-                    thumbnailUrl = track.optString("thumbnail", null),
+                    album = track.optString("album", null as String?),
+                    thumbnailUrl = track.optString("thumbnail", null as String?),
                     duration = if (track.isNull("duration")) null else track.optInt("duration"),
                     sourcePlatform = "YouTube"
                 )

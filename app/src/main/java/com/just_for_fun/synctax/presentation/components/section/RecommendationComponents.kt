@@ -30,6 +30,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
@@ -334,7 +336,7 @@ private fun RecommendationSpeedDialItem(
                         subtitle = "Add to current playlist",
                         icon = {
                             Icon(
-                                Icons.Default.PlaylistAdd,
+                                Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -354,7 +356,7 @@ private fun RecommendationSpeedDialItem(
                         subtitle = "Save to a playlist",
                         icon = {
                             Icon(
-                                Icons.Rounded.QueueMusic,
+                                Icons.AutoMirrored.Rounded.QueueMusic,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -514,7 +516,7 @@ private fun RecommendationCarouselCard(
                         subtitle = "Add to current playlist",
                         icon = {
                             Icon(
-                                Icons.Default.PlaylistAdd,
+                                Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -534,7 +536,7 @@ private fun RecommendationCarouselCard(
                         subtitle = "Save to a playlist",
                         icon = {
                             Icon(
-                                Icons.Rounded.QueueMusic,
+                                Icons.AutoMirrored.Rounded.QueueMusic,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -683,56 +685,7 @@ fun RecommendationSkeleton(
     }
 }
 
-/**
- * Empty state prompt when no recommendations available.
- */
-@Composable
-fun EmptyRecommendationsPrompt(
-    onExploreClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Default.Explore,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Start listening to get personalized recommendations",
-                style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = "Play some songs and we'll suggest music you'll love",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(onClick = onExploreClick) {
-                Text("Explore Music")
-            }
-        }
-    }
-}
+// EmptyRecommendationsPrompt has been moved to its own file: EmptyRecommendationsPrompt.kt
 
 /**
  * Song list item for shuffle batch display.

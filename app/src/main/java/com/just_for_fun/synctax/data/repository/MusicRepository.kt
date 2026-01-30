@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.local.MusicDatabase
+import com.just_for_fun.synctax.data.local.dao.PlayedSongResult
 import com.just_for_fun.synctax.data.local.entities.ListeningHistory
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.local.entities.UserPreference
@@ -60,6 +61,16 @@ class MusicRepository(private val context: Context) {
 
             // First, scan app's download directory directly (not relying on MediaStore)
             scanDirectoryDirectly(appMusicDir, songs)
+
+            // Also scan standard Downloads directory as requested
+            try {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (downloadsDir.exists() && downloadsDir.isDirectory) {
+                    scanDirectoryDirectly(downloadsDir, songs)
+                }
+            } catch (e: Exception) {
+                Log.e("MusicRepository", "Error scanning Downloads directory", e)
+            }
 
             // Then scan user-selected directories using SAF
             selectedPaths.forEach { uriString ->
@@ -694,6 +705,42 @@ class MusicRepository(private val context: Context) {
         historyDao.getRecentHistory(limit)
 
     /**
+     * Get offline (local) song listening history only
+     * Excludes online songs
+     */
+    fun getOfflineHistory(limit: Int = 100): Flow<List<ListeningHistory>> =
+        historyDao.getOfflineHistory(limit)
+
+    /**
+     * Get IDs of offline songs that have been played
+     */
+    suspend fun getPlayedOfflineSongIds(limit: Int = 100): List<PlayedSongResult> =
+        withContext(Dispatchers.IO) {
+            historyDao.getPlayedOfflineSongIds(limit)
+        }
+
+    /**
+     * Check if an offline song has been played
+     */
+    suspend fun hasOfflineSongBeenPlayed(songId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            historyDao.hasOfflineSongBeenPlayed(songId)
+        }
+
+    /**
+     * Get played offline songs (Song objects)
+     * Returns songs that have been listened to, sorted by most recent play
+     */
+    suspend fun getPlayedOfflineSongs(limit: Int = 100): List<Song> =
+        withContext(Dispatchers.IO) {
+            val playedIds = historyDao.getPlayedOfflineSongIds(limit)
+            val songs = playedIds.mapNotNull { result ->
+                songDao.getSongById(result.songId)
+            }
+            songs
+        }
+
+    /**
      * Get user preferences
      */
     fun getTopPreferences(limit: Int = 50): Flow<List<UserPreference>> =
@@ -757,6 +804,37 @@ class MusicRepository(private val context: Context) {
         songDao.getMostPlayedSongs(limit)
     }
 
+    // ========== Album Functions ==========
+
+    /**
+     * Get all albums with song counts
+     */
+    suspend fun getAlbums(): List<com.just_for_fun.synctax.data.local.dao.AlbumInfo> = 
+        withContext(Dispatchers.IO) {
+            songDao.getAlbums()
+        }
+
+    /**
+     * Get top albums by song count
+     */
+    suspend fun getTopAlbums(limit: Int = 10): List<com.just_for_fun.synctax.data.local.dao.AlbumInfo> = 
+        withContext(Dispatchers.IO) {
+            songDao.getTopAlbums(limit)
+        }
+
+    /**
+     * Get songs by album name
+     */
+    fun getSongsByAlbum(albumName: String): Flow<List<Song>> = songDao.getSongsByAlbum(albumName)
+
+    /**
+     * Get songs by album name (suspend)
+     */
+    suspend fun getSongsByAlbumList(albumName: String): List<Song> = 
+        withContext(Dispatchers.IO) {
+            songDao.getSongsByAlbumList(albumName)
+        }
+
     // ========== User Rating Functions ==========
 
     /**
@@ -765,4 +843,14 @@ class MusicRepository(private val context: Context) {
     suspend fun updateUserRating(songId: String, rating: Int) = withContext(Dispatchers.IO) {
         historyDao.updateUserRating(songId, rating)
     }
+
+    // ========== Online Songs Cache Functions ==========
+
+    private val onlineSongDao = database.onlineSongDao()
+
+    /**
+     * Get all cached online songs (Offline Saved)
+     */
+    fun getAllOnlineSongs(): Flow<List<com.just_for_fun.synctax.data.local.entities.OnlineSong>> = 
+        onlineSongDao.getAllOnlineSongs()
 }

@@ -63,14 +63,15 @@ def _get_image_size(image_path):
         return None
 
 
+"""
 def crop_center_thumbnail(orig_thumb, out_dir, base):
-    """Crop thumbnail to 720x720 from center.
+    Crop thumbnail to 720x720 from center.
     
     Extracts the center 2x2 grid from a 4x4 grid (center 50% of image),
     removing the outer 25% on each edge, then scales to 720x720.
 
     Returns the path to the cropped thumbnail on success, else None.
-    """
+    
     if not orig_thumb or not os.path.exists(orig_thumb):
         return None
 
@@ -107,6 +108,8 @@ def crop_center_thumbnail(orig_thumb, out_dir, base):
             except:
                 pass
         return None
+"""
+
 
 
 def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_id: str = None, po_token_data: str = None) -> str:
@@ -155,6 +158,23 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
             
             # Ensure output directory exists
             os.makedirs(output_dir, exist_ok=True)
+
+            # Clean up any existing thumbnail files from previous failed downloads
+            print(f"🧹 Python: Pre-cleanup check for existing thumbnails in {output_dir}", file=sys.stderr)
+            pre_cleanup_count = 0
+            if os.path.exists(output_dir):
+                for file in os.listdir(output_dir):
+                    if file.endswith(('.jpg', '.webp', '.png', '.jpeg')) and ('thumb' in file.lower() or 'thumbnail' in file.lower()):
+                        try:
+                            file_path = os.path.join(output_dir, file)
+                            os.remove(file_path)
+                            pre_cleanup_count += 1
+                            print(f"🧹 Python: Removed existing thumbnail: {file}", file=sys.stderr)
+                        except Exception as e:
+                            print(f"🧹 Python: Failed to remove existing thumbnail {file}: {e}", file=sys.stderr)
+
+            if pre_cleanup_count > 0:
+                print(f"🧹 Python: Pre-cleanup removed {pre_cleanup_count} existing thumbnail file(s)", file=sys.stderr)
             
             # Check if FFmpeg is available
             ffmpeg_available = False
@@ -292,6 +312,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                     filename = os.path.splitext(filename)[0] + '.' + actual_ext
 
                 # Crop thumbnail to 720x720 if it exists
+                """
                 thumb_base = os.path.splitext(filename)[0]
                 orig_thumb = None
                 for ext in ['.jpg', '.webp', '.png', '.jpeg', '.jpg.webp']:
@@ -317,6 +338,7 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                             print(f"🎵 Python: Failed to replace thumbnail: {e}", file=sys.stderr)
                     else:
                         print(f"🎵 Python: Thumbnail cropping failed, using original", file=sys.stderr)
+                """
                 
                 # If FFmpeg is NOT available, try to embed metadata using Mutagen
                 metadata_embedded = False
@@ -378,16 +400,48 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
                     except Exception as e:
                         print(f"🎵 Python: Mutagen metadata embedding failed: {e}", file=sys.stderr)
                 
-                # Clean up any leftover thumbnail files regardless of success
+                # Clean up any leftover thumbnail files REGARDLESS of embedding success/failure
+                # This ensures no thumbnail files are left on disk
                 thumb_base = os.path.splitext(filename)[0]
-                for ext in ['.jpg', '.webp', '.png', '.jpeg', '.jpg.webp']:
+                cleanup_count = 0
+                cleanup_errors = 0
+
+                # Also check for thumbnails in the output directory with various patterns
+                output_dir_thumbs = []
+                if os.path.exists(output_dir):
+                    for file in os.listdir(output_dir):
+                        if file.endswith(('.jpg', '.webp', '.png', '.jpeg')) and ('thumb' in file.lower() or 'thumbnail' in file.lower()):
+                            output_dir_thumbs.append(os.path.join(output_dir, file))
+
+                # Clean up thumbnail files with the same base name as the audio file
+                for ext in ['.jpg', '.webp', '.png', '.jpeg', '.jpg.webp', '.webm.webp']:
                     potential_thumb = thumb_base + ext
                     if os.path.exists(potential_thumb):
                         try:
+                            file_size = os.path.getsize(potential_thumb)
                             os.remove(potential_thumb)
-                            print(f"🧹 Python: Cleaned up thumbnail: {potential_thumb}", file=sys.stderr)
+                            cleanup_count += 1
+                            print(f"🧹 Python: Cleaned up thumbnail: {potential_thumb} ({file_size} bytes)", file=sys.stderr)
                         except Exception as e:
+                            cleanup_errors += 1
                             print(f"🧹 Python: Failed to cleanup thumbnail {potential_thumb}: {e}", file=sys.stderr)
+
+                # Clean up any other thumbnail files found in output directory
+                for thumb_path in output_dir_thumbs:
+                    try:
+                        if os.path.exists(thumb_path):
+                            file_size = os.path.getsize(thumb_path)
+                            os.remove(thumb_path)
+                            cleanup_count += 1
+                            print(f"🧹 Python: Cleaned up stray thumbnail: {thumb_path} ({file_size} bytes)", file=sys.stderr)
+                    except Exception as e:
+                        cleanup_errors += 1
+                        print(f"🧹 Python: Failed to cleanup stray thumbnail {thumb_path}: {e}", file=sys.stderr)
+
+                if cleanup_count > 0:
+                    print(f"🧹 Python: Successfully cleaned up {cleanup_count} thumbnail file(s)", file=sys.stderr)
+                if cleanup_errors > 0:
+                    print(f"⚠️ Python: {cleanup_errors} thumbnail cleanup error(s) occurred", file=sys.stderr)
                 
                 result = {
                     "success": True,
@@ -410,7 +464,20 @@ def download_audio(url: str, output_dir: str, prefer_mp3: bool = False, format_i
             error_message = str(e)
             print(f"🎵 Python: Failed with {client} client: {error_message}", file=sys.stderr)
             last_error = error_message
-            
+
+            # Clean up any thumbnail files that might have been downloaded before failure
+            try:
+                if 'output_dir' in locals():
+                    for file in os.listdir(output_dir):
+                        if file.endswith(('.jpg', '.webp', '.png', '.jpeg')):
+                            try:
+                                os.remove(os.path.join(output_dir, file))
+                                print(f"🧹 Python: Emergency cleanup of thumbnail: {file}", file=sys.stderr)
+                            except:
+                                pass
+            except:
+                pass
+
             # Continue to next client if this one failed
             continue
     

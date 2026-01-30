@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -126,6 +127,7 @@ fun <T> Flow<T>.throttleFirst(windowDurationMs: Long): Flow<T> =
  * Extension to debounce Flow emissions  
  * Waits for emissions to stop before emitting
  */
+@OptIn(FlowPreview::class)
 fun <T> Flow<T>.debounceLatest(timeoutMs: Long): Flow<T> =
     debounce(timeoutMs)
 

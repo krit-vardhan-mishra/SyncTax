@@ -40,6 +40,45 @@ interface ListeningHistoryDao {
     """)
     suspend fun getMostPlayedSongIds(limit: Int = 10): List<SongPlayCountResult>
 
+    /**
+     * Get offline (local) song history only
+     * Excludes online songs (online: and youtube: prefixes)
+     */
+    @Query("""
+        SELECT * FROM listening_history 
+        WHERE songId NOT LIKE 'online:%' AND songId NOT LIKE 'youtube:%'
+        ORDER BY playTimestamp DESC 
+        LIMIT :limit
+    """)
+    fun getOfflineHistory(limit: Int = 100): Flow<List<ListeningHistory>>
+
+    /**
+     * Get unique offline song IDs that have been played
+     * Returns distinct songIds with their latest play timestamp
+     */
+    @Query("""
+        SELECT DISTINCT songId, MAX(playTimestamp) as latestPlay
+        FROM listening_history 
+        WHERE songId NOT LIKE 'online:%' AND songId NOT LIKE 'youtube:%'
+        GROUP BY songId
+        ORDER BY latestPlay DESC 
+        LIMIT :limit
+    """)
+    suspend fun getPlayedOfflineSongIds(limit: Int = 100): List<PlayedSongResult>
+
+    /**
+     * Check if an offline song has been played (exists in history)
+     */
+    @Query("""
+        SELECT EXISTS(
+            SELECT 1 FROM listening_history 
+            WHERE songId = :songId 
+            AND songId NOT LIKE 'online:%' 
+            AND songId NOT LIKE 'youtube:%'
+        )
+    """)
+    suspend fun hasOfflineSongBeenPlayed(songId: String): Boolean
+
     // Update user rating for most recent play of a song
     @Query("""
         UPDATE listening_history 
@@ -66,4 +105,10 @@ interface ListeningHistoryDao {
 data class SongPlayCountResult(
     val songId: String,
     val playCount: Int
+)
+
+// Data class for played songs query result
+data class PlayedSongResult(
+    val songId: String,
+    val latestPlay: Long
 )

@@ -1,26 +1,25 @@
 package com.just_for_fun.synctax.presentation.components.player
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -29,13 +28,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
+import com.just_for_fun.synctax.presentation.ui.theme.PlayerSurface
+import com.just_for_fun.synctax.presentation.ui.theme.PlayerTextSecondary
 
 private const val TAG = "UnifiedPlayer"
 
@@ -52,6 +54,9 @@ fun UnifiedPlayer(
     volume: Float = 1.0f,
     upNext: List<Song> = emptyList(),
     playHistory: List<Song> = emptyList(),
+    progress: Float,
+    miniControlsAlpha: Float,
+    fullControlsAlpha: Float,
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onSelectSong: (Song) -> Unit = {},
@@ -67,99 +72,38 @@ fun UnifiedPlayer(
     onSeek: (Long) -> Unit,
     downloadPercent: Int = 0,
 ) {
-    val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
-
-    // Track drag offset for enhanced gesture handling
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-
-    // Enhanced expansion animation with spring for bouncy feedback
-    val expansionProgress by animateFloatAsState(
-        targetValue = if (isExpanded) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "expansion"
-    )
 
     var showUpNext by remember { mutableStateOf(false) }
 
-    // Album art scale with overshoot for bouncy feedback
-    val albumArtMiniScale by animateFloatAsState(
-        targetValue = if (isExpanded) {
-            PlayerSheetConstants.ALBUM_ART_EXPANDED_SCALE
-        } else {
-            PlayerSheetConstants.ALBUM_ART_MINI_SCALE
-        },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "albumArtMiniScale"
-    )
+    // Use progress directly from parent (AnchoredDraggable)
+    val expansionProgress = progress
 
-    // Alpha blending for content transitions
-    val miniPlayerAlpha by animateFloatAsState(
-        targetValue = if (isExpanded) 0f else 1f,
-        animationSpec = tween(
-            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "mini_alpha"
-    )
+    // Hide mini player image immediately when dragging starts to show the morphing image instead
+    val albumArtMiniScale = if (expansionProgress > 0.01f) {
+        0f
+    } else {
+        PlayerSheetConstants.ALBUM_ART_MINI_SCALE
+    }
 
-    val expandedAlpha by animateFloatAsState(
-        targetValue = if (isExpanded) 1f else 0f,
-        animationSpec = tween(
-            durationMillis = PlayerSheetConstants.FADE_DURATION_MS,
-            delayMillis = PlayerSheetConstants.FADE_IN_DELAY_MS,
-            easing = FastOutSlowInEasing
-        ),
-        label = "expanded_alpha"
-    )
+    // Use alpha values from parent for smoother phasing with drag
+    val miniPlayerAlpha = miniControlsAlpha
+    val expandedAlpha = fullControlsAlpha
 
     BackHandler(enabled = isExpanded) {
         onExpandedChange(false)
     }
 
-    // Main Container with enhanced drag gesture handling
-    Box(
+    // Main Container - uses full size since parent controls positioning
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            // Dynamic height with smooth interpolation
-            .height(
-                (PlayerSheetConstants.MINI_PLAYER_HEIGHT_DP +
-                        (expansionProgress * PlayerSheetConstants.MAX_EXPANSION_HEIGHT_DP)).dp
-            )
-            .pointerInput(isExpanded) {
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        dragOffset = 0f
-                    },
-                    onDragEnd = {
-                        val absOffset = kotlin.math.abs(dragOffset)
-                        if (absOffset > PlayerSheetConstants.DRAG_THRESHOLD_PX) {
-                            // Trigger state change based on drag direction
-                            if (dragOffset < 0 && !isExpanded) {
-                                // Swipe up to expand
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onExpandedChange(true)
-                            } else if (dragOffset > 0 && isExpanded) {
-                                // Swipe down to collapse
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onExpandedChange(false)
-                            }
-                        }
-                        dragOffset = 0f
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        dragOffset += dragAmount
-                    }
-                )
-            }
+            .fillMaxSize()
             .background(PlayerBackground)
     ) {
+        val density = LocalDensity.current
+        val maxWidth = maxWidth
+
         // --- 1. ENHANCED ANIMATED BACKGROUND LAYER ---
         if (!song.albumArtUri.isNullOrEmpty()) {
             // Dynamic blur radius interpolates smoothly based on expansion
@@ -239,6 +183,7 @@ fun UnifiedPlayer(
                             onClick = {
                                 onExpandedChange(true)
                             },
+//                            onSeek = onSeek,
                             onSwipeUp = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onExpandedChange(true)
@@ -266,7 +211,6 @@ fun UnifiedPlayer(
                             upNext = upNext,
                             playHistory = playHistory,
                             showUpNext = showUpNext,
-                            snackbarHostState = snackBarHostState,
                             onShowUpNextChange = { showUpNext = it },
                             onSelectSong = onSelectSong,
                             onPlaceNext = onPlaceNext,
@@ -293,6 +237,60 @@ fun UnifiedPlayer(
                             downloadPercent = downloadPercent
                         )
                     }
+                }
+            }
+        }
+
+        // --- 3. MORPHING ALBUM ART LAYER ---
+        // This renders the album art growing from mini-player position to full-player position
+        if (progress > 0.01f && fullControlsAlpha < 1f) {
+            val startSize = 40.dp
+            val targetSize =
+                maxWidth - 48.dp // Match full width of Carousel (screen width - 24dp*2 padding)
+
+            // Coordinates based on MiniPlayerContent layout
+            // MiniPlayer: Vertically centered in 80dp (top ~13dp), Left padding 16dp + 8dp inner = 24dp
+            val startTop = 13.dp
+            val startStart = 24.dp
+
+            // FullPlayer: Centered horizontally, Top offset approx 100dp
+            val targetTop = 100.dp
+            val targetStart = (maxWidth - targetSize) / 2
+
+            val currentSize = lerp(startSize, targetSize, progress)
+            val currentTop = lerp(startTop, targetTop, progress)
+            val currentStart = lerp(startStart, targetStart, progress)
+            val currentCorner = lerp(8.dp, 16.dp, progress)
+
+            // Fade out as the full player takes over (optional, currently stays opaque until full player is fully visible)
+            // Using inverse of fullControlsAlpha to crossfade properly
+            val morphAlpha = 1f - fullControlsAlpha
+
+            Surface(
+                modifier = Modifier
+                    .offset(x = currentStart, y = currentTop)
+                    .size(currentSize)
+                    .alpha(morphAlpha),
+                shape = RoundedCornerShape(currentCorner),
+                color = PlayerSurface,
+                shadowElevation = 8.dp * progress
+            ) {
+                if (song.albumArtUri.isNullOrEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(currentSize / 2),
+                            tint = PlayerTextSecondary
+                        )
+                    }
+                } else {
+                    AsyncImage(
+                        model = song.albumArtUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }

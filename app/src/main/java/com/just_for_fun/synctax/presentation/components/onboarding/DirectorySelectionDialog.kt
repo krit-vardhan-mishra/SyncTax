@@ -50,6 +50,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.documentfile.provider.DocumentFile
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +62,7 @@ fun DirectorySelectionDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val scanPaths by userPreferences.scanPaths.collectAsState(initial = emptyList())
+    val downloadsUri = remember { Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ADownload") }
 
     // SAF folder picker
     val dirPickerLauncher = rememberLauncherForActivityResult(
@@ -122,7 +124,7 @@ fun DirectorySelectionDialog(
 
                 // Description
                 Text(
-                    text = "Choose folders to scan for music files. The Download/SyncTax folder is always included and scanned automatically. You can add additional folders.",
+                    text = "Choose folders to scan for music files. The Download/SyncTax and Downloads folders are always included and scanned automatically. You can add additional folders.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -158,7 +160,7 @@ fun DirectorySelectionDialog(
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Text(
-                            text = "Selected Folders (${scanPaths.size + 1})",
+                            text = "Selected Folders (${scanPaths.size + 2})",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(16.dp)
@@ -198,6 +200,40 @@ fun DirectorySelectionDialog(
                                         )
 
                                         // No remove button for app directory
+                                    }
+                                }
+
+                                // Downloads directory item
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Folder,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Text(
+                                            text = "Downloads (Always scanned)",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+
+                                        // No remove button for downloads directory
                                     }
                                 }
 
@@ -273,8 +309,44 @@ fun DirectorySelectionDialog(
                                     }
                                 }
 
+                                // Downloads directory item
+                                item {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surface
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Folder,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+
+                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                            Text(
+                                                text = "Downloads (Always scanned)",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            // No remove button for downloads directory
+                                        }
+                                    }
+                                }
+
                                 items(scanPaths) { uriString ->
-                                    val uri = runCatching { Uri.parse(uriString) }.getOrNull()
+                                    val uri = runCatching { uriString.toUri() }.getOrNull()
                                     val displayName = remember(uri) {
                                         uri?.let { DocumentFile.fromTreeUri(context, it)?.name ?: it.toString() } ?: uriString
                                     }
@@ -350,7 +422,7 @@ fun DirectorySelectionDialog(
 
                     Button(
                         onClick = {
-                            onScanClick(scanPaths)
+                            onScanClick(scanPaths + downloadsUri.toString())
                             onDismiss()
                         },
                         enabled = true,
@@ -370,7 +442,7 @@ fun DirectorySelectionDialog(
 
                 // Note about app directory
                 Text(
-                    text = "The Download/SyncTax folder is always scanned automatically for downloaded songs",
+                    text = "The Download/SyncTax and Downloads folders are always scanned automatically for downloaded songs",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

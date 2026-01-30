@@ -18,6 +18,7 @@ import com.chaquo.python.android.AndroidPlatform
 import com.just_for_fun.synctax.core.network.NewPipeUtils
 import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import com.just_for_fun.synctax.core.worker.RecommendationUpdateWorker
+import com.just_for_fun.synctax.core.worker.scheduleUpdateCheckIfEnabled
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,10 @@ class MusicApplication : Application(), ImageLoaderFactory {
     var isFFmpegInitialized = false
         private set
 
+    // Heavy components initialization status
+    var areHeavyComponentsInitialized = false
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -47,9 +52,10 @@ class MusicApplication : Application(), ImageLoaderFactory {
         }
 
         // Initialize Python runtime on background thread to avoid blocking main thread
-        applicationScope.launch {
-            initializePython()
-        }
+        // NOTE: Now moved to splash screen for better UX
+        // applicationScope.launch {
+        //     initializePython()
+        // }
 
         // Initialize YoutubeDL and SpotDL on background thread
         applicationScope.launch {
@@ -70,6 +76,14 @@ class MusicApplication : Application(), ImageLoaderFactory {
             Log.d(TAG, "✅ Recommendation worker scheduled")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule recommendation worker", e)
+        }
+
+        // Schedule periodic update checks (every 12 hours)
+        try {
+            scheduleUpdateCheckIfEnabled()
+            Log.d(TAG, "✅ Update check worker scheduled")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to schedule update check worker", e)
         }
 
         Log.d(TAG, "Music Application initialized")
@@ -108,9 +122,21 @@ class MusicApplication : Application(), ImageLoaderFactory {
                 // Initialize YTMusicRecommender for song-only recommendations
                 YTMusicRecommender.initialize()
                 Log.d(TAG, "YTMusicRecommender initialized")
+                
+                areHeavyComponentsInitialized = true
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize Python runtime", e)
+        }
+    }
+
+    /**
+     * Initialize heavy components if not already done.
+     * This is called from splash screen now.
+     */
+    fun initializeHeavyComponentsIfNeeded() {
+        if (!areHeavyComponentsInitialized) {
+            initializePython()
         }
     }
 

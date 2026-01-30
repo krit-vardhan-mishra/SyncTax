@@ -173,14 +173,18 @@ fun SongsTab(
         }
 
         // Render songs - O(k) where k = visible items only (LazyColumn optimization)
-        items(sortedSongs, key = { it.id }) { song ->
+        // Using index + id to ensure unique keys even if duplicate song IDs exist
+        items(
+            count = sortedSongs.size,
+            key = { index -> "${index}_${sortedSongs[index].id}" }
+        ) { index ->
+            val song = sortedSongs[index]
             SongCard(
                 song = song,
                 onClick = {
-                    // O(n) worst case for indexOf, but typically O(1) as songs are near top
-                    val index = sortedSongs.indexOf(song)
-                    val queue = sortedSongs.drop(index) // O(n-index) creates sublist
-                    onSongClick(song, queue)
+                    // Pass the complete sorted list so previous/next navigation works correctly
+                    // The playSong function will find the song's index and set up the queue properly
+                    onSongClick(song, sortedSongs)
                 },
                 onDelete = { deletedSong ->
                     // Remove from local database and refresh UI

@@ -48,8 +48,10 @@ import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.data.repository.MusicRepository
+import com.just_for_fun.synctax.data.repository.OnlineSongRepository
 import com.just_for_fun.synctax.presentation.components.state.PlayerUiState
 import com.just_for_fun.synctax.presentation.components.state.PlayerSheetState
+import com.just_for_fun.synctax.utils.MusicDownloadManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -76,6 +78,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val audioProcessor = AudioProcessor(application)
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
     private val onlineManager = OnlineSearchManager()
+    
+    // Online song repository for tracking play status
+    private val onlineSongRepository = OnlineSongRepository(
+        MusicDatabase.getDatabase(application).onlineSongDao(),
+        MusicDownloadManager.instance
+    )
 
     // Preload manager for instant song switching
     private val preloadManager = PreloadManager(application)
@@ -90,7 +98,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Callback to notify when a download completes (for library refresh)
     var onDownloadComplete: (() -> Unit)? = null
 
-    // PlaybackCollector with cache invalidation callback
+    // PlaybackCollector with cache invalidation callback and online song tracking
     private val playbackCollector = PlaybackCollector(
         repository = repository,
         player = player,
@@ -98,6 +106,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         onPlaybackRecorded = {
             // Invalidate Quick Picks cache when new playback is recorded
             recommendationManager.invalidateQuickPicksCache()
+        },
+        onlineSongRepository = onlineSongRepository,
+        onOnlineSongPlayed = { videoId ->
+            Log.d("PlayerViewModel", "🎵 Online song marked as played (5+ sec): $videoId")
+        },
+        onOnlineSongFullyPlayed = { videoId ->
+            Log.d("PlayerViewModel", "✅ Online song fully played: $videoId")
+            // TODO: Check if offline storage option is enabled and auto-save if so
         }
     )
 
@@ -120,6 +136,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
     val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
     private var sleepTimerJob: Job? = null
+    
+    // Skip Pattern Monitoring: Track consecutive skips to adapt recommendations
+    // When user skips 3+ songs in a row, refresh recommendations with different strategy
+    private var consecutiveSkipCount = 0
+    private var lastSkipTime = 0L
+    private val skipResetTimeMs = 30_000L // Reset skip count after 30 seconds of no skips
 
     /**
      * Set a sleep timer to pause playback after the specified minutes
@@ -172,9 +194,48 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Check if a song is an online song (YouTube/YTMusic)
+     */
+    private fun isOnlineSong(song: Song): Boolean {
+        return song.id.startsWith("online:") || song.id.startsWith("youtube:")
+    }
+
+    /**
+     * Check if adding a song to queue is allowed based on current playback type
+     * Online songs can only be added when playing online, offline when playing offline
+     */
+    fun canAddToQueue(song: Song): Boolean {
+        val currentSong = _uiState.value.currentSong ?: return true // Allow if nothing playing
+        val currentIsOnline = isOnlineSong(currentSong)
+        val songIsOnline = isOnlineSong(song)
+        return currentIsOnline == songIsOnline
+    }
+
+    /**
+     * Get the type mismatch error message for queue addition
+     */
+    fun getQueueTypeMismatchMessage(song: Song): String {
+        val currentSong = _uiState.value.currentSong ?: return ""
+        val currentIsOnline = isOnlineSong(currentSong)
+        return if (currentIsOnline) {
+            "Cannot add offline songs to queue while playing online music"
+        } else {
+            "Cannot add online songs to queue while playing offline music"
+        }
+    }
+
+    /**
      * Add a song to the end of the queue
+     * Only allows adding songs of the same type (online/offline) as currently playing
      */
     fun addToQueue(song: Song) {
+        if (!canAddToQueue(song)) {
+            viewModelScope.launch {
+                _errorMessages.emit(getQueueTypeMismatchMessage(song))
+            }
+            Log.d("PlayerViewModel", "⚠️ Queue type mismatch: Cannot add ${song.title}")
+            return
+        }
         queueManager.addToQueue(listOf(song))
         viewModelScope.launch {
             _errorMessages.emit("Added to queue: ${song.title}")
@@ -184,17 +245,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Add multiple songs to the end of the queue
+     * Filters out songs that don't match the current playback type
      */
     fun addToQueue(songs: List<Song>) {
-        queueManager.addToQueue(songs)
-        viewModelScope.launch {
-            _errorMessages.emit("Added ${songs.size} songs to queue")
+        val currentSong = _uiState.value.currentSong
+        val filteredSongs = if (currentSong != null) {
+            val currentIsOnline = isOnlineSong(currentSong)
+            songs.filter { isOnlineSong(it) == currentIsOnline }
+        } else {
+            songs
         }
-        Log.d("PlayerViewModel", "➕ Added ${songs.size} songs to queue")
+        
+        if (filteredSongs.isEmpty()) {
+            viewModelScope.launch {
+                _errorMessages.emit("No compatible songs to add to queue")
+            }
+            return
+        }
+        
+        queueManager.addToQueue(filteredSongs)
+        val skippedCount = songs.size - filteredSongs.size
+        viewModelScope.launch {
+            if (skippedCount > 0) {
+                _errorMessages.emit("Added ${filteredSongs.size} songs (${skippedCount} incompatible skipped)")
+            } else {
+                _errorMessages.emit("Added ${filteredSongs.size} songs to queue")
+            }
+        }
+        Log.d("PlayerViewModel", "➕ Added ${filteredSongs.size} songs to queue (${skippedCount} skipped)")
     }
 
     /**
      * Add an online song to the queue by creating a Song object
+     * Only works if currently playing online music or nothing is playing
      */
     fun addOnlineSongToQueue(videoId: String, title: String, artist: String, thumbnailUrl: String? = null) {
         val onlineSong = Song(
@@ -517,9 +600,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Update notification
             updateNotification()
 
-            // Preload the current song's stream URL for instant playback when user presses play
-            Log.d("PlayerViewModel", "🚀 Preloading stream for restored song: ${onlineSong.title}")
-            preloadManager.preloadSong(onlineSong)
+            // Check if AppInitializer has preloaded stream URL from splash screen
+            val preloadedData = com.just_for_fun.synctax.core.init.AppInitializer.getInitializedData()
+            if (preloadedData?.lastPlayedStreamUrl != null) {
+                // Use preloaded stream URL for instant playback
+                Log.d("PlayerViewModel", "✅ Using preloaded stream URL from splash screen for instant playback")
+                StreamUrlCache.put(onlineState.videoId, preloadedData.lastPlayedStreamUrl)
+            } else {
+                // Fallback: Preload the current song's stream URL for instant playback when user presses play
+                Log.d("PlayerViewModel", "🚀 Preloading stream for restored song: ${onlineSong.title}")
+                preloadManager.preloadSong(onlineSong)
+            }
 
             // Fetch recommendations for the restored song
             if (onlineState.videoId.isNotEmpty()) {
@@ -535,6 +626,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Fetch recommendations for a video ID
+     * First tries to get song-only recommendations, then falls back to all recommendations
+     * (including videos) if no songs are found - useful for music videos
      */
     private fun fetchRecommendationsForVideoId(videoId: String, force: Boolean = false) {
         if (force || (_uiState.value.upNextRecommendations.isEmpty() && playedRecommendationsHistory.isEmpty())) {
@@ -545,35 +638,81 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 videoId = videoId,
                 limit = 50,
                 onResult = { recommendations ->
-                    Log.d(
-                        "PlayerViewModel",
-                        "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
-                    )
-                    // Convert RecommendedSong to Song, filtering out the current song
-                    val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
-                        Song(
-                            id = "youtube:${rec.videoId}",
-                            title = rec.title,
-                            artist = rec.artist,
-                            album = null,
-                            duration = 0L,
-                            filePath = rec.watchUrl,
-                            genre = null,
-                            releaseYear = null,
-                            albumArtUri = rec.thumbnail
+                    if (recommendations.isEmpty()) {
+                        // Fallback: try getAllRecommendations for videos/mixed content
+                        Log.d("PlayerViewModel", "🎬 No song-only recommendations, trying all recommendations for video")
+                        fetchAllRecommendationsForVideoId(videoId)
+                    } else {
+                        Log.d(
+                            "PlayerViewModel",
+                            "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
+                        )
+                        // Convert RecommendedSong to Song, filtering out the current song
+                        val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
+                            Song(
+                                id = "youtube:${rec.videoId}",
+                                title = rec.title,
+                                artist = rec.artist,
+                                album = null,
+                                duration = 0L,
+                                filePath = rec.watchUrl,
+                                genre = null,
+                                releaseYear = null,
+                                albumArtUri = rec.thumbnail
+                            )
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            upNextRecommendations = recommendedSongs,
+                            isLoadingRecommendations = false
                         )
                     }
-                    _uiState.value = _uiState.value.copy(
-                        upNextRecommendations = recommendedSongs,
-                        isLoadingRecommendations = false
-                    )
                 },
                 onError = { error ->
-                    Log.e("PlayerViewModel", "❌ Failed to fetch recommendations: $error")
-                    _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                    Log.e("PlayerViewModel", "❌ Failed to fetch recommendations: $error, trying fallback")
+                    // Fallback: try getAllRecommendations for videos
+                    fetchAllRecommendationsForVideoId(videoId)
                 }
             )
         }
+    }
+
+    /**
+     * Fetch all recommendations (including videos) for a video ID
+     * This is used as a fallback when song-only recommendations return empty
+     */
+    private fun fetchAllRecommendationsForVideoId(videoId: String) {
+        YTMusicRecommender.getAllRecommendations(
+            videoId = videoId,
+            limit = 50,
+            onResult = { recommendations ->
+                Log.d(
+                    "PlayerViewModel",
+                    "🎬 Got ${recommendations.size} all-type recommendations (including videos)"
+                )
+                // Convert RecommendedSong to Song, filtering out the current song
+                val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
+                    Song(
+                        id = "youtube:${rec.videoId}",
+                        title = rec.title,
+                        artist = rec.artist,
+                        album = null,
+                        duration = 0L,
+                        filePath = rec.watchUrl,
+                        genre = null,
+                        releaseYear = null,
+                        albumArtUri = rec.thumbnail
+                    )
+                }
+                _uiState.value = _uiState.value.copy(
+                    upNextRecommendations = recommendedSongs,
+                    isLoadingRecommendations = false
+                )
+            },
+            onError = { error ->
+                Log.e("PlayerViewModel", "❌ Failed to fetch all recommendations: $error")
+                _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+            }
+        )
     }
 
     private fun savePlaylistState() {
@@ -658,6 +797,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // Save the playlist
             savePlaylistState()
+
+            // Trigger smart preload for next songs
+            prefetchNextSongIfNeeded()
         }
     }
 
@@ -899,10 +1041,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                     "🎵 Filtered recommendations: ${recommendedSongs.size} songs (excluded current)"
                                 )
                                 _uiState.value = _uiState.value.copy(
-                                    upNextRecommendations = recommendedSongs,
                                     isLoadingRecommendations = false,
                                     repeatEnabled = false  // Disable repeat when recommendations are available
                                 )
+                                // Trigger smart preload for next songs
+                                prefetchNextSongIfNeeded()
                             }
                         },
                         onError = { error ->
@@ -1029,7 +1172,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playbackCollector.startCollecting(onlineSong.id)
 
         // Start preloading next songs
-        triggerPreloading(onlineSong)
+        prefetchNextSongIfNeeded()
 
         logSongDetails(onlineSong)
 
@@ -1316,8 +1459,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             playbackCollector.startCollecting(onlineSong.id)
 
-            // Start preloading adjacent songs for instant switching
-            triggerPreloading(onlineSong)
+            // Start preloading next songs
+            prefetchNextSongIfNeeded()
 
             // Log song details
             logSongDetails(onlineSong)
@@ -1610,120 +1753,58 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * Prefetch next song in queue when reaching 75% of current song
      * This prepares the stream URL and potentially starts downloading the first chunks
      */
+    /**
+     * Prefetch next songs using the PreloadManager
+     * This prepares stream URLs and downloads first chunks for the next 3 songs
+     */
     private fun prefetchNextSongIfNeeded() {
         val currentSong = _uiState.value.currentSong ?: return
 
-        // For online songs, check recommendations first, then queue
-        var nextSong: Song? = null
-        if ((currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:"))
+        // Get next 3 songs based on context (Online vs Offline)
+        val nextSongs = if ((currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:"))
             && _uiState.value.upNextRecommendations.isNotEmpty()
         ) {
-            // Use first recommendation as next song
-            nextSong = _uiState.value.upNextRecommendations.firstOrNull()
+            // For online radio/mix, use recommendations
+            _uiState.value.upNextRecommendations.take(3)
         } else {
-            // Use queue manager for regular songs
-            nextSong = queueManager.peekNext()
+            // For regular queue, get upcoming songs
+            queueManager.getUpcomingQueue().take(3)
         }
 
-        if (nextSong == null) return
+        if (nextSongs.isEmpty()) return
 
-        // Only prefetch if this is a different song and we're not already prefetching
-        if (nextSong.id == prefetchedSongId || isPrefetching) {
-            return
-        }
-
-        // Only prefetch online songs that need stream URL extraction
-        if (!nextSong.id.startsWith("online:") && !nextSong.id.startsWith("youtube:")) {
-            return
-        }
-
+        // Use PreloadManager to handle multi-song preloading
+        // This manages the sliding window and cleanup automatically
+        val previousSong = playedRecommendationsHistory.lastOrNull() ?: queueManager.getPlayHistory().lastOrNull()
+        
+        Log.d("PlayerViewModel", "🔄 Triggering smart preload for ${nextSongs.size} upcoming songs")
+        preloadManager.preloadAround(currentSong, nextSongs, previousSong)
+        
+        // Legacy flags update
         isPrefetching = true
-        prefetchJob?.cancel()
-
-        prefetchJob = viewModelScope.launch {
-            try {
-                Log.d("PlayerViewModel", "🔄 Prefetching next song: ${nextSong.title}")
-
-                val videoId = nextSong.id.removePrefix("online:").removePrefix("youtube:")
-
-                // Fetch stream URL for next song (this will cache it in OnlineManager)
-                val streamUrl = onlineManager.getStreamUrl(videoId)
-
-                if (streamUrl != null) {
-                    Log.d(
-                        "PlayerViewModel",
-                        "✅ Prefetched and cached stream URL for: ${nextSong.title}"
-                    )
-                    prefetchedSongId = nextSong.id
-
-                    // Optionally: Pre-download first chunk (1MB) for instant playback
-                    // This improves the user experience by reducing initial buffering
-                    try {
-                        withContext(AppDispatchers.Network) {
-                            val cacheDir = getApplication<Application>().cacheDir
-                            val prefetchFile = File(cacheDir, "prefetch_${videoId}.cache")
-
-                            // Only prefetch if file doesn't already exist
-                            if (!prefetchFile.exists()) {
-                                val connection =
-                                    URL(streamUrl).openConnection() as HttpURLConnection
-                                connection.setRequestProperty(
-                                    "Range",
-                                    "bytes=0-1048575"
-                                ) // First 1MB
-                                connection.connectTimeout = 10000
-                                connection.readTimeout = 10000
-                                connection.connect()
-
-                                if (connection.responseCode in 200..299 || connection.responseCode == 206) {
-                                    prefetchFile.parentFile?.mkdirs()
-                                    val inputStream = connection.inputStream
-                                    val outputStream = FileOutputStream(prefetchFile)
-
-                                    val buffer = ByteArray(8192)
-                                    var bytesRead: Int
-                                    var totalBytes = 0
-
-                                    // Limit to 1MB max
-                                    while (inputStream.read(buffer)
-                                            .also { bytesRead = it } != -1 && totalBytes < 1048576
-                                    ) {
-                                        outputStream.write(buffer, 0, bytesRead)
-                                        totalBytes += bytesRead
-                                    }
-
-                                    inputStream.close()
-                                    outputStream.close()
-                                    connection.disconnect()
-
-                                    Log.d(
-                                        "PlayerViewModel",
-                                        "✅ Pre-cached ${totalBytes / 1024}KB for instant playback: ${nextSong.title}"
-                                    )
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w("PlayerViewModel", "⚠️ Failed to pre-cache chunk: ${e.message}")
-                        // Not critical, continue without pre-caching
-                    }
-                } else {
-                    Log.w(
-                        "PlayerViewModel",
-                        "⚠️ Failed to prefetch stream URL for: ${nextSong.title}"
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e("PlayerViewModel", "❌ Error prefetching next song: ${e.message}")
-            } finally {
-                isPrefetching = false
-            }
-        }
+        prefetchedSongId = nextSongs.first().id
     }
 
     fun next() {
         viewModelScope.launch {
             playbackCollector.stopCollecting(skipped = true)
+
+            // Skip Pattern Monitoring: Track consecutive skips
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastSkipTime < skipResetTimeMs) {
+                consecutiveSkipCount++
+            } else {
+                consecutiveSkipCount = 1 // Reset if too much time passed
+            }
+            lastSkipTime = currentTime
+            
+            // If user skipped 3+ songs quickly, refresh recommendations
+            if (consecutiveSkipCount >= 3) {
+                Log.d("PlayerViewModel", "🔄 Detected ${consecutiveSkipCount} consecutive skips - refreshing recommendations")
+                consecutiveSkipCount = 0
+                // Force refresh recommendations for current song
+                refreshRecommendationsForCurrentSong()
+            }
 
             // Reset prefetch state when moving to next song
             prefetchedSongId = null
@@ -1955,7 +2036,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val queueState = queueManager.queueState.value
 
             if (queueState.currentPlaylist.isNotEmpty()) {
-                // Use queue manager to shuffle
+                // Use queue manager to shuffle (intelligent shuffle via QueueManager.shuffle())
+                Log.d("PlayerViewModel", "🧠 SHUFFLE: Player toggle - Triggering INTELLIGENT shuffle via QueueManager")
                 queueManager.shuffle()
 
                 // Update UI state
@@ -1995,6 +2077,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (playlist.isEmpty()) return@launch
 
             // Shuffle the playlist
+            Log.d("PlayerViewModel", "🎲 SHUFFLE: App bar/Library - Using RANDOM shuffle")
             val shuffledPlaylist = playlist.shuffled()
 
             // Start playing from the first song in shuffled list
@@ -2798,26 +2881,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         player.release()
     }
 
-    /**
-     * Trigger preloading of adjacent songs for instant switching.
-     * Called when a new song starts playing.
-     */
-    private fun triggerPreloading(currentSong: Song) {
-        viewModelScope.launch {
-            delay(1500) // Wait 1.5 seconds after current song starts to avoid competing for bandwidth
-
-            val nextSongs = _uiState.value.upNextRecommendations.take(3)
-            val previousSong = if (playedRecommendationsHistory.isNotEmpty()) {
-                playedRecommendationsHistory.lastOrNull()
-            } else null
-
-            Log.d(
-                "PlayerViewModel",
-                "🔄 Triggering preload: ${nextSongs.size} next songs, previous=${previousSong?.title}"
-            )
-            preloadManager.preloadAround(currentSong, nextSongs, previousSong)
-        }
-    }
 
     fun setCurrentLyrics(lyrics: String?) {
         currentLyrics = lyrics

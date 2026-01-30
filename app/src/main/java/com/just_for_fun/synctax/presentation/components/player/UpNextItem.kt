@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -47,7 +46,6 @@ fun UpNextItem(
     onSelect: (Song) -> Unit,
     onPlaceNext: (Song) -> Unit,
     onRemoveFromQueue: (Song) -> Unit,
-    snackbarHostState: SnackbarHostState,
     isHistory: Boolean = false,
     dragHandleModifier: Modifier = Modifier // Modifier for the drag handle
 ) {
@@ -59,13 +57,13 @@ fun UpNextItem(
                 SwipeToDismissBoxValue.StartToEnd -> {
                     onRemoveFromQueue(song)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    SnackbarUtils.ShowSnackbar(scope, snackbarHostState, "Removed: ${song.title}")
+                    SnackbarUtils.showGlobalSnackbar(message = "Removed: ${song.title}")
                     false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
                     onPlaceNext(song)
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    SnackbarUtils.ShowSnackbar(scope, snackbarHostState, "Placed next: ${song.title}")
+                    SnackbarUtils.showGlobalSnackbar(message = "Placed next: ${song.title}")
                     false
                 }
                 SwipeToDismissBoxValue.Settled -> true

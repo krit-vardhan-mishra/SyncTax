@@ -39,6 +39,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,7 +88,8 @@ fun AlbumDetailScreen(
     albumDetails: AlbumDetails? = null,
     isAlbumSaved: Boolean = false,
     onSaveAlbumClick: () -> Unit = {},
-    onUnsaveAlbumClick: () -> Unit = {}
+    onUnsaveAlbumClick: () -> Unit = {},
+    onRefresh: () -> Unit = {}
 ) {
     val displayAlbumName = if (isOnline && albumDetails != null) albumDetails.title else albumName
     val displayArtistName =
@@ -109,9 +112,9 @@ fun AlbumDetailScreen(
 
     val context = LocalContext.current
 
-    var dominantColor by remember { mutableStateOf(Color(0xFF1A1A2E)) }
-    var vibrantColor by remember { mutableStateOf(Color(0xFF6C63FF)) }
-    var darkMutedColor by remember { mutableStateOf(Color(0xFF0F0F1E)) }
+    var dominantColor by remember { mutableStateOf(Color(0xFF2A2A2A)) }
+    var vibrantColor by remember { mutableStateOf(Color(0xFFFF0033)) }
+    var darkMutedColor by remember { mutableStateOf(Color(0xFF1A1A1A)) }
 
     // Theme-aware colors from AppColors
     val cardBackgroundColor = AppColors.albumDetailCardBackground
@@ -119,6 +122,16 @@ fun AlbumDetailScreen(
     val sectionSubtitleColor = AppColors.albumDetailArtist
 
     var showBottomSheet by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    // Handle refresh completion
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            onRefresh()
+            isRefreshing = false
+        }
+    }
 
     // Extract colors from album art with improved palette
     LaunchedEffect(albumArtUri) {
@@ -139,7 +152,7 @@ fun AlbumDetailScreen(
                             val vibrant = p.vibrantSwatch?.rgb
                                 ?: p.lightVibrantSwatch?.rgb
                                 ?: p.mutedSwatch?.rgb
-                                ?: 0xFF6C63FF.toInt()
+                                ?: 0xFFFF0033.toInt()
 
                             // Get dark muted for depth
                             val darkMuted = p.darkMutedSwatch?.rgb
@@ -238,298 +251,322 @@ fun AlbumDetailScreen(
                 .background(brush = gradientBrush)
                 .padding(innerPadding)
         ) {
-            OptimizedLazyColumn(
-                contentPadding = PaddingValues(top = 20.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { isRefreshing = true },
+                state = pullToRefreshState,
+                modifier = Modifier.fillMaxSize(),
+                indicator = {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = isRefreshing,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        color = vibrantColor
+                    )
+                }
             ) {
-                item {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Spacer(modifier = Modifier.height(40.dp))
-
-                        // Album Art with enhanced card styling
-                        Card(
-                            modifier = Modifier
-                                .size(260.dp)
-                                .clip(RoundedCornerShape(20.dp)),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color.White.copy(alpha = 0.08f)
-                            )
+                OptimizedLazyColumn(
+                    contentPadding = PaddingValues(top = 20.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Box(
+                            Spacer(modifier = Modifier.height(40.dp))
+
+                            // Album Art with enhanced card styling
+                            Card(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.radialGradient(
-                                            colors = listOf(
-                                                vibrantColor.copy(alpha = 0.15f),
-                                                Color.Transparent
+                                    .size(260.dp)
+                                    .clip(RoundedCornerShape(20.dp)),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.White.copy(alpha = 0.08f)
+                                )
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.radialGradient(
+                                                colors = listOf(
+                                                    vibrantColor.copy(alpha = 0.15f),
+                                                    Color.Transparent
+                                                )
                                             )
                                         )
-                                    )
-                            ) {
-                                if (albumArtUri.isEmpty()) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Album,
-                                            contentDescription = null,
-                                            tint = Color.White.copy(alpha = 0.6f),
-                                            modifier = Modifier.size(100.dp)
+                                ) {
+                                    if (albumArtUri.isEmpty()) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Album,
+                                                contentDescription = null,
+                                                tint = Color.White.copy(alpha = 0.6f),
+                                                modifier = Modifier.size(100.dp)
+                                            )
+                                        }
+                                    } else {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(albumArtUri)
+                                                .crossfade(true)
+                                                .error(android.R.drawable.ic_menu_gallery)
+                                                .build(),
+                                            contentDescription = albumName,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(RoundedCornerShape(20.dp))
                                         )
                                     }
-                                } else {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(albumArtUri)
-                                            .crossfade(true)
-                                            .error(android.R.drawable.ic_menu_gallery)
-                                            .build(),
-                                        contentDescription = albumName,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(RoundedCornerShape(20.dp))
-                                    )
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(32.dp))
+                            Spacer(modifier = Modifier.height(32.dp))
 
-                        // Album Name
-                        Text(
-                            text = displayAlbumName,
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontSize = 36.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            ),
-                            color = Color.White,
-                            maxLines = 2,
-                            softWrap = true,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Artist Name
-                        Text(
-                            text = displayArtistName,
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
-                            color = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Song Count
-                        Text(
-                            text = "${displaySongs.size} songs",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White.copy(alpha = 0.75f),
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Description
-                        val shouldShowSeeMore =
-                            description.length > 140 && description != "No description available for this album"
-                        val displayText =
-                            if (shouldShowSeeMore) description.take(140) + "...see more" else description
-                        if (shouldShowSeeMore) {
-                            val annotatedString = buildAnnotatedString {
-                                append(description.take(140))
-                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                                    append("...see more")
-                                }
-                            }
+                            // Album Name
                             Text(
-                                text = annotatedString,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.7f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .padding(horizontal = 32.dp)
-                                    .clickable { showBottomSheet = true }
-                            )
-                        } else {
-                            Text(
-                                text = displayText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.7f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
+                                text = displayAlbumName,
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontSize = 36.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                ),
+                                color = Color.White,
+                                maxLines = 2,
+                                softWrap = true,
+                                textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 32.dp)
                             )
-                        }
 
-                        Spacer(modifier = Modifier.height(40.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
 
-                        // Action Buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            modifier = Modifier
-                                .padding(horizontal = 32.dp)
-                                .fillMaxWidth()
-                        ) {
-                            Button(
-                                onClick = onPlayAll,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(58.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE91D63),
-                                    contentColor = Color.White
-                                ),
-                                shape = RoundedCornerShape(30.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                            // Artist Name
+                            Text(
+                                text = displayArtistName,
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
+                                color = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Song Count
+                            Text(
+                                text = "${displaySongs.size} songs",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.75f),
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Description
+                            val shouldShowSeeMore =
+                                description.length > 140 && description != "No description available for this album"
+                            val displayText =
+                                if (shouldShowSeeMore) description.take(140) + "...see more" else description
+                            if (shouldShowSeeMore) {
+                                val annotatedString = buildAnnotatedString {
+                                    append(description.take(140))
+                                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                                        append("...see more")
+                                    }
+                                }
+                                Text(
+                                    text = annotatedString,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .padding(horizontal = 32.dp)
+                                        .clickable { showBottomSheet = true }
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("Play all", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            } else {
+                                Text(
+                                    text = displayText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(horizontal = 32.dp)
+                                )
                             }
 
-                            OutlinedButton(
-                                onClick = onShuffle,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(58.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = Color.White
-                                ),
-                                border = ButtonDefaults.outlinedButtonBorder.copy(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            Color.White.copy(0.8f),
-                                            Color.White.copy(0.5f)
-                                        )
-                                    )
-                                ),
-                                shape = RoundedCornerShape(30.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shuffle,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("Shuffle", fontWeight = FontWeight.Medium)
-                            }
-                        }
+                            Spacer(modifier = Modifier.height(40.dp))
 
-                        Spacer(modifier = Modifier.height(32.dp))
-                    }
-                }
-
-                // Songs List
-                items(displaySongs) { song ->
-                    if (isOnline) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 4.dp)
-                                .clickable { onSongClick(song) },
-                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
-                        ) {
+                            // Action Buttons
                             Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier
+                                    .padding(horizontal = 32.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                Button(
+                                    onClick = onPlayAll,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(58.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFE91D63),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(30.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text(
+                                        "Play all",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 16.sp
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = onShuffle,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(58.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = Color.White
+                                    ),
+                                    border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                                        .copy(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    Color.White.copy(0.8f),
+                                                    Color.White.copy(0.5f)
+                                                )
+                                            )
+                                        ),
+                                    shape = RoundedCornerShape(30.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Shuffle", fontWeight = FontWeight.Medium)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(32.dp))
+                        }
+                    }
+
+                    // Songs List
+                    items(displaySongs) { song ->
+                        if (isOnline) {
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                AsyncImage(
-                                    model = song.albumArtUri,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(50.dp)
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    contentScale = ContentScale.Crop
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .clickable { onSongClick(song) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.White.copy(
+                                        alpha = 0.1f
+                                    )
                                 )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = song.title,
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    AsyncImage(
+                                        model = song.albumArtUri,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(50.dp)
+                                            .clip(RoundedCornerShape(4.dp)),
+                                        contentScale = ContentScale.Crop
                                     )
-                                    Text(
-                                        text = song.artist,
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-                                IconButton(onClick = { onSongClick(song) }) {
-                                    Icon(
-                                        Icons.Default.PlayArrow,
-                                        contentDescription = "Play",
-                                        tint = Color.White
-                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = song.title,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = song.artist,
+                                            color = Color.White.copy(alpha = 0.7f),
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                    IconButton(onClick = { onSongClick(song) }) {
+                                        Icon(
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = "Play",
+                                            tint = Color.White
+                                        )
+                                    }
                                 }
                             }
+                        } else {
+                            SongCard(
+                                song = song,
+                                onClick = { onSongClick(song) },
+                                backgroundColor = cardBackgroundColor,
+                                titleColor = sectionTitleColor,
+                                artistColor = sectionSubtitleColor
+                            )
                         }
-                    } else {
-                        SongCard(
-                            song = song,
-                            onClick = { onSongClick(song) },
-                            backgroundColor = cardBackgroundColor,
-                            titleColor = sectionTitleColor,
-                            artistColor = sectionSubtitleColor
-                        )
                     }
                 }
-            }
+            } // End PullToRefreshBox
         }
-    }
 
-    // Bottom Sheet for full description
-    if (showBottomSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false }
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+        // Bottom Sheet for full description
+        if (showBottomSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false }
             ) {
-                Text(
-                    text = "Album Details",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                Text(
-                    text = "Title: $displayAlbumName",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = "Artist: $displayArtistName",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = "Description:",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "Album Details",
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    Text(
+                        text = "Title: $displayAlbumName",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Artist: $displayArtistName",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "Description:",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
             }
         }
     }

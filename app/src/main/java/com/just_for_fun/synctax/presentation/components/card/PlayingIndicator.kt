@@ -24,14 +24,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun PlayingIndicator() {
+fun PlayingIndicator(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "playing")
     val bars = remember { (0 until 3).toList() }
 
     Row(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.Bottom,
-        modifier = Modifier
+        modifier = modifier
             .size(16.dp)
             .clip(RoundedCornerShape(2.dp))
     ) {

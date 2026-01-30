@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MusicNote
@@ -120,7 +122,7 @@ fun QuickPickCard(
                     subtitle = "Add to end of current queue",
                     icon = {
                         Icon(
-                            Icons.Default.QueueMusic,
+                            Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -156,7 +158,7 @@ fun QuickPickCard(
                     subtitle = "Save to a playlist",
                     icon = {
                         Icon(
-                            Icons.Default.PlaylistAdd,
+                            Icons.AutoMirrored.Filled.PlaylistAdd,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)

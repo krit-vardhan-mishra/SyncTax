@@ -11,19 +11,18 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Sort
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -77,9 +77,11 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SortOption.NAME_ASC) }
     val albumColors by dynamicBgViewModel.albumColors.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showSortDialog by remember { mutableStateOf(false) }
+
+    // Pull to refresh state
+    val pullToRefreshState = rememberPullToRefreshState()
 
     // Theme-aware colors from AppColors
     val cardBackgroundColor = AppColors.homeCardBackground
@@ -100,15 +102,14 @@ fun LibraryScreen(
         dynamicBgViewModel.updateAlbumArt(playerState.currentSong?.albumArtUri)
     }
 
-    // Collect error messages from player view model
-    LaunchedEffect(Unit) {
-        playerViewModel.errorMessages.collect { message ->
-            SnackbarUtils.ShowSnackbar(scope, snackbarHostState, message)
-        }
-    }
+    // Collect error messages from player view model - moved to global level
+    // LaunchedEffect(Unit) {
+    //     playerViewModel.errorMessages.collect { message ->
+    //         SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
+    //     }
+    // }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             SimpleDynamicMusicTopAppBar(
                 title = "Library",
@@ -127,7 +128,7 @@ fun LibraryScreen(
                     if (songsToShuffle.isNotEmpty()) {
                         playerViewModel.shufflePlay(songsToShuffle)
                     } else {
-                        SnackbarUtils.ShowSnackbar(scope, snackbarHostState, "No songs available on your device, listen songs online")
+                        SnackbarUtils.showGlobalSnackbar(message = "No songs available on your device, listen songs online")
                     }
                 },
                 onRefreshClick = { homeViewModel.scanMusic() },
@@ -150,118 +151,134 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = uiState.isScanning,
+                onRefresh = { homeViewModel.scanMusic() },
+                state = pullToRefreshState,
+                modifier = Modifier.fillMaxSize(),
+                indicator = {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = uiState.isScanning,
+                        modifier = Modifier.align(
+                            Alignment.TopCenter),
+                        color = androidx.compose.ui.graphics.Color(0xFFFF0033)
+                    )
+                }
             ) {
-                // --- CUSTOM SEGMENTED/PILL TAB ROW ---
-                val tabs = listOf("Songs", "Artists", "Albums", "Favorites")
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // --- CUSTOM SEGMENTED/PILL TAB ROW ---
+                    val tabs = listOf("Songs", "Artists", "Albums", "Favorites")
 
-                TabRow(
-                    selectedTabIndex = pagerState.currentPage,
-                    // Container color: Slightly lighter than background for contrast
-                    containerColor = tabContainerColor,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    divider = {}, // Remove the default bottom line
-                    indicator = { tabPositions ->
-                        if (pagerState.currentPage < tabPositions.size) {
-                            // The floating pill indicator
-                            Box(
-                                modifier = Modifier
-                                    .tabIndicatorOffset(tabPositions[pagerState.currentPage])
-                                    .fillMaxSize()
-                                    .padding(4.dp) // Inset slightly
-                                    .background(
-                                        color = tabIndicatorColor,
-                                        shape = CircleShape
+                    TabRow(
+                        selectedTabIndex = pagerState.currentPage,
+                        // Container color: Slightly lighter than background for contrast
+                        containerColor = tabContainerColor,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        divider = {}, // Remove the default bottom line
+                        indicator = { tabPositions ->
+                            if (pagerState.currentPage < tabPositions.size) {
+                                // The floating pill indicator
+                                Box(
+                                    modifier = Modifier
+                                        .tabIndicatorOffset(tabPositions[pagerState.currentPage])
+                                        .fillMaxSize()
+                                        .padding(4.dp) // Inset slightly
+                                        .background(
+                                            color = tabIndicatorColor,
+                                            shape = CircleShape
+                                        )
+                                        .zIndex(-1f) // Behind the text
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .fillMaxWidth()
+                            .clip(CircleShape) // Round the entire tab row
+                    ) {
+                        tabs.forEachIndexed { index, title ->
+                            val isSelected = pagerState.currentPage == index
+
+                            Tab(
+                                selected = isSelected,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            page = index,
+                                            animationSpec = androidx.compose.animation.core.spring(
+                                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+                                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                                            )
+                                        )
+                                    }
+                                },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        // Text color changes based on selection for contrast
+                                        color = if (isSelected)
+                                            tabSelectedTextColor
+                                        else
+                                            tabUnselectedTextColor
                                     )
-                                    .zIndex(-1f) // Behind the text
+                                },
+                                modifier = Modifier.zIndex(1f)
                             )
                         }
-                    },
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .fillMaxWidth()
-                        .clip(CircleShape) // Round the entire tab row
-                ) {
-                    tabs.forEachIndexed { index, title ->
-                        val isSelected = pagerState.currentPage == index
-
-                        Tab(
-                            selected = isSelected,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(
-                                        page = index,
-                                        animationSpec = androidx.compose.animation.core.spring(
-                                            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-                                            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-                                        )
-                                    )
-                                }
-                            },
-                            text = {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    // Text color changes based on selection for contrast
-                                    color = if (isSelected)
-                                        tabSelectedTextColor
-                                    else
-                                        tabUnselectedTextColor
-                                )
-                            },
-                            modifier = Modifier.zIndex(1f)
-                        )
                     }
-                }
 
-                // Swipeable Content
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.fillMaxSize()
-                ) { page ->
-                    when (page) {
-                        0 -> SongsTab(
-                            songs = uiState.allSongs,
-                            sortOption = sortOption,
-                            onSongClick = { song, queue ->
-                                playerViewModel.playSong(song, queue)
-                            },
-                            homeViewModel = homeViewModel,
-                            playerViewModel = playerViewModel,
-                            cardBackgroundColor = cardBackgroundColor,
-                            sectionTitleColor = sectionTitleColor,
-                            sectionSubtitleColor = sectionSubtitleColor
-                        )
+                    // Swipeable Content
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize()
+                    ) { page ->
+                        when (page) {
+                            0 -> SongsTab(
+                                songs = uiState.allSongs,
+                                sortOption = sortOption,
+                                onSongClick = { song, queue ->
+                                    playerViewModel.playSong(song, queue)
+                                },
+                                homeViewModel = homeViewModel,
+                                playerViewModel = playerViewModel,
+                                cardBackgroundColor = cardBackgroundColor,
+                                sectionTitleColor = sectionTitleColor,
+                                sectionSubtitleColor = sectionSubtitleColor
+                            )
 
-                        1 -> ArtistsTab(
-                            songs = uiState.allSongs,
-                            onArtistClick = { artist, artistSongs ->
-                                onNavigateToArtist(artist, artistSongs)
-                            }
-                        )
+                            1 -> ArtistsTab(
+                                songs = uiState.allSongs,
+                                onArtistClick = { artist, artistSongs ->
+                                    onNavigateToArtist(artist, artistSongs)
+                                }
+                            )
 
-                        2 -> AlbumsTab(
-                            songs = uiState.allSongs,
-                            onAlbumClick = { album, artist, albumSongs ->
-                                onNavigateToAlbum(album, artist, albumSongs)
-                            }
-                        )
+                            2 -> AlbumsTab(
+                                songs = uiState.allSongs,
+                                onAlbumClick = { album, artist, albumSongs ->
+                                    onNavigateToAlbum(album, artist, albumSongs)
+                                }
+                            )
 
-                        3 -> SongsTab(
-                            songs = uiState.favoriteSongs,
-                            sortOption = sortOption,
-                            onSongClick = { song, queue ->
-                                playerViewModel.playSong(song, queue.ifEmpty { uiState.allSongs })
-                            },
-                            homeViewModel = homeViewModel,
-                            playerViewModel = playerViewModel,
-                            cardBackgroundColor = cardBackgroundColor,
-                            sectionTitleColor = sectionTitleColor,
-                            sectionSubtitleColor = sectionSubtitleColor,
-                            emptyMessage = "No favorites yet. Long-press a song to add it to favorites."
-                        )
+                            3 -> SongsTab(
+                                songs = uiState.favoriteSongs,
+                                sortOption = sortOption,
+                                onSongClick = { song, queue ->
+                                    playerViewModel.playSong(song, queue.ifEmpty { uiState.allSongs })
+                                },
+                                homeViewModel = homeViewModel,
+                                playerViewModel = playerViewModel,
+                                cardBackgroundColor = cardBackgroundColor,
+                                sectionTitleColor = sectionTitleColor,
+                                sectionSubtitleColor = sectionSubtitleColor,
+                                emptyMessage = "No favorites yet. Long-press a song to add it to favorites."
+                            )
+                        }
                     }
                 }
             }
@@ -276,7 +293,7 @@ fun LibraryScreen(
             val iconVector = when {
                 option.name.contains("ASC") -> Icons.Rounded.ArrowUpward
                 option.name.contains("DESC") -> Icons.Rounded.ArrowDownward
-                else -> Icons.Rounded.Sort
+                else -> Icons.AutoMirrored.Rounded.Sort
             }
             DialogOption(
                 id = option.name,

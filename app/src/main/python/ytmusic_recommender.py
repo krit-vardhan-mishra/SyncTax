@@ -102,6 +102,43 @@ class YTMusicRecommender:
             logger.error(f"Album search failed for query '{query}': {e}")
             return []
     
+    def search_videos(self, query, limit=20):
+        """
+        Search for videos
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default 20)
+            
+        Returns:
+            List of video dictionaries with keys: videoId, title, artist, duration, thumbnail
+        """
+        if not self.yt:
+            logger.error("YTMusic client not initialized")
+            return []
+        
+        try:
+            results = self.yt.search(query, filter='videos', limit=limit)
+            videos = []
+            
+            for item in results:
+                video = {
+                    'videoId': item.get('videoId', ''),
+                    'title': item.get('title', 'Unknown Title'),
+                    'artist': ', '.join([a['name'] for a in item.get('artists', [])]) or 'Unknown Artist',
+                    'duration': item.get('duration', '0:00'),
+                    'thumbnail': item.get('thumbnails', [{}])[-1].get('url', '') if item.get('thumbnails') else '',
+                    'views': item.get('views', '')
+                }
+                videos.append(video)
+            
+            logger.info(f"Found {len(videos)} videos for query: {query}")
+            return videos
+            
+        except Exception as e:
+            logger.error(f"Video search failed for query '{query}': {e}")
+            return []
+
     def search_artists(self, query, limit=10):
         """
         Search for artists on YouTube Music
@@ -194,15 +231,16 @@ class YTMusicRecommender:
             logger.error(f"Failed to get album details for browseId '{browse_id}': {e}")
             return None
     
-    def get_artist_details(self, browse_id):
+    def get_artist_details(self, browse_id, limit=25):
         """
         Get artist details including top songs
         
         Args:
             browse_id: Artist browseId from search results
+            limit: Maximum number of songs to return (default 25)
             
         Returns:
-            Dictionary with artist details and songs list
+            Dictionary with artist details, songs list, and pagination info
         """
         if not self.yt:
             logger.error("YTMusic client not initialized")
@@ -216,18 +254,31 @@ class YTMusicRecommender:
                 return None
             
             songs = []
+            songs_browse_id = None
+            has_more_songs = False
+            total_songs_available = 0
+            
             # Get songs from the artist (top tracks, singles, etc.)
-            if 'songs' in artist and 'results' in artist['songs']:
-                for track in artist['songs']['results'][:25]:  # Top 25 songs
-                    song = {
-                        'videoId': track.get('videoId', ''),
-                        'title': track.get('title', 'Unknown Title'),
-                        'artist': ', '.join([a['name'] for a in track.get('artists', [])]) or artist.get('name', 'Unknown Artist'),
-                        'album': track.get('album', {}).get('name', '') if track.get('album') else '',
-                        'duration': str(track.get('duration', '0:00')),
-                        'thumbnail': track.get('thumbnails', [{}])[-1].get('url', '') if track.get('thumbnails') else ''
-                    }
-                    songs.append(song)
+            if 'songs' in artist:
+                songs_data = artist['songs']
+                # Check if there's a browseId to load more songs
+                if 'browseId' in songs_data:
+                    songs_browse_id = songs_data['browseId']
+                    has_more_songs = True
+                
+                if 'results' in songs_data:
+                    results = songs_data['results']
+                    total_songs_available = len(results)
+                    for track in results[:limit]:
+                        song = {
+                            'videoId': track.get('videoId', ''),
+                            'title': track.get('title', 'Unknown Title'),
+                            'artist': ', '.join([a['name'] for a in track.get('artists', [])]) or artist.get('name', 'Unknown Artist'),
+                            'album': track.get('album', {}).get('name', '') if track.get('album') else '',
+                            'duration': str(track.get('duration', '0:00')),
+                            'thumbnail': track.get('thumbnails', [{}])[-1].get('url', '') if track.get('thumbnails') else ''
+                        }
+                        songs.append(song)
             
             result = {
                 'browseId': browse_id,
@@ -235,15 +286,60 @@ class YTMusicRecommender:
                 'description': artist.get('description', ''),
                 'thumbnail': artist.get('thumbnails', [{}])[-1].get('url', '') if artist.get('thumbnails') else '',
                 'subscribers': artist.get('subscribers', ''),
-                'songs': songs
+                'songs': songs,
+                'songsBrowseId': songs_browse_id,
+                'hasMoreSongs': has_more_songs,
+                'totalSongsAvailable': total_songs_available
             }
             
-            logger.info(f"Retrieved artist details: {result['name']} with {len(songs)} songs")
+            logger.info(f"Retrieved artist details: {result['name']} with {len(songs)} songs (hasMore: {has_more_songs})")
             return result
             
         except Exception as e:
             logger.error(f"Failed to get artist details for browseId '{browse_id}': {e}")
             return None
+    
+    def get_artist_all_songs(self, songs_browse_id, limit=100):
+        """
+        Get all songs from an artist using the songs browseId
+        
+        Args:
+            songs_browse_id: The browseId from artist['songs']['browseId']
+            limit: Maximum number of songs to return (default 100)
+            
+        Returns:
+            List of song dictionaries
+        """
+        if not self.yt:
+            logger.error("YTMusic client not initialized")
+            return []
+        
+        try:
+            # Use get_playlist to get all songs from the artist's songs playlist
+            playlist = self.yt.get_playlist(playlistId=songs_browse_id, limit=limit)
+            
+            if not playlist or 'tracks' not in playlist:
+                logger.warning(f"No songs found for songs browseId: {songs_browse_id}")
+                return []
+            
+            songs = []
+            for track in playlist['tracks']:
+                song = {
+                    'videoId': track.get('videoId', ''),
+                    'title': track.get('title', 'Unknown Title'),
+                    'artist': ', '.join([a['name'] for a in track.get('artists', [])]) or 'Unknown Artist',
+                    'album': track.get('album', {}).get('name', '') if track.get('album') else '',
+                    'duration': str(track.get('duration', '0:00')),
+                    'thumbnail': track.get('thumbnails', [{}])[-1].get('url', '') if track.get('thumbnails') else ''
+                }
+                songs.append(song)
+            
+            logger.info(f"Retrieved {len(songs)} songs from artist songs playlist")
+            return songs
+            
+        except Exception as e:
+            logger.error(f"Failed to get artist all songs for browseId '{songs_browse_id}': {e}")
+            return []
     
     def get_song_recommendations(self, video_id, limit=25):
         """
@@ -294,6 +390,53 @@ class YTMusicRecommender:
             logger.error(f"Failed to get recommendations for video_id '{video_id}': {e}")
             return []
     
+    def get_all_recommendations(self, video_id, limit=25):
+        """
+        Get all recommendations based on a video ID, including videos and songs
+        Does NOT filter by videoType, useful for music videos
+        
+        Args:
+            video_id: YouTube video ID
+            limit: Maximum number of recommendations (default 25)
+            
+        Returns:
+            List of recommended song/video dictionaries
+        """
+        if not self.yt:
+            logger.error("YTMusic client not initialized")
+            return []
+        
+        try:
+            # Get watch playlist with radio parameter for recommendations
+            watch_playlist = self.yt.get_watch_playlist(videoId=video_id, limit=limit, radio=True)
+            
+            if not watch_playlist or 'tracks' not in watch_playlist:
+                logger.warning(f"No recommendations found for video_id: {video_id}")
+                return []
+            
+            tracks = watch_playlist['tracks']
+            recommendations = []
+            
+            for track in tracks:
+                item = {
+                    'videoId': track.get('videoId', ''),
+                    'title': track.get('title', 'Unknown Title'),
+                    'artist': ', '.join([a['name'] for a in track.get('artists', [])]) or 'Unknown Artist',
+                    'album': track.get('album', {}).get('name', 'Unknown Album') if track.get('album') else 'Unknown Album',
+                    'duration': str(track.get('length', '0:00')),
+                    'thumbnail': track.get('thumbnail', [{}])[-1].get('url', '') if track.get('thumbnail') else '',
+                    'videoType': track.get('videoType', 'MUSIC_VIDEO_TYPE_ATV')
+                }
+                # Include all types - no filtering
+                recommendations.append(item)
+            
+            logger.info(f"Found {len(recommendations)} all-type recommendations for video_id: {video_id}")
+            return recommendations
+            
+        except Exception as e:
+            logger.error(f"Failed to get all recommendations for video_id '{video_id}': {e}")
+            return []
+    
     def get_recommendations_for_query(self, query, limit=25):
         """
         Get song recommendations based on a search query
@@ -330,6 +473,71 @@ class YTMusicRecommender:
             return []
 
 
+    def search_all(self, query, limit=20):
+        """
+        Search for all types of content (songs, videos, albums, artists, podcasts)
+        
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default 20)
+            
+        Returns:
+            List of dictionaries with result details including 'resultType'
+        """
+        if not self.yt:
+            logger.error("YTMusic client not initialized")
+            return []
+        
+        try:
+            # Search without filter to get mixed results
+            results = self.yt.search(query, limit=limit)
+            items = []
+            
+            for item in results:
+                result_type = item.get('resultType', 'unknown')
+                
+                # Base structure
+                entry = {
+                    'resultType': result_type,
+                    'title': item.get('title', 'Unknown Title'),
+                    'thumbnail': item.get('thumbnails', [{}])[-1].get('url', '') if item.get('thumbnails') else ''
+                }
+                
+                # Extract type-specific fields
+                if result_type in ['song', 'video']:
+                    entry['videoId'] = item.get('videoId', '')
+                    entry['artist'] = ', '.join([a['name'] for a in item.get('artists', [])]) or 'Unknown Artist'
+                    entry['album'] = item.get('album', {}).get('name', '') if item.get('album') else ''
+                    entry['duration'] = item.get('duration', '0:00')
+                    
+                elif result_type == 'album':
+                    entry['browseId'] = item.get('browseId', '')
+                    entry['artist'] = ', '.join([a['name'] for a in item.get('artists', [])]) or 'Unknown Artist'
+                    entry['year'] = item.get('year', '')
+                    
+                elif result_type == 'artist':
+                    entry['browseId'] = item.get('browseId', '')
+                    entry['artist'] = item.get('artist', '') # Sometimes just artist name
+                    entry['subscribers'] = item.get('subscribers', '')
+                    
+                elif result_type in ['podcast', 'episode']:
+                    entry['browseId'] = item.get('browseId', '') if result_type == 'podcast' else item.get('videoId', '')
+                    # For episode, browseId is videoId usually
+                    if result_type == 'episode':
+                        entry['videoId'] = item.get('videoId', '')
+                    
+                    entry['artist'] = ', '.join([a['name'] for a in item.get('artists', [])]) if 'artists' in item else item.get('author', 'Unknown Author')
+                    entry['duration'] = item.get('duration', '')
+                
+                items.append(entry)
+            
+            logger.info(f"Found {len(items)} mixed results for query: {query}")
+            return items
+            
+        except Exception as e:
+            logger.error(f"Mixed search failed for query '{query}': {e}")
+            return []
+
 # Module-level functions for easy calling from Kotlin via Chaquopy
 
 _recommender = None
@@ -344,6 +552,23 @@ def initialize():
     except Exception as e:
         logger.error(f"Initialization failed: {e}")
         return f"Initialization failed: {e}"
+
+
+def search_all(query, limit=20):
+    """
+    Mixed search for all types
+    Returns JSON string of mixed list
+    """
+    global _recommender
+    if not _recommender:
+        initialize()
+    
+    try:
+        results = _recommender.search_all(query, limit)
+        return json.dumps(results)
+    except Exception as e:
+        logger.error(f"search_all error: {e}")
+        return json.dumps([])
 
 
 def search_songs(query, limit=20):
@@ -414,6 +639,24 @@ def get_song_recommendations(video_id, limit=25):
         return json.dumps([])
 
 
+def get_all_recommendations(video_id, limit=25):
+    """
+    Get all recommendations (songs + videos) for a specific video ID
+    Does not filter by video type, useful for music videos
+    Returns JSON string of recommendation list
+    """
+    global _recommender
+    if not _recommender:
+        initialize()
+    
+    try:
+        recommendations = _recommender.get_all_recommendations(video_id, limit)
+        return json.dumps(recommendations)
+    except Exception as e:
+        logger.error(f"get_all_recommendations error: {e}")
+        return json.dumps([])
+
+
 def get_recommendations_for_query(query, limit=25):
     """
     Get recommendations based on a search query
@@ -463,6 +706,23 @@ def get_artist_details(browse_id):
     except Exception as e:
         logger.error(f"get_artist_details error: {e}")
         return json.dumps(None)
+
+
+def get_artist_all_songs(songs_browse_id, limit=100):
+    """
+    Get all songs from an artist using the songs browseId
+    Returns JSON string of songs list
+    """
+    global _recommender
+    if not _recommender:
+        initialize()
+    
+    try:
+        songs = _recommender.get_artist_all_songs(songs_browse_id, limit)
+        return json.dumps(songs) if songs else json.dumps([])
+    except Exception as e:
+        logger.error(f"get_artist_all_songs error: {e}")
+        return json.dumps([])
 
 
 def get_search_suggestions(query):

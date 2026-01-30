@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
@@ -69,7 +70,7 @@ fun SectionHeader(
 
                 IconButton(onClick = { showSortMenu = true }) {
                     Icon(
-                        imageVector = Icons.Default.Sort,
+                        imageVector = Icons.AutoMirrored.Filled.Sort,
                         contentDescription = "Sort songs",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

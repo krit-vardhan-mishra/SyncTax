@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -129,105 +130,114 @@ fun MiniPlayerContent(
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .offset(x = albumArtOffsetX.dp)
-                            .pointerInput(song.id) {
-                                detectTapGestures(onTap = { onClick() })
-                            }
-                            .pointerInput(song.id) {
-                                var totalDragX = 0f
-                                var isHorizontalDrag = false
-
-                                detectHorizontalDragGestures(
-                                    onDragStart = {
-                                        totalDragX = 0f
-                                        isHorizontalDrag = false
-                                    },
-                                    onDragEnd = {
-                                        // Only handle horizontal swipes for next/prev
-                                        val absX = kotlin.math.abs(totalDragX)
-                                        if (absX > 50f) {
-                                            if (totalDragX > swipeThreshold) onPreviousClick()
-                                            else if (totalDragX < -swipeThreshold) onNextClick()
-                                        }
-                                        albumArtOffsetX = 0f
-                                    },
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        change.consume()
-                                        totalDragX += dragAmount
-                                        albumArtOffsetX += dragAmount
-                                    }
-                                )
-                                // Note: Vertical drags are NOT consumed here,
-                                // letting them propagate to UnifiedPlayerSheet for continuous tracking
-                            }
-                            .clip(RoundedCornerShape(12.dp)) // Rounded border for the Inner Box
-                            .background(MoreBlurColor) // Stronger semi-transparent overlay for "more blur"
-                            .padding(8.dp) // Padding inside the inner box
-                            .fillMaxHeight(),
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RectangleShape)
                     ) {
-                        // Small Album Art Card
-                        Surface(
+                        Row(
                             modifier = Modifier
-                                .size(48.dp)
-                                .scale(albumArtScale)
-                                .clip(RoundedCornerShape(8.dp)),
-                            shape = RoundedCornerShape(8.dp),  // Corner radius for album art
-                            color = PlayerSurface, // Use a solid color for the album art background
-                            tonalElevation = 2.dp
+                                .fillMaxSize()
+                                .offset(x = albumArtOffsetX.dp)
+                                .pointerInput(song.id) {
+                                    detectTapGestures(onTap = { onClick() })
+                                }
+                                .pointerInput(song.id) {
+                                    var totalDragX = 0f
+                                    var isHorizontalDrag = false
+
+                                    detectHorizontalDragGestures(
+                                        onDragStart = {
+                                            totalDragX = 0f
+                                            isHorizontalDrag = false
+                                        },
+                                        onDragEnd = {
+                                            // Only handle horizontal swipes for next/prev
+                                            val absX = kotlin.math.abs(totalDragX)
+                                            if (absX > 50f) {
+                                                if (totalDragX > swipeThreshold) onPreviousClick()
+                                                else if (totalDragX < -swipeThreshold) onNextClick()
+                                            }
+                                            albumArtOffsetX = 0f
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            totalDragX += dragAmount
+                                            albumArtOffsetX += dragAmount
+                                        },
+                                        onDragCancel = {
+                                            albumArtOffsetX = 0f
+                                        }
+                                    )
+                                    // Note: Vertical drags are NOT consumed here,
+                                    // letting them propagate to UnifiedPlayerSheet for continuous tracking
+                                }
+                                .clip(RoundedCornerShape(12.dp)) // Rounded border for the Inner Box
+                                .background(MoreBlurColor) // Stronger semi-transparent overlay for "more blur"
+                                .padding(8.dp) // Padding inside the inner box
+                                .fillMaxHeight(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (song.albumArtUri.isNullOrEmpty()) {
-                                Icon(
-                                    imageVector = Icons.Default.MusicNote,
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(12.dp),
-                                    tint = PlayerTextSecondary
+                            // Small Album Art Card
+                            Surface(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .scale(albumArtScale)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                shape = RoundedCornerShape(8.dp),  // Corner radius for album art
+                                color = PlayerSurface, // Use a solid color for the album art background
+                                tonalElevation = 2.dp
+                            ) {
+                                if (song.albumArtUri.isNullOrEmpty()) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        modifier = Modifier.padding(12.dp),
+                                        tint = PlayerTextSecondary
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = song.albumArtUri,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // Song Info Column
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = song.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PlayerTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.basicMarquee()
                                 )
-                            } else {
-                                AsyncImage(
-                                    model = song.albumArtUri,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
+                                Text(
+                                    text = song.artist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = PlayerTextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.basicMarquee()
                                 )
                             }
-                        }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
 
-                        // Song Info Column
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = song.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = PlayerTextPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.basicMarquee()
-                            )
-                            Text(
-                                text = song.artist,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = PlayerTextSecondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.basicMarquee()
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        // Visualizer
-                        if (isPlaying) {
-                            Box(modifier = Modifier.padding(end = 8.dp)) {
-                                AnimatedWaveform()
+                            // Visualizer
+                            if (isPlaying) {
+                                Box(modifier = Modifier.padding(end = 8.dp)) {
+                                    AnimatedWaveform()
+                                }
                             }
                         }
                     }

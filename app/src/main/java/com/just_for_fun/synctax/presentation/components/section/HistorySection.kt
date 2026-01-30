@@ -1,0 +1,96 @@
+package com.just_for_fun.synctax.presentation.components.section
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
+import com.just_for_fun.synctax.presentation.components.card.OnlineHistoryCarousel
+
+@Composable
+fun HistorySection(
+    history: List<OnlineListeningHistory>,
+    onHistoryClick: (OnlineListeningHistory) -> Unit,
+    onViewAllClick: () -> Unit = {},
+    currentVideoId: String? = null,
+    onRemoveFromHistory: (OnlineListeningHistory) -> Unit = {}
+) {
+    Column(
+        modifier = Modifier.padding(vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Recently played songs",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "Quick Picks",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (history.isNotEmpty()) {
+                    TextButton(onClick = onViewAllClick) {
+                        Text(
+                            "View all",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+
+        if (history.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "No online songs played yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                Text(
+                    text = "Search and play songs online to see them here",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            OnlineHistoryCarousel(
+                history = history.take(10),
+                onHistoryClick = onHistoryClick,
+                currentVideoId = currentVideoId,
+                onRemoveFromHistory = onRemoveFromHistory
+            )
+        }
+    }
+}

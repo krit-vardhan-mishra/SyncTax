@@ -9,6 +9,7 @@ plugins {
     id("com.google.devtools.ksp")
     id("com.chaquo.python") version "16.1.0"
     id("kotlin-parcelize")
+    id("kotlin-kapt")
 }
 
 android {
@@ -19,8 +20,8 @@ android {
         applicationId = "com.just_for_fun.synctax"
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
-        versionName = "4.0.0"
+        versionCode = 5
+        versionName = "4.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -131,10 +132,13 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.foundation)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.remote.creation.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.graphics.shapes)
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
@@ -218,4 +222,8 @@ dependencies {
 
     // For flow operators
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+
+    // Glide for image loading
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    kapt("com.github.bumptech.glide:compiler:4.16.0")
 }

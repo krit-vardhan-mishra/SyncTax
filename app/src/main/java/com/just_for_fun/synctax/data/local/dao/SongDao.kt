@@ -12,6 +12,9 @@ interface SongDao {
     @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC")
     fun getAllSongs(): Flow<List<Song>>
 
+    @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC")
+    suspend fun getAllSongsList(): List<Song>
+
     @Query("SELECT * FROM songs ORDER BY addedTimestamp DESC LIMIT :limit OFFSET :offset")
     suspend fun getSongsPaginated(limit: Int, offset: Int): List<Song>
 
@@ -72,4 +75,40 @@ interface SongDao {
         ORDER BY h.playCount DESC
     """)
     suspend fun getMostPlayedSongs(limit: Int = 10): List<Song>
+
+    // Album-related queries
+    @Query("SELECT * FROM songs WHERE album = :albumName")
+    fun getSongsByAlbum(albumName: String): Flow<List<Song>>
+
+    @Query("SELECT * FROM songs WHERE album = :albumName")
+    suspend fun getSongsByAlbumList(albumName: String): List<Song>
+
+    @Query("""
+        SELECT album, artist, COUNT(*) as songCount, MIN(albumArtUri) as albumArt
+        FROM songs 
+        WHERE album IS NOT NULL AND album != ''
+        GROUP BY album, artist
+        ORDER BY album ASC
+    """)
+    suspend fun getAlbums(): List<AlbumInfo>
+
+    @Query("""
+        SELECT album, artist, COUNT(*) as songCount, MIN(albumArtUri) as albumArt
+        FROM songs 
+        WHERE album IS NOT NULL AND album != ''
+        GROUP BY album, artist
+        ORDER BY songCount DESC
+        LIMIT :limit
+    """)
+    suspend fun getTopAlbums(limit: Int = 10): List<AlbumInfo>
 }
+
+/**
+ * Data class for album information from grouped query
+ */
+data class AlbumInfo(
+    val album: String,
+    val artist: String,
+    val songCount: Int,
+    val albumArt: String?
+)
