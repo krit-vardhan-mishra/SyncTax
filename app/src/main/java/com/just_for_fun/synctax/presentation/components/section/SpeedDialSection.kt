@@ -17,16 +17,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.components.app.UserProfileIcon
 import com.just_for_fun.synctax.presentation.components.card.QuickPickCard
 
-
 @Composable
 fun SpeedDialSection(
-    songs: List<com.just_for_fun.synctax.data.local.entities.Song>,
-    onSongClick: (com.just_for_fun.synctax.data.local.entities.Song) -> Unit,
+    songs: List<Song>,
+    onSongClick: (Song) -> Unit,
     userInitial: String = "M",
-    currentSong: com.just_for_fun.synctax.data.local.entities.Song? = null
+    currentSong: Song? = null
 ) {
     Column(
         modifier = Modifier.padding(vertical = 16.dp)
@@ -50,7 +50,7 @@ fun SpeedDialSection(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "AI-powered suggestions based on your listening patterns",
+                    text = "suggestions based on your listening patterns",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

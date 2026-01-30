@@ -21,7 +21,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 4
-        versionName = "4.0.15"
+        versionName = "4.0.16"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -138,6 +138,7 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.graphics.shapes)
 
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))

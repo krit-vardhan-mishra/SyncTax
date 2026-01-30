@@ -192,7 +192,8 @@ fun FullScreenPlayerContent(
 
         Box(
             modifier = Modifier
-                .then(if (isBlurEnabled) Modifier.liquefiable(liquidState) else Modifier)
+                // Temporarily disabled - liquefiable might be blocking tap gestures
+                // .then(if (isBlurEnabled) Modifier.liquefiable(liquidState) else Modifier)
                 .fillMaxSize()
         ) {
 

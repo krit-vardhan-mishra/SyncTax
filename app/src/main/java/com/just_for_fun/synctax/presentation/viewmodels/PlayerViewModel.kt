@@ -48,8 +48,10 @@ import com.just_for_fun.synctax.data.local.entities.OnlineSong
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.PlayerPreferences
 import com.just_for_fun.synctax.data.repository.MusicRepository
+import com.just_for_fun.synctax.data.repository.OnlineSongRepository
 import com.just_for_fun.synctax.presentation.components.state.PlayerUiState
 import com.just_for_fun.synctax.presentation.components.state.PlayerSheetState
+import com.just_for_fun.synctax.utils.MusicDownloadManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -76,6 +78,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val audioProcessor = AudioProcessor(application)
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
     private val onlineManager = OnlineSearchManager()
+    
+    // Online song repository for tracking play status
+    private val onlineSongRepository = OnlineSongRepository(
+        MusicDatabase.getDatabase(application).onlineSongDao(),
+        MusicDownloadManager.instance
+    )
 
     // Preload manager for instant song switching
     private val preloadManager = PreloadManager(application)
@@ -90,7 +98,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     // Callback to notify when a download completes (for library refresh)
     var onDownloadComplete: (() -> Unit)? = null
 
-    // PlaybackCollector with cache invalidation callback
+    // PlaybackCollector with cache invalidation callback and online song tracking
     private val playbackCollector = PlaybackCollector(
         repository = repository,
         player = player,
@@ -98,6 +106,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         onPlaybackRecorded = {
             // Invalidate Quick Picks cache when new playback is recorded
             recommendationManager.invalidateQuickPicksCache()
+        },
+        onlineSongRepository = onlineSongRepository,
+        onOnlineSongPlayed = { videoId ->
+            Log.d("PlayerViewModel", "🎵 Online song marked as played (5+ sec): $videoId")
+        },
+        onOnlineSongFullyPlayed = { videoId ->
+            Log.d("PlayerViewModel", "✅ Online song fully played: $videoId")
+            // TODO: Check if offline storage option is enabled and auto-save if so
         }
     )
 
@@ -178,9 +194,48 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Check if a song is an online song (YouTube/YTMusic)
+     */
+    private fun isOnlineSong(song: Song): Boolean {
+        return song.id.startsWith("online:") || song.id.startsWith("youtube:")
+    }
+
+    /**
+     * Check if adding a song to queue is allowed based on current playback type
+     * Online songs can only be added when playing online, offline when playing offline
+     */
+    fun canAddToQueue(song: Song): Boolean {
+        val currentSong = _uiState.value.currentSong ?: return true // Allow if nothing playing
+        val currentIsOnline = isOnlineSong(currentSong)
+        val songIsOnline = isOnlineSong(song)
+        return currentIsOnline == songIsOnline
+    }
+
+    /**
+     * Get the type mismatch error message for queue addition
+     */
+    fun getQueueTypeMismatchMessage(song: Song): String {
+        val currentSong = _uiState.value.currentSong ?: return ""
+        val currentIsOnline = isOnlineSong(currentSong)
+        return if (currentIsOnline) {
+            "Cannot add offline songs to queue while playing online music"
+        } else {
+            "Cannot add online songs to queue while playing offline music"
+        }
+    }
+
+    /**
      * Add a song to the end of the queue
+     * Only allows adding songs of the same type (online/offline) as currently playing
      */
     fun addToQueue(song: Song) {
+        if (!canAddToQueue(song)) {
+            viewModelScope.launch {
+                _errorMessages.emit(getQueueTypeMismatchMessage(song))
+            }
+            Log.d("PlayerViewModel", "⚠️ Queue type mismatch: Cannot add ${song.title}")
+            return
+        }
         queueManager.addToQueue(listOf(song))
         viewModelScope.launch {
             _errorMessages.emit("Added to queue: ${song.title}")
@@ -190,17 +245,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Add multiple songs to the end of the queue
+     * Filters out songs that don't match the current playback type
      */
     fun addToQueue(songs: List<Song>) {
-        queueManager.addToQueue(songs)
-        viewModelScope.launch {
-            _errorMessages.emit("Added ${songs.size} songs to queue")
+        val currentSong = _uiState.value.currentSong
+        val filteredSongs = if (currentSong != null) {
+            val currentIsOnline = isOnlineSong(currentSong)
+            songs.filter { isOnlineSong(it) == currentIsOnline }
+        } else {
+            songs
         }
-        Log.d("PlayerViewModel", "➕ Added ${songs.size} songs to queue")
+        
+        if (filteredSongs.isEmpty()) {
+            viewModelScope.launch {
+                _errorMessages.emit("No compatible songs to add to queue")
+            }
+            return
+        }
+        
+        queueManager.addToQueue(filteredSongs)
+        val skippedCount = songs.size - filteredSongs.size
+        viewModelScope.launch {
+            if (skippedCount > 0) {
+                _errorMessages.emit("Added ${filteredSongs.size} songs (${skippedCount} incompatible skipped)")
+            } else {
+                _errorMessages.emit("Added ${filteredSongs.size} songs to queue")
+            }
+        }
+        Log.d("PlayerViewModel", "➕ Added ${filteredSongs.size} songs to queue (${skippedCount} skipped)")
     }
 
     /**
      * Add an online song to the queue by creating a Song object
+     * Only works if currently playing online music or nothing is playing
      */
     fun addOnlineSongToQueue(videoId: String, title: String, artist: String, thumbnailUrl: String? = null) {
         val onlineSong = Song(
@@ -549,6 +626,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Fetch recommendations for a video ID
+     * First tries to get song-only recommendations, then falls back to all recommendations
+     * (including videos) if no songs are found - useful for music videos
      */
     private fun fetchRecommendationsForVideoId(videoId: String, force: Boolean = false) {
         if (force || (_uiState.value.upNextRecommendations.isEmpty() && playedRecommendationsHistory.isEmpty())) {
@@ -559,35 +638,81 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 videoId = videoId,
                 limit = 50,
                 onResult = { recommendations ->
-                    Log.d(
-                        "PlayerViewModel",
-                        "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
-                    )
-                    // Convert RecommendedSong to Song, filtering out the current song
-                    val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
-                        Song(
-                            id = "youtube:${rec.videoId}",
-                            title = rec.title,
-                            artist = rec.artist,
-                            album = null,
-                            duration = 0L,
-                            filePath = rec.watchUrl,
-                            genre = null,
-                            releaseYear = null,
-                            albumArtUri = rec.thumbnail
+                    if (recommendations.isEmpty()) {
+                        // Fallback: try getAllRecommendations for videos/mixed content
+                        Log.d("PlayerViewModel", "🎬 No song-only recommendations, trying all recommendations for video")
+                        fetchAllRecommendationsForVideoId(videoId)
+                    } else {
+                        Log.d(
+                            "PlayerViewModel",
+                            "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
+                        )
+                        // Convert RecommendedSong to Song, filtering out the current song
+                        val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
+                            Song(
+                                id = "youtube:${rec.videoId}",
+                                title = rec.title,
+                                artist = rec.artist,
+                                album = null,
+                                duration = 0L,
+                                filePath = rec.watchUrl,
+                                genre = null,
+                                releaseYear = null,
+                                albumArtUri = rec.thumbnail
+                            )
+                        }
+                        _uiState.value = _uiState.value.copy(
+                            upNextRecommendations = recommendedSongs,
+                            isLoadingRecommendations = false
                         )
                     }
-                    _uiState.value = _uiState.value.copy(
-                        upNextRecommendations = recommendedSongs,
-                        isLoadingRecommendations = false
-                    )
                 },
                 onError = { error ->
-                    Log.e("PlayerViewModel", "❌ Failed to fetch recommendations: $error")
-                    _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                    Log.e("PlayerViewModel", "❌ Failed to fetch recommendations: $error, trying fallback")
+                    // Fallback: try getAllRecommendations for videos
+                    fetchAllRecommendationsForVideoId(videoId)
                 }
             )
         }
+    }
+
+    /**
+     * Fetch all recommendations (including videos) for a video ID
+     * This is used as a fallback when song-only recommendations return empty
+     */
+    private fun fetchAllRecommendationsForVideoId(videoId: String) {
+        YTMusicRecommender.getAllRecommendations(
+            videoId = videoId,
+            limit = 50,
+            onResult = { recommendations ->
+                Log.d(
+                    "PlayerViewModel",
+                    "🎬 Got ${recommendations.size} all-type recommendations (including videos)"
+                )
+                // Convert RecommendedSong to Song, filtering out the current song
+                val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
+                    Song(
+                        id = "youtube:${rec.videoId}",
+                        title = rec.title,
+                        artist = rec.artist,
+                        album = null,
+                        duration = 0L,
+                        filePath = rec.watchUrl,
+                        genre = null,
+                        releaseYear = null,
+                        albumArtUri = rec.thumbnail
+                    )
+                }
+                _uiState.value = _uiState.value.copy(
+                    upNextRecommendations = recommendedSongs,
+                    isLoadingRecommendations = false
+                )
+            },
+            onError = { error ->
+                Log.e("PlayerViewModel", "❌ Failed to fetch all recommendations: $error")
+                _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+            }
+        )
     }
 
     private fun savePlaylistState() {

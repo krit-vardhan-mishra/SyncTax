@@ -39,13 +39,14 @@ import kotlinx.coroutines.launch
 fun HistoryScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    initialTab: Int = 0
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val tabs = listOf("Online", "Local", "Offline Saved")
     
-    // 1. Initialize PagerState
-    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    // 1. Initialize PagerState with initialTab
+    val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, tabs.size - 1), pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(

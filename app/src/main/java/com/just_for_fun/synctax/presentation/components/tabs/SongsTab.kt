@@ -182,9 +182,9 @@ fun SongsTab(
             SongCard(
                 song = song,
                 onClick = {
-                    // O(n) worst case for indexOf, but typically O(1) as songs are near top
-                    val queue = sortedSongs.drop(index) // O(n-index) creates sublist
-                    onSongClick(song, queue)
+                    // Pass the complete sorted list so previous/next navigation works correctly
+                    // The playSong function will find the song's index and set up the queue properly
+                    onSongClick(song, sortedSongs)
                 },
                 onDelete = { deletedSong ->
                     // Remove from local database and refresh UI

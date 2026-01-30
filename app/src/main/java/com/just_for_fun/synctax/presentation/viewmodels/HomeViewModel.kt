@@ -19,9 +19,11 @@ import com.just_for_fun.synctax.core.network.OnlineSearchManager
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.core.network.OnlineResultType
 import com.just_for_fun.synctax.core.network.OnlineSearchResult
+import com.just_for_fun.synctax.presentation.model.AlbumUiModel
 import com.just_for_fun.synctax.presentation.model.SearchFilterType
 import com.just_for_fun.synctax.core.utils.AlbumDetails
 import com.just_for_fun.synctax.core.utils.ArtistDetails
+import com.just_for_fun.synctax.core.utils.RecommendedSong
 import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import com.just_for_fun.synctax.data.local.MusicDatabase
 import com.just_for_fun.synctax.data.local.entities.OnlineSong
@@ -101,6 +103,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             extractArtists(preComputedData.songs)
+            extractAlbums(preComputedData.songs)
             
             // Clear the pre-computed data to free memory
             AppInitializer.clearData()
@@ -266,6 +269,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     extractArtists(songs)
+                    extractAlbums(songs)
 
                     // Generate recommendations in ML dispatcher
                     if (songs.isNotEmpty()) {
@@ -302,8 +306,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun extractAlbums(songs: List<Song>) {
+        viewModelScope.launch(Dispatchers.Default) {
+            val albums = songs.groupBy { Pair(it.album ?: "Unknown", it.artist ?: "Unknown") }
+                .map { (albumArtist, songs) ->
+                    val firstSong = songs.firstOrNull()
+                    AlbumUiModel(
+                        name = albumArtist.first,
+                        artist = albumArtist.second,
+                        songCount = songs.size,
+                        albumArtUri = firstSong?.albumArtUri
+                    )
+                }
+                .sortedByDescending { it.songCount }
+
+            withContext(Dispatchers.Main) {
+                _uiState.value = _uiState.value.copy(albums = albums)
+            }
+        }
+    }
+
     fun getSongsByArtist(artistName: String): List<Song> {
         return _uiState.value.allSongs.filter { (it.artist ?: "Unknown") == artistName }
+    }
+
+    fun getSongsByAlbum(albumName: String, artistName: String): List<Song> {
+        return _uiState.value.allSongs.filter { 
+            (it.album ?: "Unknown") == albumName && (it.artist ?: "Unknown") == artistName 
+        }
     }
 
     fun forceRefreshLibrary() {
@@ -338,6 +368,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Refresh all sections after scanning
                 refreshSections()
+                
+                // Refresh saved playlists
+                loadSavedPlaylists()
             } catch (e: CancellationException) {
                 // Coroutine cancellation is expected, don't show as error
                 throw e
@@ -675,6 +708,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 onError = {
                     _uiState.value = _uiState.value.copy(isLoadingArtistDetails = false)
                     onResult(null)
+                }
+            )
+        }
+    }
+
+    /**
+     * Load more songs from an artist using the songsBrowseId
+     * @param songsBrowseId The browseId from artist.songsBrowseId
+     * @param onResult Callback with list of additional songs
+     */
+    fun loadMoreArtistSongs(
+        songsBrowseId: String,
+        onResult: (List<RecommendedSong>) -> Unit
+    ) {
+        viewModelScope.launch(AppDispatchers.Network) {
+            YTMusicRecommender.getArtistAllSongs(
+                songsBrowseId = songsBrowseId,
+                limit = 100,
+                onResult = { songs ->
+                    Log.d("HomeViewModel", "Loaded ${songs.size} more songs from artist")
+                    onResult(songs)
+                },
+                onError = { error ->
+                    Log.e("HomeViewModel", "Failed to load more artist songs: $error")
+                    onResult(emptyList())
                 }
             )
         }
@@ -1626,6 +1684,8 @@ data class HomeUiState(
     val offlineSavedSongs: List<com.just_for_fun.synctax.data.local.entities.OnlineSong> = emptyList(),
     // List of Artists
     val artists: List<com.just_for_fun.synctax.presentation.model.ArtistUiModel> = emptyList(),
+    // List of Albums
+    val albums: List<AlbumUiModel> = emptyList(),
     // Cached artist photos (artistName -> thumbnailUrl)
     val artistPhotos: Map<String, String?> = emptyMap(),
     val isLoadingArtistPhotos: Boolean = false

@@ -46,7 +46,7 @@ import com.just_for_fun.synctax.data.local.entities.UserPreference
         QuickPickSong::class,
         SongTransition::class
     ],
-    version = 11,  // Incremented for OnlineSong isSaved and isDownloaded columns
+    version = 12,  // Incremented for OnlineSong isSaved and isDownloaded columns
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {

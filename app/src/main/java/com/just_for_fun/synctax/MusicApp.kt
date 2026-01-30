@@ -249,7 +249,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
 
                         downloadPercent = playerState.downloadPercent,
                         onExpandedChange = { isPlayerExpanded = it },
-                        showPlayer = currentRoute != "quick_picks"
+                        showPlayer = currentRoute != "quick_picks" && currentRoute != "settings"
                     ) { innerPadding ->
                         // Provide bottom padding to all screens via CompositionLocal
                         NavHost(
@@ -282,12 +282,18 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                     onNavigateToPlaylists = { navController.navigate("playlists") },
                                     onNavigateToOnlineSongs = { navController.navigate("online_songs") },
                                     onNavigateToRecommendations = { navController.navigate("recommendations_detail") },
-                                    onNavigateToHistory = { navController.navigate("history") },
+                                    onNavigateToHistory = { navController.navigate("history?tab=0") },
                                     onNavigateToStats = { navController.navigate("stats") },
                                     onNavigateToListenedArtists = { navController.navigate("listened_artists") },
                                     onNavigateToArtistDetail = { artistName ->
                                         navController.navigate("artist_detail/$artistName")
-                                    }
+                                    },
+                                    onNavigateToAlbumDetail = { albumName, artistName ->
+                                        val songs = homeViewModel.getSongsByAlbum(albumName, artistName)
+                                        homeViewModel.setSelectedAlbum(albumName, artistName, songs)
+                                        navController.navigate("album/$albumName")
+                                    },
+                                    onNavigateToSavedSongs = { navController.navigate("history?tab=2") }
                                 )
                             }
                             composable(
@@ -483,6 +489,9 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                     onGetArtistDetails = { name, callback ->
                                         homeViewModel.fetchArtistDetailsByName(name, callback)
                                     },
+                                    onLoadMoreSongs = { songsBrowseId, callback ->
+                                        homeViewModel.loadMoreArtistSongs(songsBrowseId, callback)
+                                    },
                                     onOnlineSongClick = { song ->
                                         playerViewModel.playOnlineSongWithRecommendations(
                                             videoId = song.videoId,
@@ -524,16 +533,24 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 )
                             }
                             composable(
-                                "history",
+                                "history?tab={tab}",
+                                arguments = listOf(
+                                    navArgument("tab") {
+                                        type = NavType.IntType
+                                        defaultValue = 0
+                                    }
+                                ),
                                 enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
                                 exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
                                 popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
                                 popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
-                            ) {
+                            ) { backStackEntry ->
+                                val initialTab = backStackEntry.arguments?.getInt("tab") ?: 0
                                 HistoryScreen(
                                     homeViewModel = homeViewModel,
                                     playerViewModel = playerViewModel,
-                                    onNavigateBack = { navController.popBackStack() }
+                                    onNavigateBack = { navController.popBackStack() },
+                                    initialTab = initialTab
                                 )
                             }
                             composable(
@@ -689,7 +706,8 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                         if (history.isNotEmpty()) {
                                             playerViewModel.shufflePlayOnlineHistory(history)
                                         }
-                                    }
+                                    },
+                                    onNavigateBack = { navController.popBackStack() }
                                 )
                             }
                             composable(

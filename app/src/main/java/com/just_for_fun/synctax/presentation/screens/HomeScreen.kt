@@ -5,35 +5,25 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -46,18 +36,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
+import com.just_for_fun.synctax.presentation.components.card.AlbumCard
+import com.just_for_fun.synctax.presentation.components.card.ArtistCard
 import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
 import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.presentation.components.onboarding.DirectorySelectionDialog
@@ -67,7 +54,7 @@ import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
 import com.just_for_fun.synctax.presentation.components.section.EmptyRecommendationsPrompt
 import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
-import com.just_for_fun.synctax.presentation.components.section.OnlineHistorySection
+import com.just_for_fun.synctax.presentation.components.section.HistorySection
 import com.just_for_fun.synctax.presentation.components.section.QuickAccessGrid
 import com.just_for_fun.synctax.presentation.components.section.QuickShortcutsRow
 import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
@@ -76,6 +63,12 @@ import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSe
 import com.just_for_fun.synctax.presentation.components.section.SectionHeader
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.presentation.components.section.SpeedDialSection
+import com.just_for_fun.synctax.presentation.components.utils.BottomPaddingSpacer
+import com.just_for_fun.synctax.presentation.components.utils.ExtraLargeSpacer
+import com.just_for_fun.synctax.presentation.components.utils.LargeSpacer
+import com.just_for_fun.synctax.presentation.components.utils.SectionDivider
+import com.just_for_fun.synctax.presentation.components.utils.SectionSpacer
+import com.just_for_fun.synctax.presentation.components.utils.SmallSpacer
 import com.just_for_fun.synctax.presentation.components.utils.SortOption
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.dynamic.DynamicGreetingSection
@@ -87,41 +80,6 @@ import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
-
-// Composable helper functions for consistent spacing
-@Composable
-private fun SectionSpacer() {
-    Spacer(modifier = Modifier.height(16.dp))
-}
-
-@Composable
-private fun SmallSpacer() {
-    Spacer(modifier = Modifier.height(8.dp))
-}
-
-@Composable
-private fun LargeSpacer() {
-    Spacer(modifier = Modifier.height(24.dp))
-}
-
-@Composable
-private fun ExtraLargeSpacer() {
-    Spacer(modifier = Modifier.height(25.dp))
-}
-
-@Composable
-private fun BottomPaddingSpacer() {
-    Spacer(modifier = Modifier.height(80.dp))
-}
-
-@Composable
-private fun SectionDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        color = AppColors.divider,
-        thickness = 1.dp
-    )
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +99,9 @@ fun HomeScreen(
     onNavigateToHistory: () -> Unit = {},
     onNavigateToStats: () -> Unit = {},
     onNavigateToListenedArtists: () -> Unit = {},
-    onNavigateToArtistDetail: (String) -> Unit = {}
+    onNavigateToArtistDetail: (String) -> Unit = {},
+    onNavigateToAlbumDetail: (albumName: String, artistName: String) -> Unit = { _, _ -> },
+    onNavigateToSavedSongs: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -443,7 +403,7 @@ fun HomeScreen(
                                     onTrainClick = onTrainClick,
                                     onHistoryClick = onNavigateToHistory,
                                     onStatsClick = onNavigateToStats,
-                                    onSavedSongsClick = onNavigateToOnlineSongs,
+                                    onSavedSongsClick = onNavigateToSavedSongs,
                                     modifier = Modifier.padding(vertical = 16.dp)
                                 )
                             }
@@ -504,10 +464,36 @@ fun HomeScreen(
                                 }
                             }
 
+                            // Album Section
+                            if (uiState.albums.isNotEmpty()) {
+                                item(key = "albums", contentType = "albums") {
+                                    SectionHeader(
+                                        title = "Albums",
+                                        onViewAllClick = null, // TODO: Navigate to all albums
+                                        titleColor = sectionTitleColor
+                                    )
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier.padding(bottom = 16.dp)
+                                    ) {
+                                        items(uiState.albums.take(10)) { album ->
+                                            AlbumCard(
+                                                album = album,
+                                                onClick = {
+                                                    onNavigateToAlbumDetail(album.name, album.artist)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             // Quick Picks Section - Now shows online listening history
                             if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
                                 item {
-                                    OnlineHistorySection(
+                                    HistorySection(
                                         history = uiState.onlineHistory,
                                         onHistoryClick = { history ->
                                             playerViewModel.playUrl(
@@ -903,37 +889,6 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-//                // Training indicator
-//                AnimatedVisibility(
-//                    visible = uiState.isTraining,
-//                    enter = fadeIn() + slideInVertically { it },
-//                    exit = fadeOut() + slideOutVertically { it },
-//                    modifier = Modifier.align(Alignment.BottomCenter)
-//                ) {
-//                    Card(
-//                        modifier = Modifier.padding(16.dp),
-//                        colors = CardDefaults.cardColors(
-//                            containerColor = cardBackgroundColor
-//                        )
-//                    ) {
-//                        Row(
-//                            modifier = Modifier.padding(16.dp),
-//                            verticalAlignment = Alignment.CenterVertically,
-//                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-//                        ) {
-//                            CircularProgressIndicator(
-//                                modifier = Modifier.size(24.dp),
-//                                strokeWidth = 2.dp,
-//                                color = MaterialTheme.colorScheme.onPrimaryContainer
-//                            )
-//                            Text(
-//                                "Training ML models...",
-//                                color = MaterialTheme.colorScheme.onPrimaryContainer
-//                            )
-//                        }
-//                    }
-//                }
-
                 // Guide Overlay
                 var showGuide by remember {
                     mutableStateOf(
@@ -972,66 +927,5 @@ fun HomeScreen(
                 }
             }
         }
-    }
-}
-
-/**
- * Artist card that displays cached photo (no API calls)
- */
-@Composable
-fun ArtistCard(
-    artist: com.just_for_fun.synctax.presentation.model.ArtistUiModel,
-    isLoading: Boolean = false,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .width(100.dp)
-            .height(130.dp)
-            .clickable(onClick = onClick)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            when {
-                isLoading -> {
-                    // Show loading indicator while fetching
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.dp
-                    )
-                }
-                !artist.imageUrl.isNullOrEmpty() -> {
-                    AsyncImage(
-                        model = artist.imageUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                else -> {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(48.dp)
-                    )
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = artist.name,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center
-        )
     }
 }

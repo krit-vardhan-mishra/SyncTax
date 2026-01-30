@@ -264,6 +264,52 @@ object YTMusicRecommender {
     }
     
     /**
+     * Get all recommendations (songs + videos) based on a YouTube video ID
+     * Does NOT filter by videoType, useful for music videos that need video recommendations
+     * @param videoId YouTube video ID
+     * @param limit Maximum number of recommendations (default 25)
+     * @param onResult Callback with list of recommended songs/videos
+     * @param onError Error callback
+     */
+    fun getAllRecommendations(
+        videoId: String,
+        limit: Int = 25,
+        onResult: (List<RecommendedSong>) -> Unit,
+        onError: (String) -> Unit = { Log.e(TAG, it) }
+    ) {
+        scope.launch {
+            try {
+                Log.d(TAG, "getAllRecommendations: videoId='$videoId', limit=$limit")
+                
+                val python = Python.getInstance()
+                val module = python.getModule("ytmusic_recommender")
+                val jsonResult = module.callAttr("get_all_recommendations", videoId, limit).toString()
+                
+                val recommendations = parseSongsFromJson(jsonResult)
+                Log.d(TAG, "Found ${recommendations.size} all-type recommendations for videoId: $videoId")
+                
+                recommendations.forEachIndexed { idx, song ->
+                    Log.d(TAG, "AllRec[$idx] id=${song.videoId} title='${song.title}' artist='${song.artist}'")
+                }
+                
+                withContext(Dispatchers.Main) {
+                    onResult(recommendations)
+                }
+            } catch (e: PyException) {
+                Log.e(TAG, "Python get_all_recommendations failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("All recommendations failed: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "getAllRecommendations failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("All recommendations failed: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    /**
      * Get song recommendations based on a search query
      * First searches for songs, then gets recommendations based on the first result
      * @param query Search query
@@ -364,7 +410,7 @@ object YTMusicRecommender {
                 val jsonResult = module.callAttr("get_artist_details", browseId).toString()
                 
                 val artistDetails = parseArtistDetailsFromJson(jsonResult)
-                Log.d(TAG, "Retrieved artist: ${artistDetails?.name} with ${artistDetails?.songs?.size} songs")
+                Log.d(TAG, "Retrieved artist: ${artistDetails?.name} with ${artistDetails?.songs?.size} songs (hasMore: ${artistDetails?.hasMoreSongs})")
                 
                 withContext(Dispatchers.Main) {
                     onResult(artistDetails)
@@ -378,6 +424,47 @@ object YTMusicRecommender {
                 Log.e(TAG, "getArtistDetails failed", e)
                 withContext(Dispatchers.Main) {
                     onError("Artist details fetch failed: ${e.message}")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get all songs from an artist using the songs browseId (for pagination/load more)
+     * @param songsBrowseId The browseId from artist.songsBrowseId
+     * @param limit Maximum number of songs to return (default 100)
+     * @param onResult Callback with list of songs
+     * @param onError Error callback
+     */
+    fun getArtistAllSongs(
+        songsBrowseId: String,
+        limit: Int = 100,
+        onResult: (List<RecommendedSong>) -> Unit,
+        onError: (String) -> Unit = { Log.e(TAG, it) }
+    ) {
+        scope.launch {
+            try {
+                Log.d(TAG, "getArtistAllSongs: songsBrowseId='$songsBrowseId', limit=$limit")
+                
+                val python = Python.getInstance()
+                val module = python.getModule("ytmusic_recommender")
+                val jsonResult = module.callAttr("get_artist_all_songs", songsBrowseId, limit).toString()
+                
+                val songs = parseSongsFromJson(jsonResult)
+                Log.d(TAG, "Retrieved ${songs.size} songs from artist")
+                
+                withContext(Dispatchers.Main) {
+                    onResult(songs)
+                }
+            } catch (e: PyException) {
+                Log.e(TAG, "Python get_artist_all_songs failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Failed to load more songs: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "getArtistAllSongs failed", e)
+                withContext(Dispatchers.Main) {
+                    onError("Failed to load more songs: ${e.message}")
                 }
             }
         }
@@ -595,7 +682,10 @@ object YTMusicRecommender {
                 description = jsonObject.optString("description", ""),
                 thumbnail = jsonObject.optString("thumbnail", ""),
                 subscribers = jsonObject.optString("subscribers", ""),
-                songs = songs
+                songs = songs,
+                songsBrowseId = jsonObject.optString("songsBrowseId", null),
+                hasMoreSongs = jsonObject.optBoolean("hasMoreSongs", false),
+                totalSongsAvailable = jsonObject.optInt("totalSongsAvailable", 0)
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse artist details JSON", e)
@@ -757,5 +847,8 @@ data class ArtistDetails(
     val description: String,
     val thumbnail: String,
     val subscribers: String,
-    val songs: List<RecommendedSong>
+    val songs: List<RecommendedSong>,
+    val songsBrowseId: String? = null,
+    val hasMoreSongs: Boolean = false,
+    val totalSongsAvailable: Int = 0
 )

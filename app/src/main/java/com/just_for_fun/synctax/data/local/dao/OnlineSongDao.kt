@@ -43,6 +43,18 @@ interface OnlineSongDao {
     @Query("UPDATE online_songs SET isDownloaded = :isDownloaded WHERE id = :id")
     suspend fun updateDownloadedStatus(id: Int, isDownloaded: Boolean)
     
+    @Query("UPDATE online_songs SET isPlayed = :isPlayed WHERE videoId = :videoId")
+    suspend fun updatePlayedStatus(videoId: String, isPlayed: Boolean)
+    
+    @Query("UPDATE online_songs SET isFullyPlayed = :isFullyPlayed WHERE videoId = :videoId")
+    suspend fun updateFullyPlayedStatus(videoId: String, isFullyPlayed: Boolean)
+    
+    @Query("SELECT * FROM online_songs WHERE isPlayed = 1 ORDER BY addedAt DESC")
+    fun getPlayedSongs(): Flow<List<OnlineSong>>
+    
+    @Query("SELECT * FROM online_songs WHERE isFullyPlayed = 1 ORDER BY addedAt DESC")
+    fun getFullyPlayedSongs(): Flow<List<OnlineSong>>
+    
     @Query("SELECT * FROM online_songs WHERE isSaved = 1")
     fun getSavedSongs(): Flow<List<OnlineSong>>
     

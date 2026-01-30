@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
+import com.just_for_fun.synctax.presentation.components.utils.PolyShapes
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,18 +90,29 @@ fun ArtistDetailScreen(
     artistDetails: ArtistDetails? = null,
     onOnlineSongClick: (RecommendedSong) -> Unit = {},
     onGetArtistDetails: ((String, (ArtistDetails?) -> Unit) -> Unit)? = null,
+    onLoadMoreSongs: ((String, (List<RecommendedSong>) -> Unit) -> Unit)? = null,
     onRefresh: () -> Unit = {}
 ) {
     var fetchedDetails by remember { mutableStateOf<ArtistDetails?>(null) }
     var isLoadingArtistDetails by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+    // Refresh counter to trigger re-fetch when pull-to-refresh is used
+    var refreshKey by remember { mutableStateOf(0) }
     val pullToRefreshState = rememberPullToRefreshState()
+    
+    // Pagination state for loading more songs
+    var additionalSongs by remember { mutableStateOf<List<RecommendedSong>>(emptyList()) }
+    var isLoadingMoreSongs by remember { mutableStateOf(false) }
+    var hasLoadedAllSongs by remember { mutableStateOf(false) }
 
-    // Handle refresh completion
+    // Handle refresh completion - increment refreshKey to trigger re-fetch
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
-            // Reset fetched details to trigger re-fetch
-            fetchedDetails = null
+            // Increment refresh key to trigger the fetch LaunchedEffect
+            refreshKey++
+            // Reset pagination state on refresh
+            additionalSongs = emptyList()
+            hasLoadedAllSongs = false
             onRefresh()
             isRefreshing = false
         }
@@ -110,11 +122,15 @@ fun ArtistDetailScreen(
     // We fetch if:
     // 1. We are not explicitly in "online mode" (where details are passed in)
     // 2. We have a fetcher provided
-    // 3. We haven't fetched yet
+    // 3. We haven't fetched yet OR refreshKey changed (pull-to-refresh)
     // 4. EITHER we have no local image/songs OR we just want to enrich with online image
-    LaunchedEffect(artistName) {
-        if (!isOnline && onGetArtistDetails != null && fetchedDetails == null) {
+    LaunchedEffect(artistName, refreshKey) {
+        if (!isOnline && onGetArtistDetails != null) {
             isLoadingArtistDetails = true
+            fetchedDetails = null // Reset before fetching
+            // Reset additional songs when fetching new details
+            additionalSongs = emptyList()
+            hasLoadedAllSongs = false
             onGetArtistDetails(artistName) { details ->
                 fetchedDetails = details
                 isLoadingArtistDetails = false
@@ -129,8 +145,21 @@ fun ArtistDetailScreen(
 
     val imageUri = effectiveDetails?.thumbnail ?: songs.firstOrNull()?.albumArtUri.orEmpty()
 
-    val songCount =
-        if (isOnline && effectiveDetails != null) effectiveDetails.songs.size else songs.size
+    // Calculate total song count: local songs + fetched online songs + additional loaded songs
+    val songCount = when {
+        isOnline && effectiveDetails != null -> effectiveDetails.songs.size + additionalSongs.size
+        else -> {
+            val localCount = songs.size
+            val onlineCount = (fetchedDetails?.songs?.size ?: 0) + additionalSongs.size
+            localCount + onlineCount
+        }
+    }
+    
+    // Check if more songs can be loaded
+    val canLoadMore = effectiveDetails?.hasMoreSongs == true && 
+                      effectiveDetails.songsBrowseId != null && 
+                      !hasLoadedAllSongs &&
+                      onLoadMoreSongs != null
 
     val description = effectiveDetails?.description ?: "No details about this artist available"
 
@@ -286,7 +315,7 @@ fun ArtistDetailScreen(
                                             ),
                                             radius = 350f
                                         ),
-                                        shape = CircleShape
+                                        shape = PolyShapes.Cookie9
                                     )
                                     .padding(8.dp),
                                 contentAlignment = Alignment.Center
@@ -294,7 +323,7 @@ fun ArtistDetailScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .clip(CircleShape)
+                                        .clip(PolyShapes.Cookie9)
                                         .background(Color.White.copy(alpha = 0.08f)),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -312,7 +341,7 @@ fun ArtistDetailScreen(
                                             contentScale = ContentScale.Crop,
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .clip(CircleShape)
+                                                .clip(PolyShapes.Cookie9)
                                         )
                                     }
                                 }
@@ -487,6 +516,69 @@ fun ArtistDetailScreen(
                             }
                             items(fetchedDetails!!.songs) { song ->
                                 OnlineSongCardForItem(song, onOnlineSongClick)
+                            }
+                            
+                            // Show additional loaded songs
+                            if (additionalSongs.isNotEmpty()) {
+                                items(additionalSongs) { song ->
+                                    OnlineSongCardForItem(song, onOnlineSongClick)
+                                }
+                            }
+                            
+                            // Load More button or loading indicator
+                            if (canLoadMore || isLoadingMoreSongs) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isLoadingMoreSongs) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(24.dp),
+                                                    color = Color.White.copy(alpha = 0.8f),
+                                                    strokeWidth = 2.dp
+                                                )
+                                                Text(
+                                                    text = "Loading more songs...",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = Color.White.copy(alpha = 0.7f)
+                                                )
+                                            }
+                                        } else {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    val browseId = effectiveDetails?.songsBrowseId
+                                                    if (browseId != null && onLoadMoreSongs != null) {
+                                                        isLoadingMoreSongs = true
+                                                        onLoadMoreSongs(browseId) { moreSongs ->
+                                                            if (moreSongs.isNotEmpty()) {
+                                                                // Filter out duplicates
+                                                                val existingIds = (fetchedDetails?.songs?.map { it.videoId } ?: emptyList()) + 
+                                                                                  additionalSongs.map { it.videoId }
+                                                                val newSongs = moreSongs.filter { it.videoId !in existingIds }
+                                                                additionalSongs = additionalSongs + newSongs
+                                                            }
+                                                            hasLoadedAllSongs = true
+                                                            isLoadingMoreSongs = false
+                                                        }
+                                                    }
+                                                },
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = Color.White
+                                                ),
+                                                border = ButtonDefaults.outlinedButtonBorder(enabled = true)
+                                            ) {
+                                                Text("Load More Songs")
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 

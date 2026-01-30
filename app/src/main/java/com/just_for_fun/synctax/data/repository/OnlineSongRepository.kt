@@ -18,6 +18,10 @@ class OnlineSongRepository(
     fun getSavedSongs(): Flow<List<OnlineSong>> = onlineSongDao.getSavedSongs()
 
     fun getDownloadedSongs(): Flow<List<OnlineSong>> = onlineSongDao.getDownloadedSongs()
+    
+    fun getPlayedSongs(): Flow<List<OnlineSong>> = onlineSongDao.getPlayedSongs()
+    
+    fun getFullyPlayedSongs(): Flow<List<OnlineSong>> = onlineSongDao.getFullyPlayedSongs()
 
     suspend fun getOnlineSongById(id: Int): OnlineSong? = onlineSongDao.getOnlineSongById(id)
 
@@ -28,6 +32,22 @@ class OnlineSongRepository(
     suspend fun updateOnlineSong(song: OnlineSong) = onlineSongDao.updateOnlineSong(song)
 
     suspend fun deleteOnlineSong(song: OnlineSong) = onlineSongDao.deleteOnlineSong(song)
+    
+    /**
+     * Mark an online song as played (when played for 5+ seconds)
+     * This adds it to the online song history section
+     */
+    suspend fun markAsPlayed(videoId: String) {
+        onlineSongDao.updatePlayedStatus(videoId, true)
+    }
+    
+    /**
+     * Mark an online song as fully played
+     * If offline storage is enabled, this can trigger auto-save
+     */
+    suspend fun markAsFullyPlayed(videoId: String) {
+        onlineSongDao.updateFullyPlayedStatus(videoId, true)
+    }
 
     fun saveSong(song: OnlineSong, url: String) {
         // Download to internal storage

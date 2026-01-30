@@ -17,7 +17,7 @@ import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
 import com.just_for_fun.synctax.presentation.components.card.OnlineHistoryCarousel
 
 @Composable
-fun OnlineHistorySection(
+fun HistorySection(
     history: List<OnlineListeningHistory>,
     onHistoryClick: (OnlineListeningHistory) -> Unit,
     onViewAllClick: () -> Unit = {},
@@ -37,13 +37,13 @@ fun OnlineHistorySection(
         ) {
             Column {
                 Text(
-                    text = "Quick Picks",
+                    text = "Recently played songs",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Recently played online",
+                    text = "Quick Picks",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -52,7 +52,7 @@ fun OnlineHistorySection(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (history.size > 0) {
+                if (history.isNotEmpty()) {
                     TextButton(onClick = onViewAllClick) {
                         Text(
                             "View all",

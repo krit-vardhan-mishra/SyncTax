@@ -132,11 +132,17 @@ fun AlbumArtCarousel(
         pageCount = { queue.size }
     )
 
+    // Track if we're programmatically scrolling to prevent sync loops
+    var isProgrammaticScroll by remember { mutableStateOf(false) }
+
     // 1. Sync Pager with Current Song (External Changes - e.g., Next button, song ends)
     LaunchedEffect(currentSong.id) {
         val index = queue.indexOfFirst { it.id == currentSong.id }
         if (index >= 0 && pagerState.currentPage != index) {
+            isProgrammaticScroll = true
             pagerState.animateScrollToPage(index)
+            // Reset flag after animation completes
+            isProgrammaticScroll = false
         }
     }
 
@@ -146,8 +152,8 @@ fun AlbumArtCarousel(
     LaunchedEffect(pagerState) {
         // snapshotFlow detects when the swipe "settles" on a new page
         snapshotFlow { pagerState.settledPage }.collect { page ->
-            // Check against currentSongState.value to avoid stale reference bugs
-            if (page in queue.indices && queue[page].id != currentSongState.value.id) {
+            // Only trigger song change if it's a user swipe, not programmatic scroll
+            if (!isProgrammaticScroll && page in queue.indices && queue[page].id != currentSongState.value.id) {
                 onSongSelected(queue[page])
             }
         }
@@ -240,24 +246,7 @@ fun AlbumArtCarousel(
 
                         // Only show gesture layers on current page
                         if (page == pagerState.currentPage) {
-                            // Vertical Volume Drag Layer
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectVerticalDragGestures { change, dragAmount ->
-                                            change.consume()
-                                            val volumeChange = -dragAmount * 0.002f
-                                            val newVolume =
-                                                (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
-                                            overlayVolume = newVolume
-                                            showVolume = true
-                                            onSetVolume(newVolume)
-                                        }
-                                    }
-                            )
-
-                            // Tap Gesture Layer (Seek & Play/Pause & Lyrics Toggle)
+                            // Combined Gesture Layer (Tap & Vertical Drag)
                             Row(modifier = Modifier.fillMaxSize()) {
                                 // Double Tap Left: Rewind
                                 Box(
@@ -277,6 +266,18 @@ fun AlbumArtCarousel(
                                                 }
                                             )
                                         }
+                                        // Vertical drag for volume - commented out as requested
+                                        // .pointerInput(Unit) {
+                                        //     detectVerticalDragGestures { change, dragAmount ->
+                                        //         change.consume()
+                                        //         val volumeChange = -dragAmount * 0.002f
+                                        //         val newVolume =
+                                        //             (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
+                                        //         overlayVolume = newVolume
+                                        //         showVolume = true
+                                        //         onSetVolume(newVolume)
+                                        //     }
+                                        // }
                                 )
                                 // Double Tap Center: Play/Pause
                                 Box(
@@ -290,10 +291,23 @@ fun AlbumArtCarousel(
                                                 },
                                                 onDoubleTap = {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    showPlayPause = true
                                                     onPlayPauseClick()
                                                 }
                                             )
                                         }
+                                        // Vertical drag for volume - commented out as requested
+                                        // .pointerInput(Unit) {
+                                        //     detectVerticalDragGestures { change, dragAmount ->
+                                        //         change.consume()
+                                        //         val volumeChange = -dragAmount * 0.002f
+                                        //         val newVolume =
+                                        //             (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
+                                        //         overlayVolume = newVolume
+                                        //         showVolume = true
+                                        //         onSetVolume(newVolume)
+                                        //     }
+                                        // }
                                 )
                                 // Double Tap Right: Forward
                                 Box(
@@ -314,6 +328,18 @@ fun AlbumArtCarousel(
                                                 }
                                             )
                                         }
+                                        // Vertical drag for volume - commented out as requested
+                                        // .pointerInput(Unit) {
+                                        //     detectVerticalDragGestures { change, dragAmount ->
+                                        //         change.consume()
+                                        //         val volumeChange = -dragAmount * 0.002f
+                                        //         val newVolume =
+                                        //             (overlayVolume + volumeChange).coerceIn(0.0f, 1.0f)
+                                        //         overlayVolume = newVolume
+                                        //         showVolume = true
+                                        //         onSetVolume(newVolume)
+                                        //     }
+                                        // }
                                 )
                             }
 

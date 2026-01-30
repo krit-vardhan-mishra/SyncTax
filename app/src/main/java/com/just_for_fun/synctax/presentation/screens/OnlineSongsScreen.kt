@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +46,8 @@ fun OnlineSongsScreen(
     userPreferences: UserPreferences,
     homeViewModel: com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel,
     onOpenSettings: () -> Unit = {},
-    onShuffleClick: () -> Unit = {}
+    onShuffleClick: () -> Unit = {},
+    onNavigateBack: () -> Unit = {}
 ) {
     val uiState by onlineSongsViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -90,6 +90,7 @@ fun OnlineSongsScreen(
                 showSortButton = false,
                 showRefreshButton = false,
                 onShuffleClick = onShuffleClick,
+                onNavigateBack = onNavigateBack,
                 userPreferences = userPreferences,
                 userName = userName,
                 userInitial = userInitial,

@@ -29,5 +29,7 @@ data class OnlineSong(
     val sourcePlatform: String = "YouTube",
     val addedAt: Long = System.currentTimeMillis(),
     val isSaved: Boolean = false, // Saved to internal storage
-    val isDownloaded: Boolean = false // Downloaded to external storage
+    val isDownloaded: Boolean = false, // Downloaded to external storage
+    val isPlayed: Boolean = false, // True when played for 5+ seconds (adds to history)
+    val isFullyPlayed: Boolean = false // True when played fully (can trigger auto-save if enabled)
 )
