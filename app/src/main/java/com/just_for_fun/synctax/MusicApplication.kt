@@ -18,6 +18,7 @@ import com.chaquo.python.android.AndroidPlatform
 import com.just_for_fun.synctax.core.network.NewPipeUtils
 import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import com.just_for_fun.synctax.core.worker.RecommendationUpdateWorker
+import com.just_for_fun.synctax.core.worker.scheduleUpdateCheckIfEnabled
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +71,14 @@ class MusicApplication : Application(), ImageLoaderFactory {
             Log.d(TAG, "✅ Recommendation worker scheduled")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to schedule recommendation worker", e)
+        }
+
+        // Schedule periodic update checks (every 12 hours)
+        try {
+            scheduleUpdateCheckIfEnabled()
+            Log.d(TAG, "✅ Update check worker scheduled")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to schedule update check worker", e)
         }
 
         Log.d(TAG, "Music Application initialized")

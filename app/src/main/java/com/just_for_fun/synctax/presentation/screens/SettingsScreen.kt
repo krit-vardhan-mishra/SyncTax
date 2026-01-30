@@ -919,21 +919,11 @@ fun SettingsScreen(
                 }
             }
 
-            // --- Library Updates ---
+            // --- Updates Section (App & Library Updates) ---
             item {
-                com.just_for_fun.synctax.core.ui.LibraryUpdateSection(
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-
-            // --- Check for Updates ---
-            item {
-                Button(
-                    onClick = onCheckForUpdate,
+                com.just_for_fun.synctax.core.ui.UpdateSettingsSection(
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Check for Updates")
-                }
+                )
             }
 
             item {
