@@ -5,10 +5,14 @@ import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.repository.MusicRepository
 import com.just_for_fun.synctax.core.ml.MusicRecommendationManager
 import com.just_for_fun.synctax.core.ml.SkipPattern
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import android.util.Log
 
 /**
  * Centralized queue manager for handling playback queue operations.
@@ -148,32 +152,60 @@ class QueueManager(
 
     /**
      * Play a specific song from the queue
-     * Removes all songs before the selected song
+     * Handles both forward (from currentPlaylist) and backward (from playHistory) navigation
      */
     fun playFromQueue(song: Song): Song? {
         val state = _queueState.value
-        val songIndex = state.currentPlaylist.indexOf(song)
+        
+        // First, check if song is in currentPlaylist (forward navigation)
+        val songIndexInPlaylist = state.currentPlaylist.indexOfFirst { it.id == song.id }
+        
+        if (songIndexInPlaylist != -1) {
+            // Song is in current playlist (forward navigation or current song)
+            if (songIndexInPlaylist > 0) {
+                // Add songs before selected song to history
+                val songsToHistory = state.currentPlaylist.subList(0, songIndexInPlaylist)
+                val updatedHistory = (state.playHistory + songsToHistory).takeLast(50)
+                
+                // Remove songs before the selected song from queue
+                val updatedPlaylist = state.currentPlaylist.subList(songIndexInPlaylist, state.currentPlaylist.size)
 
-        if (songIndex == -1) return null
-
-        // Add songs before selected song to history
-        if (songIndex > 0) {
-            val songsToHistory = state.currentPlaylist.subList(0, songIndex)
-            val updatedHistory = (state.playHistory + songsToHistory).takeLast(50)
+                _queueState.value = state.copy(
+                    currentPlaylist = updatedPlaylist,
+                    currentIndex = 0,
+                    playHistory = updatedHistory
+                )
+            } else {
+                _queueState.value = state.copy(currentIndex = songIndexInPlaylist)
+            }
+            return getCurrentSong()
+        }
+        
+        // Check if song is in playHistory (backward navigation - swiping to previous songs)
+        val songIndexInHistory = state.playHistory.indexOfFirst { it.id == song.id }
+        
+        if (songIndexInHistory != -1) {
+            // Song is in history - need to move it back to current playlist
+            // Songs after it in history should go back to playlist too
+            val songsToRestore = state.playHistory.subList(songIndexInHistory, state.playHistory.size)
+            val remainingHistory = if (songIndexInHistory > 0) {
+                state.playHistory.subList(0, songIndexInHistory)
+            } else {
+                emptyList()
+            }
             
-            // Remove songs before the selected song from queue
-            val updatedPlaylist = state.currentPlaylist.subList(songIndex, state.currentPlaylist.size)
-
+            // Restore songs to beginning of playlist (selected song + songs that were after it)
+            val updatedPlaylist = songsToRestore + state.currentPlaylist
+            
             _queueState.value = state.copy(
                 currentPlaylist = updatedPlaylist,
                 currentIndex = 0,
-                playHistory = updatedHistory
+                playHistory = remainingHistory
             )
-        } else {
-            _queueState.value = state.copy(currentIndex = songIndex)
+            return getCurrentSong()
         }
 
-        return getCurrentSong()
+        return null
     }
 
     /**
@@ -273,23 +305,61 @@ class QueueManager(
      * - Skip penalty for frequently skipped songs
      * - Diversity constraints (no same artist in sequence)
      * - Exploration factor (15% random for discovery)
+     * 
+     * NOTE: This is the player shuffle that uses intelligent algorithm.
+     * App bar shuffle uses playSongShuffled() for random order.
      */
     fun shuffle() {
         val state = _queueState.value
         val currentSong = getCurrentSong() ?: return
 
-        // Remove current song and shuffle remaining
-        val songsToShuffle = state.currentPlaylist.toMutableList().apply {
-            remove(currentSong)
-        }.shuffled()
+        if (useIntelligentShuffle && state.currentPlaylist.size > 1) {
+            // Use intelligent shuffle in a coroutine
+            Log.d("QueueManager", "🧠 SHUFFLE: Using INTELLIGENT shuffle algorithm (Markov chain + skip penalty + diversity)")
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    val songsToShuffle = state.currentPlaylist.toMutableList().apply {
+                        remove(currentSong)
+                    }
+                    
+                    // Generate intelligent queue from remaining songs
+                    val shuffledRemaining = recommendationManager.generateIntelligentShuffleQueue(
+                        songs = songsToShuffle,
+                        currentSongId = currentSong.id,
+                        recentlyPlayed = state.playHistory.map { it.id }
+                    )
+                    
+                    // Keep current song at front
+                    val finalQueue = listOf(currentSong) + shuffledRemaining
+                    
+                    _queueState.value = state.copy(
+                        currentPlaylist = finalQueue,
+                        currentIndex = 0
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Fallback to simple shuffle on error
+                    val shuffledPlaylist = listOf(currentSong) + state.currentPlaylist.filter { it.id != currentSong.id }.shuffled()
+                    _queueState.value = state.copy(
+                        currentPlaylist = shuffledPlaylist,
+                        currentIndex = 0
+                    )
+                }
+            }
+        } else {
+            // Simple random shuffle (fallback or when intelligent shuffle disabled)
+            Log.d("QueueManager", "🎲 SHUFFLE: Using RANDOM shuffle algorithm (simple shuffled())")
+            val songsToShuffle = state.currentPlaylist.toMutableList().apply {
+                remove(currentSong)
+            }.shuffled()
 
-        // Place current song at the beginning
-        val shuffledPlaylist = listOf(currentSong) + songsToShuffle
+            val shuffledPlaylist = listOf(currentSong) + songsToShuffle
 
-        _queueState.value = state.copy(
-            currentPlaylist = shuffledPlaylist,
-            currentIndex = 0
-        )
+            _queueState.value = state.copy(
+                currentPlaylist = shuffledPlaylist,
+                currentIndex = 0
+            )
+        }
     }
 
     /**

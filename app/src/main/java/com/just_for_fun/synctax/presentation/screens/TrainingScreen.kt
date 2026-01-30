@@ -31,6 +31,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,9 +40,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,6 +73,16 @@ fun TrainingScreen(
     onBackClick: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    // Handle refresh completion
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            homeViewModel.forceRefreshLibrary()
+            isRefreshing = false
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -85,15 +102,30 @@ fun TrainingScreen(
             )
         }
     ) { paddingValues ->
-        OptimizedLazyColumn(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { isRefreshing = true },
+            state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(paddingValues),
+            indicator = {
+                androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         ) {
-            // NEW: Training Quality Indicator
-            item {
+            OptimizedLazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // NEW: Training Quality Indicator
+                item {
                 TrainingQualityCard(uiState.trainingStatistics)
             }
 
@@ -160,7 +192,8 @@ fun TrainingScreen(
             item {
                 Spacer(Modifier.height(80.dp))
             }
-        }
+        } // End OptimizedLazyColumn
+        } // End PullToRefreshBox
     }
 }
 
@@ -244,7 +277,7 @@ private fun TrainingControlCard(uiState: HomeUiState, viewModel: HomeViewModel) 
                         style = MaterialTheme.typography.bodyMedium
                     )
                     LinearProgressIndicator(
-                        progress = uiState.trainingProgress,
+                        progress = { uiState.trainingProgress },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(
@@ -472,7 +505,7 @@ private fun RecommendationConfidenceCard(topSongs: List<SongPlayCount>) {
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     LinearProgressIndicator(
-                        progress = count.toFloat() / topSongs.size,
+                        progress = { count.toFloat() / topSongs.size },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(8.dp),
@@ -750,7 +783,7 @@ private fun TrainingSessionRow(session: TrainingSession) {
             tint = if (session.success) Color.Green else Color.Red
         )
     }
-    Divider(modifier = Modifier.padding(vertical = 4.dp))
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 }
 
 @Composable
@@ -791,7 +824,7 @@ private fun TopSongsCard(topSongs: List<SongPlayCount>) {
                     )
                 }
                 if (index < topSongs.size - 1) {
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
             }
         }

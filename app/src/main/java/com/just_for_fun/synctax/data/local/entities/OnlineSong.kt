@@ -13,7 +13,9 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["videoId"], unique = true),
         Index(value = ["title"]),
-        Index(value = ["artist"])
+        Index(value = ["artist"]),
+        Index(value = ["isSaved"]),
+        Index(value = ["isDownloaded"])
     ]
 )
 data class OnlineSong(
@@ -25,5 +27,7 @@ data class OnlineSong(
     val thumbnailUrl: String? = null,
     val duration: Int? = null, // duration in seconds
     val sourcePlatform: String = "YouTube",
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    val isSaved: Boolean = false, // Saved to internal storage
+    val isDownloaded: Boolean = false // Downloaded to external storage
 )

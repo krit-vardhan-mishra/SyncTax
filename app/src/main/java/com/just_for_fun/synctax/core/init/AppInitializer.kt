@@ -343,18 +343,28 @@ object AppInitializer {
                     lastPlayedSong = lastPlayedSong,
                     lastPlayedStreamUrl = lastPlayedStreamUrl
                 )
-                
-                // Phase 13: Ensure minimum splash duration for smooth progress bar
+
+                // Phase 13: Schedule library update checks
+                updateProgress("Setting up updates...", 0.95f)
+                try {
+                    com.just_for_fun.synctax.core.service.LibraryUpdateCheckWorker.schedulePeriodicCheck(context)
+                    Log.d(TAG, "Phase 13 complete: Scheduled library update checks")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to schedule library update checks: ${e.message}")
+                }
+
+                // Phase 14: Ensure minimum splash duration for smooth progress bar
+                updateProgress("Almost ready...", 0.97f)
                 updateProgress("Almost ready...", 0.95f)
                 val elapsed = System.currentTimeMillis() - startTime
                 if (elapsed < MIN_SPLASH_DURATION_MS) {
                     val remaining = MIN_SPLASH_DURATION_MS - elapsed
                     // Animate progress smoothly during wait
                     val steps = (remaining / 100).toInt().coerceAtLeast(1)
-                    val progressPerStep = (1f - 0.95f) / steps
+                    val progressPerStep = (1f - 0.97f) / steps
                     repeat(steps) { i ->
                         delay(remaining / steps)
-                        updateProgress("Almost ready...", 0.95f + (progressPerStep * (i + 1)))
+                        updateProgress("Almost ready...", 0.97f + (progressPerStep * (i + 1)))
                     }
                 }
                 

@@ -62,9 +62,23 @@ fun RecommendationsDetailScreen(
             )
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
+        val pullToRefreshState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { recommendationViewModel.refreshRecommendations() },
+            state = pullToRefreshState,
+            modifier = Modifier.fillMaxSize().padding(padding),
+            indicator = {
+                androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = isLoading,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    color = androidx.compose.ui.graphics.Color(0xFFFF0033)
+                )
+            }
+        ) {
             when {
-                isLoading -> {
+                isLoading && recommendations == null -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center

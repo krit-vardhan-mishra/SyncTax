@@ -63,6 +63,7 @@ fun OnlineSongCard(
     isPlaying: Boolean = false,
     onRemoveFromHistory: ((OnlineListeningHistory) -> Unit)? = null,
     onAddToQueue: ((OnlineListeningHistory) -> Unit)? = null,
+    onSave: ((OnlineListeningHistory) -> Unit)? = null,
     onDownload: ((OnlineListeningHistory) -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
@@ -71,7 +72,7 @@ fun OnlineSongCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Create comprehensive options for the dialog
-    val dialogOptions = remember(history, onRemoveFromHistory, onAddToQueue, onDownload) {
+    val dialogOptions = remember(history, onRemoveFromHistory, onAddToQueue, onSave, onDownload) {
         mutableListOf<DialogOption>().apply {
             // Play Now option
             add(DialogOption(
@@ -98,6 +99,24 @@ fun OnlineSongCard(
                     icon = {
                         Icon(
                             Icons.AutoMirrored.Filled.QueueMusic,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    onClick = { it(history) }
+                ))
+            }
+            
+            // Save option (save to app data)
+            onSave?.let {
+                add(DialogOption(
+                    id = "save",
+                    title = "Save",
+                    subtitle = "Save to app data",
+                    icon = {
+                        Icon(
+                            Icons.Default.Download, // You can use a different icon
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)

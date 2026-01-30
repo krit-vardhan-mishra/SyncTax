@@ -1911,7 +1911,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val queueState = queueManager.queueState.value
 
             if (queueState.currentPlaylist.isNotEmpty()) {
-                // Use queue manager to shuffle
+                // Use queue manager to shuffle (intelligent shuffle via QueueManager.shuffle())
+                Log.d("PlayerViewModel", "🧠 SHUFFLE: Player toggle - Triggering INTELLIGENT shuffle via QueueManager")
                 queueManager.shuffle()
 
                 // Update UI state
@@ -1951,6 +1952,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (playlist.isEmpty()) return@launch
 
             // Shuffle the playlist
+            Log.d("PlayerViewModel", "🎲 SHUFFLE: App bar/Library - Using RANDOM shuffle")
             val shuffledPlaylist = playlist.shuffled()
 
             // Start playing from the first song in shuffled list

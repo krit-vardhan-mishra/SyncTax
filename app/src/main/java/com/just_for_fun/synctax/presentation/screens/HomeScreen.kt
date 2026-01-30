@@ -3,40 +3,36 @@ package com.just_for_fun.synctax.presentation.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.rounded.QueueMusic
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -46,16 +42,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
@@ -66,15 +66,16 @@ import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDial
 import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
 import com.just_for_fun.synctax.presentation.components.section.EmptyRecommendationsPrompt
+import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
 import com.just_for_fun.synctax.presentation.components.section.OnlineHistorySection
-import com.just_for_fun.synctax.presentation.components.section.RecommendationsSection
-import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
 import com.just_for_fun.synctax.presentation.components.section.QuickAccessGrid
+import com.just_for_fun.synctax.presentation.components.section.QuickShortcutsRow
+import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
+import com.just_for_fun.synctax.presentation.components.section.RecommendationsSection
 import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSection
 import com.just_for_fun.synctax.presentation.components.section.SectionHeader
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.presentation.components.section.SpeedDialSection
-import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
 import com.just_for_fun.synctax.presentation.components.utils.SortOption
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.dynamic.DynamicGreetingSection
@@ -138,7 +139,9 @@ fun HomeScreen(
     onNavigateToOnlineSongs: () -> Unit = {},
     onNavigateToRecommendations: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
-    onNavigateToStats: () -> Unit = {}
+    onNavigateToStats: () -> Unit = {},
+    onNavigateToListenedArtists: () -> Unit = {},
+    onNavigateToArtistDetail: (String) -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -157,10 +160,6 @@ fun HomeScreen(
 
     // Sorting state for All Songs section
     var currentSortOption by remember { mutableStateOf(SortOption.TITLE_ASC) }
-
-    // Snackbar state
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
 
     val listState = rememberLazyListState()
     var hasScrolledToBottom by remember { mutableStateOf(false) }
@@ -218,17 +217,64 @@ fun HomeScreen(
         }
     }
 
-    // Collect error messages from player view model
-    LaunchedEffect(Unit) {
-        playerViewModel.errorMessages.collect { message ->
-            SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
+    // Fetch artist photos once when artists list changes
+    LaunchedEffect(uiState.artists, uiState.onlineHistory) {
+        val artistNames = mutableListOf<String>()
+
+        // Collect offline artist names - split by comma and clean up
+        uiState.artists.take(5).forEach { artist ->
+            artist.name.split(",")
+                .map { it.trim() }
+                .map { name ->
+                    // Clean up common prefixes/suffixes
+                    name.removePrefix("and ")
+                        .removePrefix("& ")
+                        .removePrefix("feat. ")
+                        .removePrefix("ft. ")
+                        .trim()
+                }
+                .filter { it.isNotEmpty() }
+                .forEach { artistName ->
+                    artistNames.add(artistName)
+                }
+        }
+
+        // Collect online artist names - split by comma and clean up
+        uiState.onlineHistory
+            .groupBy { it.artist }
+            .keys
+            .take(5)
+            .forEach { artistString ->
+                artistString.split(",")
+                    .map { it.trim() }
+                    .map { name ->
+                        // Clean up common prefixes/suffixes
+                        name.removePrefix("and ")
+                            .removePrefix("& ")
+                            .removePrefix("feat. ")
+                            .removePrefix("ft. ")
+                            .trim()
+                    }
+            }
+
+        // Fetch photos for unique artists
+        val uniqueArtists = artistNames.distinct().take(5)
+        if (uniqueArtists.isNotEmpty()) {
+            homeViewModel.fetchAllArtistPhotos(uniqueArtists)
         }
     }
+
+    // Collect error messages from player view model - moved to global level
+    // LaunchedEffect(Unit) {
+    //     playerViewModel.errorMessages.collect { message ->
+    //         SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, message)
+    //     }
+    // }
 
     // Show error from uiState via Snackbar (auto-dismiss)
     LaunchedEffect(uiState.error) {
         uiState.error?.takeIf { it.isNotBlank() }?.let { error ->
-            SnackbarUtils.ShowSnackbar(coroutineScope, snackbarHostState, error)
+            SnackbarUtils.showGlobalSnackbar(message = error)
             homeViewModel.dismissError()
         }
     }
@@ -238,15 +284,16 @@ fun HomeScreen(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 SimpleDynamicMusicTopAppBar(
-                    title = "Music",
+                    title = "Synctax",
                     albumColors = albumColors,
                     showShuffleButton = true,
                     showRefreshButton = false,
                     showProfileButton = true,
                     onShuffleClick = {
                         if (uiState.allSongs.isNotEmpty()) {
-                            // Use smart shuffle with recommendations on Home screen
-                            playerViewModel.shufflePlayWithRecommendations(uiState.allSongs)
+                            // Use simple random shuffle on Home screen app bar (per RECOMMENDATION_LOGIC_NEW.md)
+                            // Intelligent shuffle is used during playback via toggleShuffle()
+                            playerViewModel.playSongShuffled(uiState.allSongs)
                         }
                     },
                     onRefreshClick = { homeViewModel.scanMusic() },
@@ -278,18 +325,65 @@ fun HomeScreen(
                 LaunchedEffect(Unit) {
                     isVisible = true
                 }
-                
+
                 // Pull-to-refresh state
                 var isRefreshing by remember { mutableStateOf(false) }
                 val pullToRefreshState = rememberPullToRefreshState()
-                
-                // Update isRefreshing when scanning completes
+
+                // Update isRefreshing when scanning completes and refresh artist photos
                 LaunchedEffect(uiState.isScanning) {
                     if (!uiState.isScanning && isRefreshing) {
+                        // Refresh complete - re-fetch artist photos
+                        val artistNames = mutableListOf<String>()
+
+                        // Collect offline artist names - split by comma and clean up
+                        uiState.artists.take(5).forEach { artist ->
+                            artist.name.split(",")
+                                .map { it.trim() }
+                                .map { name ->
+                                    // Clean up common prefixes/suffixes
+                                    name.removePrefix("and ")
+                                        .removePrefix("& ")
+                                        .removePrefix("feat. ")
+                                        .removePrefix("ft. ")
+                                        .trim()
+                                }
+                                .filter { it.isNotEmpty() }
+                                .forEach { artistName ->
+                                    artistNames.add(artistName)
+                                }
+                        }
+
+                        // Collect online artist names - split by comma and clean up
+                        uiState.onlineHistory
+                            .groupBy { it.artist }
+                            .keys
+                            .take(5)
+                            .forEach { artistString ->
+                                artistString.split(",")
+                                    .map { it.trim() }
+                                    .map { name ->
+                                        // Clean up common prefixes/suffixes
+                                        name.removePrefix("and ")
+                                            .removePrefix("& ")
+                                            .removePrefix("feat. ")
+                                            .removePrefix("ft. ")
+                                            .trim()
+                                    }
+                                    .filter { it.isNotEmpty() }
+                                    .forEach { artistName ->
+                                        artistNames.add(artistName)
+                                    }
+                            }
+
+                        val uniqueArtists = artistNames.distinct().take(5)
+                        if (uniqueArtists.isNotEmpty()) {
+                            homeViewModel.refreshArtistPhotos(uniqueArtists)
+                        }
                         isRefreshing = false
                     }
                 }
-                
+
                 AnimatedVisibility(
                     visible = isVisible,
                     enter = fadeIn(animationSpec = tween(600)) +
@@ -316,419 +410,490 @@ fun HomeScreen(
                             state = listState,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                        // Greeting Section with dynamic colors
-                        if (userName.isNotEmpty()) {
-                            item(
-                                key = "header",
-                                contentType = "header"
-                            ) {
-                                DynamicGreetingSection(
-                                    userName = userName,
-                                    albumColors = albumColors,
-                                    greetingTextColor = greetingTextColor,
-                                    userNameColor = sectionTitleColor,
-                                    subGreetingColor = sectionSubtitleColor
-                                )
-                            }
-                        }
-
-                        // Filter Chips
-                        item(
-                            key = "filter_chips",
-                            contentType = "filter"
-                        ) {
-                            FilterChipsRow(
-                                selectedChip = selectedFilter,
-                                onChipSelected = { chip -> selectedFilter = chip }
-                            )
-                        }
-
-                        // Quick Picks Section - Now shows online listening history
-                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                            item {
-                                OnlineHistorySection(
-                                    history = uiState.onlineHistory,
-                                    onHistoryClick = { history ->
-                                        playerViewModel.playUrl(
-                                            url = history.watchUrl,
-                                            title = history.title,
-                                            artist = history.artist,
-                                            durationMs = 0L
-                                        )
-                                    },
-                                    onViewAllClick = onNavigateToOnlineSongs,
-                                    currentVideoId = if (playerState.currentSong?.id?.startsWith(
-                                            "online:"
-                                        ) == true
-                                    )
-                                        playerState.currentSong?.id?.removePrefix("online:")
-                                    else null,
-                                    onRemoveFromHistory = { history ->
-                                        homeViewModel.deleteOnlineHistory(history.videoId)
-                                    }
-                                )
-                            }
-                        }
-
-                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                            item {
-                                SmallSpacer()
-                            }
-                        }
-
-                        // Listen Again Section (only show if there are local songs)
-                        if ((selectedFilter == "All" || selectedFilter == "Listen Again") && uiState.allSongs.isNotEmpty()) {
-                            @OptIn(ExperimentalFoundationApi::class)
-                            item(
-                                key = "listen_again",
-                                contentType = "section"
-                            ) {
-                                // State for bottom sheet dialog
-                                var showOptionsDialog by remember { mutableStateOf(false) }
-                                var selectedSong by remember {
-                                    mutableStateOf<com.just_for_fun.synctax.data.local.entities.Song?>(
-                                        null
-                                    )
-                                }
-                                val haptic = LocalHapticFeedback.current
-
-                                SectionHeader(
-                                    title = "Listen again",
-                                    subtitle = null,
-                                    onViewAllClick = null,
-                                    titleColor = sectionTitleColor,
-                                    subtitleColor = sectionSubtitleColor
-                                )
-
-                                val songsPerPage = 4
-                                val shuffledSongs = remember(uiState.allSongs) {
-                                    uiState.allSongs.take(16).shuffled()
-                                }
-                                val pages = shuffledSongs.chunked(songsPerPage)
-
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    contentPadding = PaddingValues(horizontal = 16.dp)
+                            // Greeting Section with dynamic colors
+                            if (userName.isNotEmpty()) {
+                                item(
+                                    key = "header",
+                                    contentType = "header"
                                 ) {
-                                    items(
-                                        count = pages.size,
-                                        key = { pageIndex -> "listen_again_page_$pageIndex" }
-                                    ) { pageIndex ->
-                                        Column(
-                                            modifier = Modifier
-                                                .fillParentMaxWidth()
-                                                .padding(vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            pages[pageIndex].forEach { song ->
-                                                SimpleSongCard(
-                                                    song = song,
-                                                    onClick = {
-                                                        playerViewModel.playSong(
-                                                            song,
-                                                            uiState.allSongs
-                                                        )
-                                                    },
-                                                    onLongClick = {
-                                                        haptic.performHapticFeedback(
-                                                            HapticFeedbackType.LongPress
-                                                        )
-                                                        selectedSong = song
-                                                        showOptionsDialog = true
-                                                    }
-                                                )
+                                    DynamicGreetingSection(
+                                        userName = userName,
+                                        albumColors = albumColors,
+                                        greetingTextColor = greetingTextColor,
+                                        userNameColor = sectionTitleColor,
+                                        subGreetingColor = sectionSubtitleColor
+                                    )
+                                }
+                            }
+
+                            // Filter Chips
+                            item(
+                                key = "filter_chips",
+                                contentType = "filter"
+                            ) {
+                                FilterChipsRow(
+                                    selectedChip = selectedFilter,
+                                    onChipSelected = { chip -> selectedFilter = chip }
+                                )
+                            }
+
+                            // Shortcuts Section
+                            item(key = "shortcuts", contentType = "shortcuts") {
+                                QuickShortcutsRow(
+                                    onTrainClick = onTrainClick,
+                                    onHistoryClick = onNavigateToHistory,
+                                    onStatsClick = onNavigateToStats,
+                                    onSavedSongsClick = onNavigateToOnlineSongs,
+                                    modifier = Modifier.padding(vertical = 16.dp)
+                                )
+                            }
+
+                            // Artist Section
+                            if (uiState.artists.isNotEmpty() || uiState.onlineHistory.isNotEmpty()) {
+                                item(key = "artists", contentType = "artists") {
+                                    SectionHeader(
+                                        title = "Artists",
+                                        onViewAllClick = onNavigateToListenedArtists,
+                                        titleColor = sectionTitleColor
+                                    )
+
+                                    // Combine offline and online artists with cached photos
+                                    val offlineArtists = uiState.artists.take(5).map {
+                                        com.just_for_fun.synctax.presentation.model.ArtistUiModel(
+                                            name = it.name,
+                                            songCount = it.songCount,
+                                            isOnline = false,
+                                            imageUrl = uiState.artistPhotos[it.name] // Use cached photo
+                                        )
+                                    }
+
+                                    // Extract unique online artists from history with cached photos
+                                    val onlineArtists = uiState.onlineHistory
+                                        .groupBy { it.artist }
+                                        .map { (name, history) ->
+                                            com.just_for_fun.synctax.presentation.model.ArtistUiModel(
+                                                name = name,
+                                                songCount = history.size,
+                                                isOnline = true,
+                                                imageUrl = uiState.artistPhotos[name] // Use cached photo
+                                            )
+                                        }
+                                        .sortedByDescending { it.songCount }
+                                        .take(5)
+
+                                    // Merge and show up to 5 total (Offline first, then Online) (Modified per user request)
+                                    val displayArtists =
+                                        (offlineArtists + onlineArtists).distinctBy { it.name }
+                                            .take(5)
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        modifier = Modifier.padding(bottom = 16.dp)
+                                    ) {
+                                        items(displayArtists) { artist ->
+                                            ArtistCard(
+                                                artist = artist,
+                                                isLoading = uiState.isLoadingArtistPhotos && artist.imageUrl == null,
+                                                onClick = {
+                                                    onNavigateToArtistDetail(artist.name)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Quick Picks Section - Now shows online listening history
+                            if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                                item {
+                                    OnlineHistorySection(
+                                        history = uiState.onlineHistory,
+                                        onHistoryClick = { history ->
+                                            playerViewModel.playUrl(
+                                                url = history.watchUrl,
+                                                title = history.title,
+                                                artist = history.artist,
+                                                durationMs = 0L
+                                            )
+                                        },
+                                        onViewAllClick = onNavigateToOnlineSongs,
+                                        currentVideoId = if (playerState.currentSong?.id?.startsWith(
+                                                "online:"
+                                            ) == true
+                                        )
+                                            playerState.currentSong?.id?.removePrefix("online:")
+                                        else null,
+                                        onRemoveFromHistory = { history ->
+                                            homeViewModel.deleteOnlineHistory(history.videoId)
+                                        }
+                                    )
+                                }
+                            }
+
+                            if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                                item {
+                                    SmallSpacer()
+                                }
+                            }
+
+                            // Listen Again Section (only show if there are local songs)
+                            if ((selectedFilter == "All" || selectedFilter == "Listen Again") && uiState.allSongs.isNotEmpty()) {
+                                @OptIn(ExperimentalFoundationApi::class)
+                                item(
+                                    key = "listen_again",
+                                    contentType = "section"
+                                ) {
+                                    // State for bottom sheet dialog
+                                    var showOptionsDialog by remember { mutableStateOf(false) }
+                                    var selectedSong by remember {
+                                        mutableStateOf<com.just_for_fun.synctax.data.local.entities.Song?>(
+                                            null
+                                        )
+                                    }
+                                    val haptic = LocalHapticFeedback.current
+
+                                    SectionHeader(
+                                        title = "Listen again",
+                                        subtitle = null,
+                                        onViewAllClick = null,
+                                        titleColor = sectionTitleColor,
+                                        subtitleColor = sectionSubtitleColor
+                                    )
+
+                                    val songsPerPage = 4
+                                    val shuffledSongs = remember(uiState.allSongs) {
+                                        uiState.allSongs.take(16).shuffled()
+                                    }
+                                    val pages = shuffledSongs.chunked(songsPerPage)
+
+                                    LazyRow(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        contentPadding = PaddingValues(horizontal = 16.dp)
+                                    ) {
+                                        items(
+                                            count = pages.size,
+                                            key = { pageIndex -> "listen_again_page_$pageIndex" }
+                                        ) { pageIndex ->
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillParentMaxWidth()
+                                                    .padding(vertical = 8.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                pages[pageIndex].forEach { song ->
+                                                    SimpleSongCard(
+                                                        song = song,
+                                                        onClick = {
+                                                            playerViewModel.playSong(
+                                                                song,
+                                                                uiState.allSongs
+                                                            )
+                                                        },
+                                                        onLongClick = {
+                                                            haptic.performHapticFeedback(
+                                                                HapticFeedbackType.LongPress
+                                                            )
+                                                            selectedSong = song
+                                                            showOptionsDialog = true
+                                                        }
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                // Create options for the dialog
-                                val dialogOptions = remember(selectedSong, uiState.favoriteSongs) {
-                                    selectedSong?.let { song ->
-                                        val isFavorite = uiState.favoriteSongs.any { it.id == song.id }
-                                        mutableListOf<DialogOption>().apply {
-                                            // Play option
-                                            add(
-                                                DialogOption(
-                                                    id = "play",
-                                                    title = "Play",
-                                                    subtitle = "Play this song",
-                                                    icon = {
-                                                        Icon(
-                                                            Icons.Default.PlayArrow,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(20.dp)
+                                    // Create options for the dialog
+                                    val dialogOptions =
+                                        remember(selectedSong, uiState.favoriteSongs) {
+                                            selectedSong?.let { song ->
+                                                val isFavorite =
+                                                    uiState.favoriteSongs.any { it.id == song.id }
+                                                mutableListOf<DialogOption>().apply {
+                                                    // Play option
+                                                    add(
+                                                        DialogOption(
+                                                            id = "play",
+                                                            title = "Play",
+                                                            subtitle = "Play this song",
+                                                            icon = {
+                                                                Icon(
+                                                                    Icons.Default.PlayArrow,
+                                                                    contentDescription = null,
+                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(20.dp)
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                playerViewModel.playSong(
+                                                                    song,
+                                                                    uiState.allSongs
+                                                                )
+                                                            }
                                                         )
-                                                    },
-                                                    onClick = {
-                                                        playerViewModel.playSong(
-                                                            song,
-                                                            uiState.allSongs
+                                                    )
+
+                                                    // Add to Queue option
+                                                    add(
+                                                        DialogOption(
+                                                            id = "add_to_queue",
+                                                            title = "Add to Queue",
+                                                            subtitle = "Add to end of current queue",
+                                                            icon = {
+                                                                Icon(
+                                                                    Icons.AutoMirrored.Filled.QueueMusic,
+                                                                    contentDescription = null,
+                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(20.dp)
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                playerViewModel.addToQueue(song)
+                                                            }
                                                         )
-                                                    }
-                                                )
-                                            )
-                                            
-                                            // Add to Queue option
-                                            add(
-                                                DialogOption(
-                                                    id = "add_to_queue",
-                                                    title = "Add to Queue",
-                                                    subtitle = "Add to end of current queue",
-                                                    icon = {
-                                                        Icon(
-                                                            Icons.AutoMirrored.Filled.QueueMusic,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(20.dp)
+                                                    )
+
+                                                    // Add to Favorites option
+                                                    add(
+                                                        DialogOption(
+                                                            id = "toggle_favorite",
+                                                            title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
+                                                            subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
+                                                            icon = {
+                                                                Icon(
+                                                                    if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                                                    contentDescription = null,
+                                                                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(20.dp)
+                                                                )
+                                                            },
+                                                            onClick = {
+                                                                homeViewModel.toggleFavorite(song.id)
+                                                            }
                                                         )
-                                                    },
-                                                    onClick = {
-                                                        playerViewModel.addToQueue(song)
-                                                    }
-                                                )
-                                            )
-                                            
-                                            // Add to Favorites option
-                                            add(
-                                                DialogOption(
-                                                    id = "toggle_favorite",
-                                                    title = if (isFavorite) "Remove from Favorites" else "Add to Favorites",
-                                                    subtitle = if (isFavorite) "Remove from your liked songs" else "Add to your liked songs",
-                                                    icon = {
-                                                        Icon(
-                                                            if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                                            contentDescription = null,
-                                                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(20.dp)
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        homeViewModel.toggleFavorite(song.id)
-                                                    }
-                                                )
-                                            )
+                                                    )
+                                                }
+                                            } ?: emptyList()
                                         }
-                                    } ?: emptyList()
+
+                                    // Bottom options dialog
+                                    BottomOptionsDialog(
+                                        song = selectedSong,
+                                        isVisible = showOptionsDialog,
+                                        onDismiss = { showOptionsDialog = false },
+                                        options = dialogOptions,
+                                        title = "Song Options",
+                                        description = "Choose an action for this song",
+                                        songTitle = selectedSong?.title ?: "",
+                                        songArtist = selectedSong?.artist ?: ""
+                                    )
                                 }
-
-                                // Bottom options dialog
-                                BottomOptionsDialog(
-                                    song = selectedSong,
-                                    isVisible = showOptionsDialog,
-                                    onDismiss = { showOptionsDialog = false },
-                                    options = dialogOptions,
-                                    title = "Song Options",
-                                    description = "Choose an action for this song",
-                                    songTitle = selectedSong?.title ?: "",
-                                    songArtist = selectedSong?.artist ?: ""
-                                )
-                            }
-                        }
-
-                        // Online Recommendations Section
-                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                            item {
-                                SmallSpacer()
                             }
 
-                            // Only show divider if recommendations will be displayed
-                            val shouldShowRecommendations = when {
-                                isLoadingRecommendations -> true
-                                recommendations != null -> true
-                                hasEnoughHistory -> true
-                                else -> false
-                            }
-
-                            if (shouldShowRecommendations) {
+                            // Online Recommendations Section
+                            if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
                                 item {
-                                    SectionDivider()
+                                    SmallSpacer()
                                 }
-                            }
 
-                            item(
-                                key = "recommendations",
-                                contentType = "recommendations"
-                            ) {
-                                when {
-                                    isLoadingRecommendations -> {
-                                        RecommendationSkeleton()
+                                // Only show divider if recommendations will be displayed
+                                val shouldShowRecommendations = when {
+                                    isLoadingRecommendations -> true
+                                    recommendations != null -> true
+                                    hasEnoughHistory -> true
+                                    else -> false
+                                }
+
+                                if (shouldShowRecommendations) {
+                                    item {
+                                        SectionDivider()
                                     }
+                                }
 
-                                    recommendations != null -> {
-                                        RecommendationsSection(
-                                            recommendations = recommendations!!,
-                                            onSongClick = { song ->
-                                                playerViewModel.playOnlineSongWithRecommendations(
-                                                    videoId = song.id,
-                                                    title = song.title,
-                                                    artist = song.author ?: "Unknown Artist",
-                                                    thumbnailUrl = song.thumbnailUrl
-                                                )
-                                                recommendationViewModel.trackInteraction(
-                                                    song.id,
-                                                    "played",
+                                item(
+                                    key = "recommendations",
+                                    contentType = "recommendations"
+                                ) {
+                                    when {
+                                        isLoadingRecommendations -> {
+                                            RecommendationSkeleton()
+                                        }
+
+                                        recommendations != null -> {
+                                            RecommendationsSection(
+                                                recommendations = recommendations!!,
+                                                onSongClick = { song ->
+                                                    playerViewModel.playOnlineSongWithRecommendations(
+                                                        videoId = song.id,
+                                                        title = song.title,
+                                                        artist = song.author ?: "Unknown Artist",
+                                                        thumbnailUrl = song.thumbnailUrl
+                                                    )
+                                                    recommendationViewModel.trackInteraction(
+                                                        song.id,
+                                                        "played",
+                                                        recommendationViewModel.getRecommendationReason(
+                                                            song
+                                                        )
+                                                    )
+                                                },
+                                                onViewAllClick = onNavigateToRecommendations,
+                                                getRecommendationReason = { song ->
                                                     recommendationViewModel.getRecommendationReason(
                                                         song
                                                     )
-                                                )
-                                            },
-                                            onViewAllClick = onNavigateToRecommendations,
-                                            getRecommendationReason = { song ->
-                                                recommendationViewModel.getRecommendationReason(song)
-                                            }
-                                        )
-                                    }
+                                                }
+                                            )
+                                        }
 
-                                    hasEnoughHistory -> {
-                                        // Has history but no recommendations loaded yet
-                                        EmptyRecommendationsPrompt(
-                                            onExploreClick = { recommendationViewModel.loadRecommendations() }
-                                        )
+                                        hasEnoughHistory -> {
+                                            // Has history but no recommendations loaded yet
+                                            EmptyRecommendationsPrompt(
+                                                onExploreClick = { recommendationViewModel.loadRecommendations() }
+                                            )
+                                        }
+                                        // Don't show anything if no listening history
                                     }
-                                    // Don't show anything if no listening history
                                 }
                             }
-                        }
 
-                        if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
-                            item {
-                                SmallSpacer()
+                            if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
+                                item {
+                                    SmallSpacer()
+                                }
+
+                                // Only show divider if Speed Dial section will be displayed
+                                if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.speedDialSongs.isNotEmpty()) {
+                                    item {
+                                        SectionDivider()
+                                    }
+                                }
+
+                                item {
+                                    SmallSpacer()
+                                }
                             }
 
-                            // Only show divider if Speed Dial section will be displayed
+                            // Speed Dial Section (only show if there are local songs)
                             if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.speedDialSongs.isNotEmpty()) {
+                                item(
+                                    key = "speed_dial",
+                                    contentType = "section"
+                                ) {
+                                    SpeedDialSection(
+                                        songs = uiState.speedDialSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(
+                                                song,
+                                                uiState.speedDialSongs
+                                            )
+                                        },
+                                        userInitial = userInitial,
+                                        currentSong = playerState.currentSong
+                                    )
+                                }
+                            }
+
+                            // Saved Playlists Section (only show if there are saved playlists)
+                            if ((selectedFilter == "All" || selectedFilter == "Playlists") && uiState.savedPlaylists.isNotEmpty()) {
+                                item {
+                                    SavedPlaylistsSection(
+                                        playlists = uiState.savedPlaylists,
+                                        onPlaylistClick = { playlist ->
+                                            onNavigateToPlaylist(playlist.playlistId)
+                                        },
+                                        onViewAllClick = onNavigateToPlaylists
+                                    )
+                                }
+                            }
+
+                            // Most Played Section (only show if there are most played songs)
+                            if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.mostPlayedSongs.isNotEmpty()) {
+                                item {
+                                    SmallSpacer()
+                                }
+
+                                item(
+                                    key = "most_played",
+                                    contentType = "section"
+                                ) {
+                                    MostPlayedSection(
+                                        songs = uiState.mostPlayedSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(song, uiState.allSongs)
+                                        },
+                                        onSongLongClick = { _ ->
+                                            // Could add options dialog here if needed
+                                        }
+                                    )
+                                    SectionSpacer()
+                                }
+                            }
+
+                            // Divider and Quick Access (only show if there are local songs)
+                            if (selectedFilter == "All" && uiState.allSongs.isNotEmpty() && uiState.quickAccessSongs.isNotEmpty()) {
+                                item {
+                                    SmallSpacer()
+                                }
+
                                 item {
                                     SectionDivider()
                                 }
+
+                                item {
+                                    SmallSpacer()
+                                }
                             }
 
+                            // Quick Access Grid (only show if there are local songs)
+                            if (uiState.quickAccessSongs.isNotEmpty()) {
+                                item {
+                                    QuickAccessGrid(
+                                        songs = uiState.quickAccessSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(
+                                                song,
+                                                uiState.quickAccessSongs
+                                            )
+                                        },
+                                        currentSong = playerState.currentSong
+                                    )
+                                }
+
+                                item {
+                                    ExtraLargeSpacer()
+                                }
+                            }
+
+                            // Empty Music State - Show when no local songs available
+                            if (uiState.allSongs.isEmpty()) {
+                                item {
+                                    LargeSpacer()
+                                }
+
+                                item {
+                                    SectionDivider()
+                                }
+
+                                item {
+                                    EmptyMusicState(
+                                        onScanClick = {
+                                            if (scanPaths.isEmpty()) {
+                                                showDirectorySelectionDialog = true
+                                            } else {
+                                                homeViewModel.scanMusic()
+                                            }
+                                        },
+                                        isScanning = uiState.isScanning
+                                    )
+                                }
+                            }
+
+                            // Bottom padding for mini player
                             item {
-                                SmallSpacer()
+                                BottomPaddingSpacer()
                             }
                         }
-
-                        // Speed Dial Section (only show if there are local songs)
-                        if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.speedDialSongs.isNotEmpty()) {
-                            item(
-                                key = "speed_dial",
-                                contentType = "section"
-                            ) {
-                                SpeedDialSection(
-                                    songs = uiState.speedDialSongs,
-                                    onSongClick = { song ->
-                                        playerViewModel.playSong(
-                                            song,
-                                            uiState.speedDialSongs
-                                        )
-                                    },
-                                    userInitial = userInitial,
-                                    currentSong = playerState.currentSong
-                                )
-                            }
-                        }
-
-                        // Saved Playlists Section (only show if there are saved playlists)
-                        if ((selectedFilter == "All" || selectedFilter == "Playlists") && uiState.savedPlaylists.isNotEmpty()) {
-                            item {
-                                SavedPlaylistsSection(
-                                    playlists = uiState.savedPlaylists,
-                                    onPlaylistClick = { playlist ->
-                                        onNavigateToPlaylist(playlist.playlistId)
-                                    },
-                                    onViewAllClick = onNavigateToPlaylists
-                                )
-                            }
-                        }
-
-                        // Most Played Section (only show if there are most played songs)
-                        if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.mostPlayedSongs.isNotEmpty()) {
-                            item {
-                                SmallSpacer()
-                            }
-
-                            item(
-                                key = "most_played",
-                                contentType = "section"
-                            ) {
-                                MostPlayedSection(
-                                    songs = uiState.mostPlayedSongs,
-                                    onSongClick = { song ->
-                                        playerViewModel.playSong(song, uiState.allSongs)
-                                    },
-                                    onSongLongClick = { _ ->
-                                        // Could add options dialog here if needed
-                                    }
-                                )
-                                SectionSpacer()
-                            }
-                        }
-
-                        // Divider and Quick Access (only show if there are local songs)
-                        if (selectedFilter == "All" && uiState.allSongs.isNotEmpty() && uiState.quickAccessSongs.isNotEmpty()) {
-                            item {
-                                SmallSpacer()
-                            }
-
-                            item {
-                                SectionDivider()
-                            }
-
-                            item {
-                                SmallSpacer()
-                            }
-                        }
-
-                        // Quick Access Grid (only show if there are local songs)
-                        if (uiState.quickAccessSongs.isNotEmpty()) {
-                            item {
-                                QuickAccessGrid(
-                                    songs = uiState.quickAccessSongs,
-                                    onSongClick = { song ->
-                                        playerViewModel.playSong(
-                                            song,
-                                            uiState.quickAccessSongs
-                                        )
-                                    },
-                                    currentSong = playerState.currentSong
-                                )
-                            }
-
-                            item {
-                                ExtraLargeSpacer()
-                            }
-                        }
-
-                        // Empty Music State - Show when no local songs available
-                        if (uiState.allSongs.isEmpty()) {
-                            item {
-                                LargeSpacer()
-                            }
-
-                            item {
-                                SectionDivider()
-                            }
-
-                            item {
-                                EmptyMusicState(
-                                    onScanClick = {
-                                        if (scanPaths.isEmpty()) {
-                                            showDirectorySelectionDialog = true
-                                        } else {
-                                            homeViewModel.scanMusic()
-                                        }
-                                    },
-                                    isScanning = uiState.isScanning
-                                )
-                            }
-                        }
-
-                        // Bottom padding for mini player
-                        item {
-                            BottomPaddingSpacer()
-                        }
-                    }
                     }  // End PullToRefreshBox
                 }
             }
@@ -807,13 +972,66 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
 
-        // Snackbar positioned above mini player
-        SnackbarHost(
-            hostState = snackbarHostState,
+/**
+ * Artist card that displays cached photo (no API calls)
+ */
+@Composable
+fun ArtistCard(
+    artist: com.just_for_fun.synctax.presentation.model.ArtistUiModel,
+    isLoading: Boolean = false,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(100.dp)
+            .height(130.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = if (playerState.currentSong != null) 90.dp else 16.dp)
+                .size(100.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                isLoading -> {
+                    // Show loading indicator while fetching
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp
+                    )
+                }
+                !artist.imageUrl.isNullOrEmpty() -> {
+                    AsyncImage(
+                        model = artist.imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                else -> {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = artist.name,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center
         )
     }
 }

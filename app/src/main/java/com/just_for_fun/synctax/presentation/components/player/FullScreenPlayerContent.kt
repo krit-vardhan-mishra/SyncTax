@@ -38,8 +38,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,14 +56,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.core.utils.TimeUtils.formatTime
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.model.LyricLine
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.presentation.components.SnackbarUtils.ShowSnackbar
+import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.app.TooltipIconButton
 import com.just_for_fun.synctax.presentation.components.utils.FormatSelectionDialog
 import com.just_for_fun.synctax.presentation.guide.GuideContent
@@ -97,7 +94,6 @@ fun FullScreenPlayerContent(
     upNext: List<Song>,
     playHistory: List<Song>,
     showUpNext: Boolean,
-    snackbarHostState: SnackbarHostState,
     onShowUpNextChange: (Boolean) -> Unit,
     onSelectSong: (Song) -> Unit,
     onPlaceNext: (Song) -> Unit,
@@ -139,8 +135,21 @@ fun FullScreenPlayerContent(
     var showPlayerMenu by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
     var showCancelDownloadDialog by remember { mutableStateOf(false) }
+    var isBlurEnabled by remember { mutableStateOf(true) } // Hoisted state
 
-    LaunchedEffect(song.id) { lyricsViewModel.loadLyricsForSong(song) }
+    // Load lyrics when song changes - first try local, then fetch from API if not found
+    LaunchedEffect(song.id) { 
+        lyricsViewModel.loadLyricsForSong(song)
+    }
+    
+    // Auto-fetch lyrics from API when local lyrics not found and showLyrics is triggered
+    LaunchedEffect(showLyrics, lyrics, song.id) {
+        if (showLyrics && lyrics == null && !lyricsState.isFetching && !lyricsViewModel.hasFailedToFindLyrics(song.id)) {
+            // No local lyrics found, try fetching from API
+            lyricsViewModel.fetchLyricsForSong(song)
+        }
+    }
+    
     LaunchedEffect(lyrics) {
         val lyricsText = lyrics?.joinToString("\n") { it.text }
         playerViewModel.setCurrentLyrics(lyricsText)
@@ -158,7 +167,7 @@ fun FullScreenPlayerContent(
     LaunchedEffect(uiState.downloadMessage) {
         uiState.downloadMessage?.let { message ->
             if (!message.startsWith("Downloading")) {
-                ShowSnackbar(scope, snackbarHostState, message, duration = SnackbarDuration.Short)
+                SnackbarUtils.showGlobalSnackbar(message = message, duration = SnackbarDuration.Short)
             }
             playerViewModel.dismissDownloadMessage()
         }
@@ -167,11 +176,10 @@ fun FullScreenPlayerContent(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Transparent,
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             if (uiState.downloadingSongs.contains(song.id)) {
                 LinearProgressIndicator(
-                    progress = animatedProgress,
+                    progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp),
@@ -184,7 +192,7 @@ fun FullScreenPlayerContent(
 
         Box(
             modifier = Modifier
-                .liquefiable(liquidState)
+                .then(if (isBlurEnabled) Modifier.liquefiable(liquidState) else Modifier)
                 .fillMaxSize()
         ) {
 
@@ -231,15 +239,19 @@ fun FullScreenPlayerContent(
                         }
                     }
 
-                    TooltipIconButton(
-                        onClick = { showPlayerMenu = true },
-                        tooltipText = "Options"
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.GraphicEq,
-                            contentDescription = "Options",
-                            tint = PlayerIconColor
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Lyrics button removed - tap on album art to toggle lyrics
+                        
+                        TooltipIconButton(
+                            onClick = { showPlayerMenu = true },
+                            tooltipText = "Options"
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.GraphicEq,
+                                contentDescription = "Options",
+                                tint = PlayerIconColor
+                            )
+                        }
                     }
                 }
 
@@ -283,13 +295,12 @@ fun FullScreenPlayerContent(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
+                        AlwaysScrollMarqueeText(
                             text = song.artist,
-                            style = MaterialTheme.typography.titleMedium,
+                            textStyle = MaterialTheme.typography.titleMedium,
                             color = PlayerTextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Start
+                            isPlaying = isPlaying, // Or true to always scroll
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
 
@@ -570,7 +581,6 @@ fun FullScreenPlayerContent(
                             onPlaceNext = onPlaceNext,
                             onRemoveFromQueue = onRemoveFromQueue,
                             onReorderQueue = onReorderQueue,
-                            snackbarHostState = snackbarHostState,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
@@ -650,16 +660,6 @@ fun FullScreenPlayerContent(
             )
         }
     }
-}
-
-
-
-// Helper function for time formatting
-fun formatTime(millis: Long): String {
-    val totalSeconds = millis / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%02d:%02d".format(minutes, seconds)
 }
 
 // Function to get current lyric line based on position

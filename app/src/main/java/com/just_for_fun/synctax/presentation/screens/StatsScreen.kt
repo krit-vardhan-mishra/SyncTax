@@ -75,122 +75,139 @@ fun StatsScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
+        val pullToRefreshState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
+        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+            isRefreshing = uiState.isLoadingStats,
+            onRefresh = { homeViewModel.refreshStats() },
+            state = pullToRefreshState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(paddingValues),
+            indicator = {
+                androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.isLoadingStats,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    color = androidx.compose.ui.graphics.Color(0xFFFF0033)
+                )
+            }
         ) {
-            // Quick Stats Cards
-            item {
-                Text(
-                    text = "Overview",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.PlayArrow,
-                        value = "${stats.totalPlays}",
-                        label = "Total Plays"
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.MusicNote,
-                        value = "${stats.uniqueSongsPlayed}",
-                        label = "Unique Songs"
-                    )
-                }
-            }
-
-            // Completion Stats
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.Schedule,
-                        value = "${(stats.averageCompletionRate * 100).toInt()}%",
-                        label = "Avg Completion"
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.AccessTime,
-                        value = getHourName(stats.mostActiveHour),
-                        label = "Peak Hour"
-                    )
-                }
-            }
-
-            // Most Active Day
-            item {
-                StatCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    icon = Icons.Default.CalendarToday,
-                    value = getDayName(stats.mostActiveDay),
-                    label = "Most Active Day"
-                )
-            }
-
-            // Top Songs Section
-            if (stats.topSongs.isNotEmpty()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Quick Stats Cards
                 item {
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Top Songs",
+                        text = "Overview",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.PlayArrow,
+                            value = "${stats.totalPlays}",
+                            label = "Total Plays"
+                        )
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.MusicNote,
+                            value = "${stats.uniqueSongsPlayed}",
+                            label = "Unique Songs"
+                        )
+                    }
                 }
 
-                items(stats.topSongs) { songPlayCount ->
-                    TopSongCard(
-                        title = songPlayCount.title,
-                        artist = songPlayCount.artist,
-                        playCount = songPlayCount.playCount
-                    )
+                // Completion Stats
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Schedule,
+                            value = "${(stats.averageCompletionRate * 100).toInt()}%",
+                            label = "Avg Completion"
+                        )
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.AccessTime,
+                            value = getHourName(stats.mostActiveHour),
+                            label = "Peak Hour"
+                        )
+                    }
                 }
-            }
 
-            // Library Stats
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Library",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+                // Most Active Day
+                item {
                     StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.MusicNote,
-                        value = "${uiState.allSongs.size}",
-                        label = "Local Songs"
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.PlayArrow,
-                        value = "${uiState.onlineHistory.size}",
-                        label = "Online Played"
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = Icons.Default.CalendarToday,
+                        value = getDayName(stats.mostActiveDay),
+                        label = "Most Active Day"
                     )
                 }
-            }
 
-            // Bottom padding for mini player
-            item {
-                Spacer(modifier = Modifier.height(100.dp))
+                // Top Songs Section
+                if (stats.topSongs.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Top Songs",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    items(stats.topSongs) { songPlayCount ->
+                        TopSongCard(
+                            title = songPlayCount.title,
+                            artist = songPlayCount.artist,
+                            playCount = songPlayCount.playCount
+                        )
+                    }
+                }
+
+                // Library Stats
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Library",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.MusicNote,
+                            value = "${uiState.allSongs.size}",
+                            label = "Local Songs"
+                        )
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.PlayArrow,
+                            value = "${uiState.onlineHistory.size}",
+                            label = "Online Played"
+                        )
+                    }
+                }
+
+                // Bottom padding for mini player
+                item {
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
             }
         }
     }

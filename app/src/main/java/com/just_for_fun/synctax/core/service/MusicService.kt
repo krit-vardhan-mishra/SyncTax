@@ -5,6 +5,10 @@ import android.content.ContentUris
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.LruCache
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import kotlinx.coroutines.Job
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -24,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -48,34 +53,61 @@ class MusicService : Service() {
     private var isPlaying = false
     private var currentPosition = 0L
     private var duration = 0L
+
+    private var currentBitmapLoadJob: Job? = null
+    
+    // In-memory cache for album art bitmaps to prevent flickering
+    private val bitmapCache = object : LruCache<String, Bitmap>(50) {
+        override fun sizeOf(key: String, bitmap: Bitmap): Int {
+            // Return size in KB
+            return bitmap.byteCount / 1024
+        }
+    }
+
     
     private val widgetPreferences by lazy { WidgetPreferences(this) }
     
     // Track if we were playing before losing focus
     private var wasPlayingBeforeFocusLoss = false
     
+    // Track if pause was due to audio focus loss (to prevent abandoning focus)
+    private var pausedDueToFocusLoss = false
+    
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
-                // Permanent loss of audio focus - pause playback
+                // Permanent loss of audio focus - pause playback and don't auto-resume
+                Log.d("MusicService", "Audio focus lost permanently")
                 wasPlayingBeforeFocusLoss = false
+                pausedDueToFocusLoss = true
                 onPause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 // Temporary loss of audio focus - remember state and pause
+                Log.d("MusicService", "Audio focus lost transiently, wasPlaying: $isPlaying")
                 wasPlayingBeforeFocusLoss = isPlaying
-                onPause()
+                pausedDueToFocusLoss = true
+                if (isPlaying) {
+                    onPause()
+                }
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 // Temporary loss with ducking allowed - remember state and pause
+                // (We choose to pause instead of ducking for better user experience)
+                Log.d("MusicService", "Audio focus lost with duck option, wasPlaying: $isPlaying")
                 wasPlayingBeforeFocusLoss = isPlaying
-                onPause()
+                pausedDueToFocusLoss = true
+                if (isPlaying) {
+                    onPause()
+                }
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
                 // Regained audio focus - resume if we were playing before
+                Log.d("MusicService", "Audio focus gained, wasPlayingBeforeFocusLoss: $wasPlayingBeforeFocusLoss")
+                pausedDueToFocusLoss = false
                 if (wasPlayingBeforeFocusLoss) {
-                    onPlay()
                     wasPlayingBeforeFocusLoss = false
+                    onPlay()
                 }
             }
         }
@@ -134,7 +166,7 @@ class MusicService : Service() {
         // Send a stop broadcast to the ViewModel/receiver so it can clean up playback state.
         sendBroadcast(Intent(ACTION_STOP))
         // Remove foreground notification and stop the service
-        stopForeground(true)
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         super.onTaskRemoved(rootIntent)
     }
@@ -237,11 +269,14 @@ class MusicService : Service() {
         val initialMetadata = metadataBuilder.build()
         mediaSession.setMetadata(initialMetadata)
 
+        // Cancel previous job
+        currentBitmapLoadJob?.cancel()
+
         // Load high-quality album art asynchronously
         if (!song.albumArtUri.isNullOrEmpty()) {
-            serviceScope.launch {
+            currentBitmapLoadJob = serviceScope.launch {
                 val bitmap = loadAlbumArt(song.albumArtUri)
-                if (bitmap != null) {
+                if (bitmap != null && isActive) {
                     val metadataWithArt = MediaMetadataCompat.Builder(initialMetadata)
                         .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, bitmap)
                         .putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, bitmap)
@@ -254,32 +289,25 @@ class MusicService : Service() {
 
     private suspend fun loadAlbumArt(albumArtUri: String?): Bitmap? {
         if (albumArtUri.isNullOrEmpty()) return null
+        
+        // Check in-memory cache first for instant retrieval
+        bitmapCache.get(albumArtUri)?.let { return it }
 
         return withContext(Dispatchers.IO) {
             try {
-                when {
-                    albumArtUri.startsWith("http") -> {
-                        // Handle HTTP URLs for online songs
-                        loadBitmapFromUrl(albumArtUri)
-                    }
-                    albumArtUri.startsWith("content://") -> {
-                        // Handle content URIs from MediaStore
-                        val uri = Uri.parse(albumArtUri)
-                        contentResolver.openInputStream(uri)?.use { inputStream ->
-                            BitmapFactory.decodeStream(inputStream)?.let { bitmap ->
-                                resizeBitmap(bitmap, 512)
-                            }
-                        }
-                    }
-                    albumArtUri.startsWith("/storage/emulated/0/Download/SyncTax/") -> {
-                        // Use MediaStore to access files in Download directory
-                        loadAlbumArtFromDownloadDirectory(albumArtUri)
-                    }
-                    else -> {
-                        // Fallback for other file paths
-                        loadBitmapFromFilePath(albumArtUri)
-                    }
-                }
+                // Use Glide for robust loading, caching, and resize
+                val bitmap = Glide.with(this@MusicService)
+                    .asBitmap()
+                    .load(albumArtUri)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(512, 512)
+                    .centerCrop()
+                    .submit()
+                    .get()
+                
+                // Cache the loaded bitmap for future use
+                bitmap?.let { bitmapCache.put(albumArtUri, it) }
+                bitmap
             } catch (e: Exception) {
                 Log.e("MusicService", "Failed to load album art from: $albumArtUri", e)
                 null
@@ -469,15 +497,28 @@ class MusicService : Service() {
     fun updatePlaybackState(song: Song?, isPlaying: Boolean, position: Long, duration: Long, lyrics: String? = null) {
         // Request audio focus when starting playback
         if (isPlaying && !this.isPlaying) {
+            // Reset focus loss tracking when user resumes playback
+            pausedDueToFocusLoss = false
+            wasPlayingBeforeFocusLoss = false
             if (!requestAudioFocus()) {
                 // If we can't get audio focus, don't start playback
                 return
             }
         }
         
-        // Abandon audio focus when stopping playback
-        if (!isPlaying && this.isPlaying) {
+        // Only abandon audio focus when user explicitly stops playback (not due to focus loss)
+        // This allows us to receive AUDIOFOCUS_GAIN when other apps finish using audio
+        // Also abandon focus when song is cleared (user stopped playback completely)
+        if (!isPlaying && this.isPlaying && !pausedDueToFocusLoss) {
             abandonAudioFocus()
+            wasPlayingBeforeFocusLoss = false
+        }
+        
+        // Also abandon focus when song is removed (complete stop)
+        if (song == null && this.currentSong != null) {
+            abandonAudioFocus()
+            wasPlayingBeforeFocusLoss = false
+            pausedDueToFocusLoss = false
         }
 
         this.currentSong = song

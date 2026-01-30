@@ -37,6 +37,18 @@ interface OnlineSongDao {
     @Query("DELETE FROM online_songs WHERE id = :id")
     suspend fun deleteOnlineSongById(id: Int)
     
+    @Query("UPDATE online_songs SET isSaved = :isSaved WHERE id = :id")
+    suspend fun updateSavedStatus(id: Int, isSaved: Boolean)
+    
+    @Query("UPDATE online_songs SET isDownloaded = :isDownloaded WHERE id = :id")
+    suspend fun updateDownloadedStatus(id: Int, isDownloaded: Boolean)
+    
+    @Query("SELECT * FROM online_songs WHERE isSaved = 1")
+    fun getSavedSongs(): Flow<List<OnlineSong>>
+    
+    @Query("SELECT * FROM online_songs WHERE isDownloaded = 1")
+    fun getDownloadedSongs(): Flow<List<OnlineSong>>
+    
     /**
      * Get or insert a song by videoId
      * Returns the existing song's id if found, otherwise inserts and returns new id

@@ -58,6 +58,10 @@ class OnlineSongsViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun refreshHistory() {
+        loadInitialHistory()
+    }
+
     fun loadMoreHistory() {
         if (_uiState.value.isLoadingMore || !_uiState.value.hasMore) return
 

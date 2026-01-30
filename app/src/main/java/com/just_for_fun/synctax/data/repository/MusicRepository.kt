@@ -775,4 +775,14 @@ class MusicRepository(private val context: Context) {
     suspend fun updateUserRating(songId: String, rating: Int) = withContext(Dispatchers.IO) {
         historyDao.updateUserRating(songId, rating)
     }
+
+    // ========== Online Songs Cache Functions ==========
+
+    private val onlineSongDao = database.onlineSongDao()
+
+    /**
+     * Get all cached online songs (Offline Saved)
+     */
+    fun getAllOnlineSongs(): Flow<List<com.just_for_fun.synctax.data.local.entities.OnlineSong>> = 
+        onlineSongDao.getAllOnlineSongs()
 }

@@ -54,8 +54,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -89,7 +87,7 @@ import com.just_for_fun.synctax.core.utils.AppIconManager
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.app.TooltipIconButton
-import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
+import androidx.compose.foundation.lazy.LazyColumn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -129,7 +127,7 @@ private fun AssetIconPreviewCard(
     modifier: Modifier = Modifier
 ) {
     val iconBitmap = rememberAssetBitmap(context, iconOption.assetPath)
-    
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -155,7 +153,7 @@ private fun AssetIconPreviewCard(
                         .clip(RoundedCornerShape(12.dp))
                 )
             }
-            
+
             // Selection indicator
             if (isSelected) {
                 Box(
@@ -174,9 +172,9 @@ private fun AssetIconPreviewCard(
                 }
             }
         }
-        
+
         Spacer(Modifier.height(4.dp))
-        
+
         // Icon name with premium indicator
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -304,7 +302,7 @@ private fun NumericalSetting(
                         valueRange.start.toInt(),
                         valueRange.endInclusive.toInt()
                     )
-                    
+
                     if (value != null) {
                         sliderValue = value.toFloat()
                         onValueChange(value)
@@ -340,7 +338,6 @@ fun SettingsScreen(
     val userName by userPreferences.userName.collectAsState(initial = "")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     // Check if READ_MEDIA_IMAGES permission is granted
     var hasImagePermission by remember {
@@ -373,7 +370,8 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         try {
-            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            val takeFlags =
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             context.contentResolver.takePersistableUriPermission(uri, takeFlags)
             scope.launch {
                 userPreferences.addScanPath(uri.toString())
@@ -397,10 +395,9 @@ fun SettingsScreen(
                     }
                 }
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-        ) { padding ->
-        OptimizedLazyColumn(
+        }
+    ) { padding ->
+        LazyColumn(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize(),
@@ -448,7 +445,10 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Contributor Features", style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                "Contributor Features",
+                                style = MaterialTheme.typography.titleLarge
+                            )
                             Spacer(Modifier.height(12.dp))
 
                             // App Icon Variants with Visual Previews - Telegram Style
@@ -459,20 +459,31 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(Modifier.height(12.dp))
-                            
+
                             // Available icon options from assets
                             val iconOptions = listOf(
                                 AppIconOption("default", "Default", "app_icon/app_icon_1.jpg"),
                                 AppIconOption("vintage", "Vintage", "app_icon/app_icon_2.png"),
                                 AppIconOption("aqua", "Aqua", "app_icon/app_icon_3.png"),
-                                AppIconOption("premium", "Premium", "app_icon/app_icon_4.png", isPremium = true),
+                                AppIconOption(
+                                    "premium",
+                                    "Premium",
+                                    "app_icon/app_icon_4.png",
+                                    isPremium = true
+                                ),
                                 AppIconOption("turbo", "Turbo", "app_icon/app_icon_5.png"),
                                 AppIconOption("neon", "Neon", "app_icon/app_icon_6.png")
                             )
-                            
+
                             // Get current icon from AppIconManager
-                            var selectedIconId by remember { mutableStateOf(AppIconManager.getCurrentIconId(context)) }
-                            
+                            var selectedIconId by remember {
+                                mutableStateOf(
+                                    AppIconManager.getCurrentIconId(
+                                        context
+                                    )
+                                )
+                            }
+
                             // Telegram-style horizontal scrolling icon picker
                             Row(
                                 modifier = Modifier
@@ -485,41 +496,41 @@ fun SettingsScreen(
                                         context = context,
                                         iconOption = iconOption,
                                         isSelected = selectedIconId == iconOption.id,
-                                        onClick = { 
+                                        onClick = {
                                             selectedIconId = iconOption.id
                                             // Apply icon change using AppIconManager
                                             AppIconManager.setIconById(context, iconOption.id)
-                                            
+
                                             // Show snackbar and close app
+                                            SnackbarUtils.showGlobalSnackbar(
+                                                message = "App icon changed! Restarting app...",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                            // Wait for snackbar to show and close app
                                             scope.launch {
-                                                SnackbarUtils.ShowSnackbar(
-                                                    scope = scope,
-                                                    snackbarHostState = snackbarHostState,
-                                                    message = "App icon changed! Restarting app...",
-                                                    duration = SnackbarDuration.Short
-                                                )
-                                                // Wait for snackbar to show
                                                 delay(1500)
                                                 // Close the app
-                                                (context as? Activity)?.finishAffinity() ?: Process.killProcess(Process.myPid())
+                                                (context as? Activity)?.finishAffinity()
+                                                    ?: Process.killProcess(Process.myPid())
                                             }
                                         }
                                     )
                                 }
                             }
-                            
-                            Spacer(Modifier.height(8.dp))
-                            
-                            // Note about icon change
-                            Text(
-                                text = "⚠️ Changes take effect after app restart",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        // Note about icon change
+                        Text(
+                            text = "⚠️ Changes take effect after app restart",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
+
 
             // --- 2. Album Art Section ---
             item {
@@ -539,7 +550,10 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Scan local library for album art", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "Scan local library for album art",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
                                 Text(
                                     text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                         "Requires media images permission"
@@ -605,9 +619,11 @@ fun SettingsScreen(
 
             // --- 3.5. Offline Storage ---
             item {
-                val offlineCacheEnabled by userPreferences.offlineCacheEnabled.collectAsState(initial = false)
+                val offlineCacheEnabled by userPreferences.offlineCacheEnabled.collectAsState(
+                    initial = false
+                )
                 val offlineCacheCount by userPreferences.offlineCacheCount.collectAsState(initial = 50)
-                
+
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -618,7 +634,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Offline Storage", style = MaterialTheme.typography.titleLarge)
                         Spacer(Modifier.height(8.dp))
-                        
+
                         // Toggle for offline cache
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -626,7 +642,10 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Cache Online Songs", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "Cache Online Songs",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
                                 Text(
                                     text = "Store suggested songs for offline listening. List refreshes weekly.",
                                     style = MaterialTheme.typography.bodySmall,
@@ -640,7 +659,7 @@ fun SettingsScreen(
                                 }
                             )
                         }
-                        
+
                         // Slider for song count (only shown when enabled)
                         androidx.compose.animation.AnimatedVisibility(visible = offlineCacheEnabled) {
                             Column(modifier = Modifier.padding(top = 16.dp)) {
@@ -652,7 +671,7 @@ fun SettingsScreen(
                                 } else {
                                     String.format("%.0f MB", estimatedStorageMB)
                                 }
-                                
+
                                 Text(
                                     text = "Songs to Cache: $offlineCacheCount",
                                     style = MaterialTheme.typography.titleSmall
@@ -663,18 +682,18 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(Modifier.height(8.dp))
-                                
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text("0", style = MaterialTheme.typography.labelSmall)
-                                    
+
                                     // Custom colored slider
                                     val activeColor = Color(0xFFFF0033)
                                     val inactiveColor = Color(0xFFE8DEF8)
-                                    
+
                                     Slider(
                                         value = offlineCacheCount.toFloat(),
                                         onValueChange = { userPreferences.setOfflineCacheCount(it.toInt()) },
@@ -687,10 +706,10 @@ fun SettingsScreen(
                                             thumbColor = activeColor
                                         )
                                     )
-                                    
+
                                     Text("500", style = MaterialTheme.typography.labelSmall)
                                 }
-                                
+
                                 // Storage warning
                                 if (offlineCacheCount > 200) {
                                     Spacer(Modifier.height(8.dp))
@@ -732,7 +751,11 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             contentPadding = PaddingValues(12.dp)
                         ) {
-                            Icon(Icons.Default.Folder, contentDescription = null, Modifier.size(20.dp))
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = null,
+                                Modifier.size(20.dp)
+                            )
                             Spacer(Modifier.width(8.dp))
                             Text("Add Scan Folder")
                         }
@@ -740,7 +763,7 @@ fun SettingsScreen(
 
                         Text("Default Scan Paths:", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
-                        
+
                         // Downloads folder (always scanned)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -761,7 +784,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        
+
                         // SyncTax folder (always scanned)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -782,16 +805,19 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        
+
                         if (scanPaths.isNotEmpty()) {
                             Spacer(Modifier.height(12.dp))
                             Text("User Added Folders:", style = MaterialTheme.typography.titleSmall)
                             Spacer(Modifier.height(4.dp))
-                            
+
                             scanPaths.forEach { uriString ->
                                 val uri = runCatching { uriString.toUri() }.getOrNull()
                                 val displayName = remember(uri) {
-                                    uri?.let { DocumentFile.fromTreeUri(context, it)?.name ?: "External Folder" } ?: "Invalid Path"
+                                    uri?.let {
+                                        DocumentFile.fromTreeUri(context, it)?.name
+                                            ?: "External Folder"
+                                    } ?: "Invalid Path"
                                 }
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -819,8 +845,14 @@ fun SettingsScreen(
                                     IconButton(onClick = {
                                         scope.launch {
                                             try {
-                                                val releaseFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                                                uri?.let { context.contentResolver.releasePersistableUriPermission(it, releaseFlags) }
+                                                val releaseFlags =
+                                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                                uri?.let {
+                                                    context.contentResolver.releasePersistableUriPermission(
+                                                        it,
+                                                        releaseFlags
+                                                    )
+                                                }
                                             } catch (_: Exception) {
                                             }
                                             userPreferences.removeScanPath(uriString)
@@ -846,8 +878,10 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            val intent = Intent(Intent.ACTION_VIEW,
-                                "https://github.com/krit-vardhan-mishra/SyncTax".toUri())
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                "https://github.com/krit-vardhan-mishra/SyncTax".toUri()
+                            )
                             context.startActivity(intent)
                         }
                 ) {
@@ -883,6 +917,13 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            // --- Library Updates ---
+            item {
+                com.just_for_fun.synctax.core.ui.LibraryUpdateSection(
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
             }
 
             // --- Check for Updates ---

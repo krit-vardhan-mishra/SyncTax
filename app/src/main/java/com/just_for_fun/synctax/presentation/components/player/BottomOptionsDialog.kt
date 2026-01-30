@@ -334,21 +334,11 @@ private fun OptionItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Icon
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (option.destructive) {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
-                } else {
-                    PlayerTextSecondary.copy(alpha = 0.1f)
-                },
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier.size(40.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    option.icon()
-                }
+                option.icon()
             }
 
             Spacer(modifier = Modifier.width(16.dp))

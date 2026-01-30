@@ -34,12 +34,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BlurOff
 import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,10 +73,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.core.utils.TimeUtils
 import com.just_for_fun.synctax.data.local.entities.Song
+import kotlinx.coroutines.delay
 
 // --- 1. SENSOR LOGIC ---
 
@@ -104,7 +109,9 @@ fun rememberParallaxSensorState(): State<Offset> {
                     sensorState.value = Offset(x = orientation[2], y = orientation[1])
                 }
             }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* No-op */ }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* No-op */
+            }
         }
 
         // Register listener if sensor exists
@@ -137,16 +144,108 @@ fun MotionPlayerScreen(
     onSongSelected: (Song) -> Unit = {},
     onModeChanged: (String) -> Unit = {},
     onShuffle: () -> Unit = {},
-    selectedMode: String = "Offline"
+    selectedMode: String = "Offline",
+    onFullScreenChanged: (Boolean) -> Unit = {}  // Callback for fullscreen state changes
 ) {
     if (songs.isEmpty() || currentSong == null) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
-            contentAlignment = Alignment.Center
+                .background(Color.Black)
         ) {
-            Text("No songs available", color = Color.White)
+            // Top Bar even when empty
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            ) {
+                // --- Top Bar ---
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Back Button
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Title Area with Capsule Switch
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        GlassCapsuleSwitch(
+                            selectedOption = selectedMode,
+                            onOptionSelected = { onModeChanged(it) }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "NOW PLAYING",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.7f),
+                            letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing.times(
+                                1.2
+                            )
+                        )
+                    }
+
+                    // Placeholder for balance (no blur toggle when empty)
+                    Box(modifier = Modifier.size(48.dp))
+                }
+
+                // Empty content
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(32.dp)
+                    ) {
+                        if (selectedMode == "Online") {
+                            Text(
+                                text = "No online songs played yet",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Please play any online song first to see recommendations here.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                        } else {
+                            Text(
+                                text = "There are no local songs available",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Play online songs or download some songs or select the directory which has songs.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
         }
         return
     }
@@ -204,7 +303,8 @@ fun MotionPlayerScreen(
             isCurrentSong = song.id == currentSong.id,
             onModeChanged = onModeChanged,
             onShuffle = onShuffle,
-            selectedMode = selectedMode
+            selectedMode = selectedMode,
+            onFullScreenChanged = onFullScreenChanged
         )
     }
 }
@@ -223,17 +323,37 @@ fun MotionPlayerPage(
     isCurrentSong: Boolean,
     onModeChanged: (String) -> Unit = {},
     onShuffle: () -> Unit = {},
-    selectedMode: String = "Offline"
+    selectedMode: String = "Offline",
+    onFullScreenChanged: (Boolean) -> Unit = {}
 ) {
     // --- State Setup ---
+
+    // Full screen state
+    var isFullScreen by remember { mutableStateOf(false) }
+    
+    // Notify parent when fullscreen state changes
+    LaunchedEffect(isFullScreen) {
+        onFullScreenChanged(isFullScreen)
+    }
 
     // 1. Toggle for the global wallpaper blur (Top Right)
     var isGlobalBlurEnabled by remember { mutableStateOf(false) }
 
-    // 2. Sensor Data for Parallax
+    // 2. Shuffle loading state
+    var isShuffling by remember { mutableStateOf(false) }
+
+    // 3. Sensor Data for Parallax
     val sensorOffset by rememberParallaxSensorState()
 
-    // 3. Animations
+    // 4. Handle shuffle loading delay
+    LaunchedEffect(isShuffling) {
+        if (isShuffling) {
+            delay(1000)
+            isShuffling = false
+        }
+    }
+
+    // 5. Animations
     // Smooth out the sensor data so the image "floats" rather than jitters
     val animatedParallax by animateOffsetAsState(
         targetValue = Offset(
@@ -282,203 +402,351 @@ fun MotionPlayerPage(
                 }
         )
 
-        // LAYER 2: The "Frosted Glass" Bottom Control Area
-        // This ensures controls are readable regardless of the background status
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(350.dp) // Height of the control area
-                .blur(radius = 50.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                .background(Color.Black.copy(alpha = 0.2f)) // Subtle tint
-        ) {
-            // We render the image *again* here but cropped to the bottom
-            // This is the standard trick to create a "glass" effect over a dynamic background
-            AsyncImage(
-                model = imageModel,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                alignment = Alignment.BottomCenter, // Align bottom to match
+        // LAYER 2: The "Frosted Glass" Bottom Control Area (only in non-fullscreen)
+        if (!isFullScreen) {
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(0.5f) // Dim it slightly
-            )
-        }
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(350.dp) // Height of the control area
+                    .blur(radius = 50.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .background(Color.Black.copy(alpha = 0.2f)) // Subtle tint
+            ) {
+                // We render the image *again* here but cropped to the bottom
+                // This is the standard trick to create a "glass" effect over a dynamic background
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.BottomCenter, // Align bottom to match
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha(0.5f) // Dim it slightly
+                )
+            }
 
-        // LAYER 3: Dark Gradient Scrim (Bottom)
-        // Adds contrast for white text
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(400.dp)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.6f),
-                            Color.Black.copy(alpha = 0.9f)
+            // LAYER 3: Dark Gradient Scrim (Bottom)
+            // Adds contrast for white text
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(400.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.6f),
+                                Color.Black.copy(alpha = 0.9f)
+                            )
                         )
                     )
-                )
-        )
+            )
+        }
 
         // LAYER 4: The Actual UI Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
+                .then(if (!isFullScreen) Modifier.navigationBarsPadding() else Modifier)
         ) {
             // --- Top Bar ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isFullScreen,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
             ) {
-                // Back Button
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
-                    )
-                }
-
-                // Title Area with Capsule Switch
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    GlassCapsuleSwitch(
-                        selectedOption = selectedMode,
-                        onOptionSelected = { onModeChanged(it) }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "NOW PLAYING",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.7f),
-                        letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing.times(1.2)
-                    )
-                }
-
-                // Blur Toggle (Top Right)
-                IconButton(
-                    onClick = { isGlobalBlurEnabled = !isGlobalBlurEnabled },
+                Row(
                     modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.15f))
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (isGlobalBlurEnabled) Icons.Default.BlurOn else Icons.Default.BlurOff,
-                        contentDescription = "Toggle Blur",
-                        tint = Color.White
-                    )
+                    // Back logic replaced by FullScreen toggle
+                    IconButton(onClick = { isFullScreen = !isFullScreen }) {
+                        Icon(
+                            imageVector = Icons.Default.Fullscreen,
+                            contentDescription = "Full Screen",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Title Area with Capsule Switch
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        GlassCapsuleSwitch(
+                            selectedOption = selectedMode,
+                            onOptionSelected = { onModeChanged(it) }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "NOW PLAYING",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.7f),
+                            letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing.times(
+                                1.2
+                            )
+                        )
+                    }
+
+                    // Blur Toggle (Top Right)
+                    IconButton(
+                        onClick = { isGlobalBlurEnabled = !isGlobalBlurEnabled },
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.15f))
+                    ) {
+                        Icon(
+                            imageVector = if (isGlobalBlurEnabled) Icons.Default.BlurOn else Icons.Default.BlurOff,
+                            contentDescription = "Toggle Blur",
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+
+            // Exit FullScreen Button (Only visible when FullScreen)
+            if (isFullScreen) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Exit fullscreen button
+                    IconButton(onClick = { isFullScreen = false }) {
+                        Icon(
+                            imageVector = Icons.Default.FullscreenExit,
+                            contentDescription = "Exit Full Screen",
+                            tint = Color.White
+                        )
+                    }
+                    
+                    // Blur Toggle (Also visible in fullscreen)
+                    IconButton(
+                        onClick = { isGlobalBlurEnabled = !isGlobalBlurEnabled },
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.15f))
+                    ) {
+                        Icon(
+                            imageVector = if (isGlobalBlurEnabled) Icons.Default.BlurOn else Icons.Default.BlurOff,
+                            contentDescription = "Toggle Blur",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
             // --- Bottom Controls ---
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 32.dp)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isFullScreen,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it },
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it }
             ) {
-                // Song Info
-                Text(
-                    text = song.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1
-                )
-                Text(
-                    text = song.artist,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // Slider / Seekbar
-                Slider(
-                    value = if (totalDuration > 0) currentPosition.toFloat() / totalDuration else 0f,
-                    onValueChange = onSeek,
-                    colors = SliderDefaults.colors(
-                        thumbColor = Color.White,
-                        activeTrackColor = Color.White,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                // Time Labels
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 32.dp)
                 ) {
+                    // Song Info
                     Text(
-                        text = TimeUtils.formatTime(currentPosition),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.6f)
+                        text = song.title,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1
                     )
                     Text(
-                        text = TimeUtils.formatTime(totalDuration),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.6f)
+                        text = song.artist,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
-                // Playback Controls
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Shuffle - regenerates queue with new recommendations
-                    IconButton(onClick = onShuffle) {
-                        Icon(Icons.Default.Shuffle, null, tint = Color.White.copy(alpha = 0.7f))
-                    }
-
-                    // Previous
-                    IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.SkipPrevious, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                    }
-
-                    // Play/Pause (Prominent)
-                    IconButton(
-                        onClick = onPlayPause,
+                    // Small Progress Bar instead of Slider
+                    // seeking via tapping on the bar
+                    Box(
                         modifier = Modifier
-                            .size(72.dp)
-                            .background(Color.White, CircleShape)
+                            .fillMaxWidth()
+                            .height(20.dp) // clickable area height
+                            .clickable { /* handled by tap gesture or just replace Slider visuals */ },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = "Play/Pause",
-                            tint = Color.Black, // Dark icon on white button
-                            modifier = Modifier.size(36.dp)
+                        // We use a custom thin slider
+                        Slider(
+                            value = if (totalDuration > 0) currentPosition.toFloat() / totalDuration else 0f,
+                            onValueChange = onSeek,
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color.White,
+                                activeTrackColor = Color.White,
+                                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    scaleY = 0.5f // Make it thinner
+                                }
                         )
                     }
 
-                    // Next
-                    IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Default.SkipNext, null, tint = Color.White, modifier = Modifier.size(32.dp))
+                    // Time Labels
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = TimeUtils.formatTime(currentPosition),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = TimeUtils.formatTime(totalDuration),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
                     }
 
-                    // Repeat (Dummy)
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.Repeat, null, tint = Color.White.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Playback Controls
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Shuffle - regenerates queue with new recommendations
+                        IconButton(onClick = {
+                            if (isPlaying) {
+                                isShuffling = true
+                            } // Optimization
+                            onShuffle()
+                        }) {
+                            // existing content...
+                            if (isShuffling) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Shuffle,
+                                    null,
+                                    tint = Color.White.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+
+                        // Previous
+                        IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.Default.SkipPrevious,
+                                null,
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        // Play/Pause (Prominent)
+                        IconButton(
+                            onClick = onPlayPause,
+                            modifier = Modifier
+                                .size(72.dp)
+                                .background(Color.White, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = "Play/Pause",
+                                tint = Color.Black, // Dark icon on white button
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+
+                        // Next
+                        IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                Icons.Default.SkipNext,
+                                null,
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        // Repeat (Dummy)
+                        IconButton(onClick = { }) {
+                            Icon(Icons.Default.Repeat, null, tint = Color.White.copy(alpha = 0.7f))
+                        }
                     }
                 }
+            }
+            
+            // Fullscreen mode: Show song info at bottom with thin progress bar
+            if (isFullScreen) {
+                Spacer(modifier = Modifier.weight(1f))
+                
+                // Song info in fullscreen
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = song.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = song.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+        
+        // Fullscreen mode: Thin seekable progress bar at the very bottom
+        if (isFullScreen) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clickable { /* Progress bar click area */ }
+            ) {
+                // Background track
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White.copy(alpha = 0.2f))
+                )
+                // Progress track
+                val progress = if (totalDuration > 0) currentPosition.toFloat() / totalDuration else 0f
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(4.dp)
+                        .background(Color.White)
+                )
             }
         }
     }
@@ -543,4 +811,3 @@ fun GlassCapsuleSwitch(
         }
     }
 }
-

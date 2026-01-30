@@ -681,7 +681,7 @@ object YTMusicRecommender {
                     thumbnailUrl = obj.optString("thumbnail", ""),
                     streamUrl = null,
                     type = type,
-                    year = obj.optString("year", null),
+                    year = obj.optString("year", null as String?),
                     browseId = if (type == OnlineResultType.ALBUM || type == OnlineResultType.ARTIST || type == OnlineResultType.PODCAST) id else null
                 )
                 results.add(result)

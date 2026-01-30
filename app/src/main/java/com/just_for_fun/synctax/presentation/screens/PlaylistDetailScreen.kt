@@ -44,6 +44,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,6 +84,16 @@ fun PlaylistDetailScreen(
     val detailState by playlistViewModel.detailState.collectAsState()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    // Handle refresh completion
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            playlistViewModel.loadPlaylistDetail(playlistId)
+            isRefreshing = false
+        }
+    }
 
     // Load playlist details
     LaunchedEffect(playlistId) {
@@ -217,13 +229,27 @@ fun PlaylistDetailScreen(
                 }
             }
         } else {
-            OptimizedLazyColumn(
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { isRefreshing = true },
+                state = pullToRefreshState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
+                    .padding(paddingValues),
+                indicator = {
+                    androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                        state = pullToRefreshState,
+                        isRefreshing = isRefreshing,
+                        modifier = Modifier.align(Alignment.TopCenter),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             ) {
-                // Playlist header
-                item {
+                OptimizedLazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Playlist header
+                    item {
                     PlaylistHeader(
                         playlist = detailState.playlist,
                         songCount = detailState.songs.size,
@@ -252,7 +278,8 @@ fun PlaylistDetailScreen(
                 item {
                     Spacer(modifier = Modifier.height(100.dp))
                 }
-            }
+            } // End OptimizedLazyColumn
+            } // End PullToRefreshBox
         }
     }
 }

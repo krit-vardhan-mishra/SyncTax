@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,7 +42,6 @@ fun UpNextSheet(
     onPlaceNext: (Song) -> Unit,
     onRemoveFromQueue: (Song) -> Unit,
     onReorderQueue: (Int, Int) -> Unit,
-    snackbarHostState: SnackbarHostState,
     modifier: Modifier,
     shape: CornerBasedShape,
     color: Color
@@ -144,7 +142,6 @@ fun UpNextSheet(
                             onSelect = onSelect,
                             onPlaceNext = onPlaceNext,
                             onRemoveFromQueue = onRemoveFromQueue,
-                            snackbarHostState = snackbarHostState,
                             dragHandleModifier = Modifier.pointerInput(Unit) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { offset ->
@@ -189,7 +186,6 @@ fun UpNextSheet(
                         onSelect = onSelect,
                         onPlaceNext = onPlaceNext,
                         onRemoveFromQueue = onRemoveFromQueue,
-                        snackbarHostState = snackbarHostState,
                         isHistory = true
                         // No drag handle modifier for history
                     )

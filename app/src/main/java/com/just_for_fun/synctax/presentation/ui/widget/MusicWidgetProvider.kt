@@ -33,7 +33,6 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_SHUFFLE = "ACTION_SHUFFLE"
         const val ACTION_NEXT = "ACTION_NEXT"
         const val ACTION_PREVIOUS = "ACTION_PREVIOUS"
-
         const val EXTRA_SONG_TITLE = "extra_song_title"
         const val EXTRA_SONG_ARTIST = "extra_song_artist"
         const val EXTRA_SONG_ALBUM = "extra_song_album"
@@ -46,7 +45,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val EXTRA_LYRICS = "extra_lyrics"
 
         private val widgetScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-        
+
         // Lyrics caching to prevent continuous refresh
         private var lastLyricsUpdate = 0L
         private var cachedLyrics: String? = null
@@ -68,7 +67,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
             val componentName = ComponentName(context, MusicWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
 
-            val isOnline = albumArtUri?.startsWith("http") == true || songTitle?.startsWith("http") == true
+            val isOnline =
+                albumArtUri?.startsWith("http") == true || songTitle?.startsWith("http") == true
 
             val intent = Intent(context, MusicWidgetProvider::class.java).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
@@ -120,7 +120,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 widgetPrefs.getPosition(),
                 widgetPrefs.getDuration(),
                 widgetPrefs.isShuffleOn(),
-                widgetPrefs.getAlbumArtUri()?.startsWith("http") == true || widgetPrefs.getSongTitle().startsWith("http")
+                widgetPrefs.getAlbumArtUri()
+                    ?.startsWith("http") == true || widgetPrefs.getSongTitle().startsWith("http")
             )
         }
     }
@@ -137,9 +138,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
         // For now, just re-apply default state to switch layout
         val widgetPrefs = WidgetPreferences(context)
         updateAppWidget(
-            context, 
-            appWidgetManager, 
-            appWidgetId, 
+            context,
+            appWidgetManager,
+            appWidgetId,
             widgetPrefs.getSongTitle(),
             widgetPrefs.getSongArtist(),
             widgetPrefs.getSongAlbum(),
@@ -148,7 +149,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
             widgetPrefs.getPosition(),
             widgetPrefs.getDuration(),
             widgetPrefs.isShuffleOn(),
-            widgetPrefs.getAlbumArtUri()?.startsWith("http") == true || widgetPrefs.getSongTitle().startsWith("http")
+            widgetPrefs.getAlbumArtUri()?.startsWith("http") == true || widgetPrefs.getSongTitle()
+                .startsWith("http")
         )
     }
 
@@ -159,31 +161,36 @@ class MusicWidgetProvider : AppWidgetProvider() {
             ACTION_PLAY_PAUSE -> {
                 val widgetPrefs = WidgetPreferences(context)
                 val isCurrentlyPlaying = widgetPrefs.isPlaying()
-                
-                val action = if (isCurrentlyPlaying) MusicService.ACTION_PAUSE else MusicService.ACTION_PLAY
+
+                val action =
+                    if (isCurrentlyPlaying) MusicService.ACTION_PAUSE else MusicService.ACTION_PLAY
                 val serviceIntent = Intent(context, MusicService::class.java).apply {
                     this.action = action
                 }
                 context.startService(serviceIntent)
             }
+
             ACTION_NEXT -> {
                 val serviceIntent = Intent(context, MusicService::class.java).apply {
                     action = MusicService.ACTION_NEXT
                 }
                 context.startService(serviceIntent)
             }
+
             ACTION_PREVIOUS -> {
                 val serviceIntent = Intent(context, MusicService::class.java).apply {
                     action = MusicService.ACTION_PREVIOUS
                 }
                 context.startService(serviceIntent)
             }
+
             ACTION_SHUFFLE -> {
                 val serviceIntent = Intent(context, MusicService::class.java).apply {
                     action = MusicService.ACTION_SHUFFLE
                 }
                 context.startService(serviceIntent)
             }
+
             AppWidgetManager.ACTION_APPWIDGET_UPDATE -> {
                 val appWidgetManager = AppWidgetManager.getInstance(context)
                 val componentName = ComponentName(context, MusicWidgetProvider::class.java)
@@ -237,16 +244,16 @@ class MusicWidgetProvider : AppWidgetProvider() {
             return when {
                 // Big Widget (4x4+) -> Lyrics support
                 width >= 300 && height >= 250 -> R.layout.widget_music_big
-                
+
                 // Large Widget -> Album art focus
                 width >= 250 && height >= 150 -> R.layout.widget_music_large
-                
+
                 // Circular Widget (2x2 approx) -> Circular design
                 width in 110..200 && height in 110..200 -> R.layout.widget_music_circular
-                
+
                 // Large Widget -> Album art focus (replaces medium)
                 width >= 200 && height >= 100 -> R.layout.widget_music_large
-                
+
                 // Small Widget (4x1 or smaller) -> Minimal
                 else -> R.layout.widget_music_small
             }
@@ -298,7 +305,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             } else {
                 ""
             }
-            
+
             views.setTextViewText(R.id.widget_song_title, displayTitle)
             views.setTextViewText(R.id.widget_artist, displayArtist)
 
@@ -321,19 +328,20 @@ class MusicWidgetProvider : AppWidgetProvider() {
                     isOnline -> "" // Blank space for online
                     else -> "Lyrics not available for this song.\n\n(Lyrics feature coming soon)" // Placeholder
                 }
-                
+
                 // Check if this is actual lyrics content (not placeholder or empty)
                 val isActualLyrics = lyrics != null && lyrics.isNotEmpty()
-                
+
                 // Only update lyrics if text has changed
                 if (lyricsTextToDisplay != cachedLyrics) {
                     val currentTime = System.currentTimeMillis()
-                    
+
                     // Always update immediately if:
                     // 1. We're getting actual lyrics (prioritize real content)
                     // 2. Enough time has passed since last update (throttle placeholder/empty updates)
-                    val shouldUpdateLyrics = isActualLyrics || (currentTime - lastLyricsUpdate > LYRICS_UPDATE_INTERVAL)
-                    
+                    val shouldUpdateLyrics =
+                        isActualLyrics || (currentTime - lastLyricsUpdate > LYRICS_UPDATE_INTERVAL)
+
                     if (shouldUpdateLyrics) {
                         views.setTextViewText(R.id.widget_lyrics, lyricsTextToDisplay)
                         cachedLyrics = lyricsTextToDisplay
@@ -351,7 +359,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             } else {
                 0
             }
-            
+
             // Only set progress bar if it exists in this layout
             try {
                 views.setProgressBar(R.id.widget_progress, 100, progress, false)

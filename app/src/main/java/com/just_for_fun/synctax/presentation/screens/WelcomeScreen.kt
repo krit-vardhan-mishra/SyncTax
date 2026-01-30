@@ -94,8 +94,8 @@ fun WelcomeScreen(
     val trimmedName = name.trim()
     val isCreator = AppConfig.isCreator(context, trimmedName)
 
-    // Show special welcome screen for creators
-    if (showSpecialWelcome && isCreator) {
+    // Show special welcome screen for everyone
+    if (showSpecialWelcome) {
         // *** CHANGE THIS LINE ***
         SpecialCreatorWelcomeScreenTwo(
             creatorName = trimmedName,

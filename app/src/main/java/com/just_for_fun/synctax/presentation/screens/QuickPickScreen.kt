@@ -42,7 +42,8 @@ fun QuickPicksScreen(
     homeViewModel: HomeViewModel = viewModel(),
     playerViewModel: PlayerViewModel = viewModel(),
     dynamicBgViewModel: DynamicBackgroundViewModel = viewModel(),
-    quickPickViewModel: QuickPickViewModel = viewModel()
+    quickPickViewModel: QuickPickViewModel = viewModel(),
+    onFullScreenChanged: (Boolean) -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val quickPickState by quickPickViewModel.uiState.collectAsState()
@@ -207,7 +208,8 @@ fun QuickPicksScreen(
                 // Shuffle regenerates the queue with new recommendations
                 quickPickViewModel.shuffle()
             },
-            selectedMode = selectedMode
+            selectedMode = selectedMode,
+            onFullScreenChanged = onFullScreenChanged
         )
 
         // Guide overlay

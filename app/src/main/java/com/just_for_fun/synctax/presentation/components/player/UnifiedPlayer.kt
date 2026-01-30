@@ -3,6 +3,7 @@ package com.just_for_fun.synctax.presentation.components.player
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -12,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,8 +29,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import coil.compose.AsyncImage
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.presentation.ui.theme.PlayerBackground
@@ -70,14 +72,13 @@ fun UnifiedPlayer(
     onSeek: (Long) -> Unit,
     downloadPercent: Int = 0,
 ) {
-    val snackBarHostState = remember { SnackbarHostState() }
     val haptic = LocalHapticFeedback.current
 
     var showUpNext by remember { mutableStateOf(false) }
 
     // Use progress directly from parent (AnchoredDraggable)
     val expansionProgress = progress
-    
+
     // Hide mini player image immediately when dragging starts to show the morphing image instead
     val albumArtMiniScale = if (expansionProgress > 0.01f) {
         0f
@@ -94,15 +95,15 @@ fun UnifiedPlayer(
     }
 
     // Main Container - uses full size since parent controls positioning
-    androidx.compose.foundation.layout.BoxWithConstraints(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .fillMaxSize()
             .background(PlayerBackground)
     ) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
+        val density = LocalDensity.current
         val maxWidth = maxWidth
-        
+
         // --- 1. ENHANCED ANIMATED BACKGROUND LAYER ---
         if (!song.albumArtUri.isNullOrEmpty()) {
             // Dynamic blur radius interpolates smoothly based on expansion
@@ -182,6 +183,7 @@ fun UnifiedPlayer(
                             onClick = {
                                 onExpandedChange(true)
                             },
+//                            onSeek = onSeek,
                             onSwipeUp = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onExpandedChange(true)
@@ -209,7 +211,6 @@ fun UnifiedPlayer(
                             upNext = upNext,
                             playHistory = playHistory,
                             showUpNext = showUpNext,
-                            snackbarHostState = snackBarHostState,
                             onShowUpNextChange = { showUpNext = it },
                             onSelectSong = onSelectSong,
                             onPlaceNext = onPlaceNext,
@@ -239,27 +240,28 @@ fun UnifiedPlayer(
                 }
             }
         }
-        
+
         // --- 3. MORPHING ALBUM ART LAYER ---
         // This renders the album art growing from mini-player position to full-player position
         if (progress > 0.01f && fullControlsAlpha < 1f) {
             val startSize = 40.dp
-            val targetSize = maxWidth - 48.dp // Match full width of Carousel (screen width - 24dp*2 padding)
-            
+            val targetSize =
+                maxWidth - 48.dp // Match full width of Carousel (screen width - 24dp*2 padding)
+
             // Coordinates based on MiniPlayerContent layout
             // MiniPlayer: Vertically centered in 80dp (top ~13dp), Left padding 16dp + 8dp inner = 24dp
-            val startTop = 13.dp 
+            val startTop = 13.dp
             val startStart = 24.dp
-            
+
             // FullPlayer: Centered horizontally, Top offset approx 100dp
             val targetTop = 100.dp
             val targetStart = (maxWidth - targetSize) / 2
-            
-            val currentSize = androidx.compose.ui.unit.lerp(startSize, targetSize, progress)
-            val currentTop = androidx.compose.ui.unit.lerp(startTop, targetTop, progress)
-            val currentStart = androidx.compose.ui.unit.lerp(startStart, targetStart, progress)
-            val currentCorner = androidx.compose.ui.unit.lerp(8.dp, 16.dp, progress)
-            
+
+            val currentSize = lerp(startSize, targetSize, progress)
+            val currentTop = lerp(startTop, targetTop, progress)
+            val currentStart = lerp(startStart, targetStart, progress)
+            val currentCorner = lerp(8.dp, 16.dp, progress)
+
             // Fade out as the full player takes over (optional, currently stays opaque until full player is fully visible)
             // Using inverse of fullControlsAlpha to crossfade properly
             val morphAlpha = 1f - fullControlsAlpha
@@ -275,7 +277,7 @@ fun UnifiedPlayer(
             ) {
                 if (song.albumArtUri.isNullOrEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                         Icon(
+                        Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             modifier = Modifier.size(currentSize / 2),

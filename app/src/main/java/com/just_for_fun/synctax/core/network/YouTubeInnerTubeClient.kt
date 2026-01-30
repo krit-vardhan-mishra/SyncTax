@@ -1,11 +1,11 @@
 package com.just_for_fun.synctax.core.network
 
 import android.util.Log
+import com.just_for_fun.synctax.BuildConfig
+import com.just_for_fun.synctax.core.utils.LibraryUpdateChecker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import com.just_for_fun.synctax.core.network.NewPipeUtils
-import com.just_for_fun.synctax.BuildConfig
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -144,18 +144,19 @@ class YouTubeInnerTubeClient {
 
     /**
      * Get playable stream URL for a video
-     * 
+     *
      * YouTube InnerTube API now returns incomplete format objects (no URL, no cipher).
      * Using NewPipe extractor directly which implements YouTube's client logic fully.
+     * Falls back to yt-dlp if NewPipe fails.
      */
     suspend fun getStreamUrl(videoId: String): String? {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Getting stream URL for $videoId using NewPipe extractor")
-                
-                // Use NewPipe extractor - it handles all YouTube client logic internally
+
+                // Try NewPipe extractor first
                 val result = NewPipeUtils.getStreamUrl(videoId)
-                
+
                 if (result.isSuccess) {
                     val streamUrl = result.getOrNull()
                     if (streamUrl != null) {
@@ -164,13 +165,66 @@ class YouTubeInnerTubeClient {
                     }
                 } else {
                     Log.e(TAG, "❌ NewPipe failed for $videoId", result.exceptionOrNull())
+
+                    // Check if this is a known NewPipe version issue
+                    val exception = result.exceptionOrNull()
+                    if (LibraryUpdateChecker.isNewPipeVersionError(exception)) {
+                        Log.w(TAG, "🔄 NewPipe failed with known version issue - trying yt-dlp fallback")
+
+                        // Try yt-dlp fallback
+                        try {
+                            val ytdlpResult = extractStreamUrlWithYTDLP(videoId)
+                            if (ytdlpResult != null) {
+                                Log.d(TAG, "✅ yt-dlp fallback successful for $videoId")
+                                return@withContext ytdlpResult
+                            } else {
+                                Log.w(TAG, "❌ yt-dlp fallback also failed for $videoId")
+                                // Could notify user here about potential NewPipe update needed
+                                Log.w(TAG, "⚠️ Both NewPipe and yt-dlp failed - NewPipeExtractor may need updating")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "❌ yt-dlp fallback exception for $videoId", e)
+                        }
+                    }
                 }
-                
+
                 Log.w(TAG, "No audio stream found for $videoId")
                 null
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get stream URL for $videoId", e)
                 null
+            }
+        }
+    }
+
+    /**
+     * Extract stream URL using yt-dlp as fallback when NewPipe fails
+     */
+    private suspend fun extractStreamUrlWithYTDLP(videoId: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Import Chaquopy Python module
+                val sys = com.chaquo.python.Python.getInstance().getModule("sys")
+                val ytStreamExtractor = com.chaquo.python.Python.getInstance().getModule("yt_stream_extractor")
+
+                // Call the Python function
+                val result = ytStreamExtractor.callAttr("extract_stream_url", videoId)
+
+                // Parse JSON result
+                val jsonResult = org.json.JSONObject(result.toString())
+
+                if (jsonResult.getBoolean("success")) {
+                    val streamUrl = jsonResult.getString("url")
+                    Log.d(TAG, "yt-dlp extracted URL for $videoId: ${streamUrl.take(100)}...")
+                    return@withContext streamUrl
+                } else {
+                    val error = jsonResult.optString("error", "Unknown error")
+                    Log.w(TAG, "yt-dlp failed for $videoId: $error")
+                    return@withContext null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to extract stream URL with yt-dlp for $videoId", e)
+                return@withContext null
             }
         }
     }
@@ -310,7 +364,7 @@ class YouTubeInnerTubeClient {
             var artist: String? = null
             var duration: Long? = null
             
-            if (flexColumns != null && flexColumns.length() > 1) {
+            if (flexColumns.length() > 1) {
                 val metadataColumn = flexColumns.optJSONObject(1)
                     ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
                     ?.optJSONObject("text")
