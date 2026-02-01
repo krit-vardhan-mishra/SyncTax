@@ -1,11 +1,17 @@
 package com.just_for_fun.synctax.core.ui
 
 import android.content.Intent
+import android.net.Uri
+import android.util.Base64
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +43,14 @@ import com.just_for_fun.synctax.R
 import com.just_for_fun.synctax.data.model.GithubRelease
 import com.just_for_fun.synctax.presentation.viewmodels.AppUpdateViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.isSystemInDarkTheme
+import coil.compose.AsyncImage
+import android.webkit.JavascriptInterface
+import android.os.Handler
+import android.os.Looper
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.zIndex
 
 /**
  * Comprehensive update settings section for Settings screen
@@ -56,6 +70,14 @@ fun UpdateSettingsSection(
     var showAppUpdateDialog by remember { mutableStateOf(false) }
     var showLibraryUpdateDialog by remember { mutableStateOf(false) }
     var showChangelogDialog by remember { mutableStateOf(false) }
+    var selectedRelease by remember { mutableStateOf<GithubRelease?>(null) }
+
+    if (selectedRelease != null) {
+        ReleaseDetailDialog(
+            release = selectedRelease!!,
+            onDismiss = { selectedRelease = null }
+        )
+    }
 
     // Show dialogs
     if (showAppUpdateDialog && appUpdateState is AppUpdateViewModel.AppUpdateState.UpdateAvailable) {
@@ -397,7 +419,8 @@ fun UpdateSettingsSection(
         val releases by viewModel.allReleases.collectAsState()
         ChangelogDialog(
             releases = releases,
-            onDismiss = { showChangelogDialog = false }
+            onDismiss = { showChangelogDialog = false },
+            onReleaseClick = { release -> selectedRelease = release }
         )
     }
 }
@@ -419,7 +442,7 @@ private fun AutoUpdateSettingsCard() {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
         Column(
@@ -653,7 +676,8 @@ fun LibraryUpdateInfoDialog(
 @Composable
 fun ChangelogDialog(
     releases: List<GithubRelease>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onReleaseClick: (GithubRelease) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -708,6 +732,7 @@ fun ChangelogDialog(
                             ChangelogItem(
                                 release = release,
                                 isCurrentVersion = release.tagName.contains(BuildConfig.VERSION_NAME),
+                                onClick = { onReleaseClick(release) },
                                 onOpenUrl = { url ->
                                     val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                                     context.startActivity(intent)
@@ -725,16 +750,24 @@ fun ChangelogDialog(
 private fun ChangelogItem(
     release: GithubRelease,
     isCurrentVersion: Boolean,
+    onClick: () -> Unit,
     onOpenUrl: (String) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    OutlinedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
+        colors = CardDefaults.outlinedCardColors(
             containerColor = if (isCurrentVersion)
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
             else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            1.dp, 
+            if (isCurrentVersion) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) 
+            else MaterialTheme.colorScheme.outlineVariant
         )
     ) {
         Column(
@@ -798,14 +831,425 @@ private fun ChangelogItem(
                             },
                             leadingIcon = {
                                 Icon(
-                                    imageVector = Icons.Default.Download,
+                                    Icons.Default.Download,
                                     contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog showing full details of a release
+ */
+@Composable
+fun ReleaseDetailDialog(
+    release: GithubRelease,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = release.name.ifEmpty { release.tagName },
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Update,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = release.publishedAt.take(10), // Show date part
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                HorizontalDivider()
+
+                // Content
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                ) {
+                    // Badges
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Badge(containerColor = MaterialTheme.colorScheme.primaryContainer) {
+                            Text(
+                                text = release.tagName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        if (release.prerelease) {
+                            Badge(containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
+                                Text(
+                                    text = "Pre-release",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                        }
+                    }
+                    
+                    Text(
+                        text = "Release Notes",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    MarkdownText(
+                        text = release.body.ifEmpty { "No release notes provided." },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Text(
+                        text = "Assets",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    release.assets.forEach { asset ->
+                        OutlinedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    val intent = Intent(Intent.ACTION_VIEW, asset.browserDownloadUrl.toUri())
+                                    context.startActivity(intent)
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.outlinedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = asset.name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${String.format("%.2f", asset.size / 1024f / 1024f)} MB",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog showing Read Me content
+ */
+@Composable
+fun ReadmeDialog(
+    content: String,
+    onDismiss: () -> Unit
+) {
+    val isDarkTheme = isSystemInDarkTheme()
+    var expandedImageUrl by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    if (expandedImageUrl != null) {
+        ImageViewerDialog(
+            imageUrl = expandedImageUrl!!,
+            onDismiss = { expandedImageUrl = null }
+        )
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Read Me",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                HorizontalDivider()
+
+                // Content
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (content.isEmpty()) {
+                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                             CircularProgressIndicator()
+                         }
+                    } else {
+                        val base64Content = try {
+                            Base64.encodeToString(content.toByteArray(), Base64.NO_WRAP)
+                        } catch (e: Exception) { "" }
+                        
+                        val htmlContent = """
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+                                <style>
+                                    body { 
+                                        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                                        padding: 16px; 
+                                        color: ${if (isDarkTheme) "#E0E0E0" else "#212121"}; 
+                                        background-color: ${if (isDarkTheme) "#1E1E1E" else "#FFFFFF"}; 
+                                    }
+                                    a { color: ${if (isDarkTheme) "#8AB4F8" else "#1A73E8"}; }
+                                    img { max-width: 100%; border-radius: 8px; cursor: pointer; } 
+                                    pre { background-color: ${if (isDarkTheme) "#2D2D2D" else "#F5F5F5"}; padding: 12px; border-radius: 8px; overflow-x: auto; }
+                                    code { font-family: monospace; background-color: ${if (isDarkTheme) "#2D2D2D" else "#F5F5F5"}; padding: 2px 4px; border-radius: 4px; }
+                                    table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+                                    th, td { border: 1px solid ${if (isDarkTheme) "#444" else "#DDD"}; padding: 8px; text-align: left; }
+                                    th { background-color: ${if (isDarkTheme) "#333" else "#F9F9F9"}; }
+                                    blockquote { border-left: 4px solid ${if (isDarkTheme) "#444" else "#DDD"}; margin: 0; padding-left: 16px; color: ${if (isDarkTheme) "#AAA" else "#666"}; }
+                                    h1, h2, h3 { border-bottom: 1px solid ${if (isDarkTheme) "#333" else "#EEE"}; padding-bottom: 8px; }
+                                    p { line-height: 1.6; }
+                                    .scroll-gallery { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 8px; margin: 16px 0; }
+                                    .scroll-gallery img { max-width: none; height: 300px; margin-right: 8px; vertical-align: middle; }
+                                    .scroll-gallery table { width: auto; min-width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0; } 
+                                    .scroll-gallery td { border: none !important; padding: 0 !important; vertical-align: top; }
+                                    /* Restore normal table style if not in gallery */
+                                    table:not(.gallery-table) { width: 100%; border-collapse: collapse; }
+                                </style>
+                            </head>
+                            <body>
+                                <div id="content"></div>
+                                <script>
+                                    try {
+                                        const md = decodeURIComponent(escape(window.atob('$base64Content')));
+                                        document.getElementById('content').innerHTML = marked.parse(md);
+                                        
+                                        // Logic to wrap image groups in scrollable container
+                                        setTimeout(function() {
+                                            // Handle tables with images
+                                            var tables = document.querySelectorAll('table');
+                                            tables.forEach(function(table) {
+                                                if (table.querySelector('img')) {
+                                                    var wrapper = document.createElement('div');
+                                                    wrapper.className = 'scroll-gallery';
+                                                    table.parentNode.insertBefore(wrapper, table);
+                                                    wrapper.appendChild(table);
+                                                    table.classList.add('gallery-table');
+                                                    // Ensure images in table cells don't shrink
+                                                    var imgs = table.getElementsByTagName('img');
+                                                    for (var i=0; i<imgs.length; i++) {
+                                                        imgs[i].style.maxWidth = 'none';
+                                                        imgs[i].style.height = '300px'; // Force height
+                                                    }
+                                                }
+                                            });
+
+                                            // Handle paragraphs with multiple images
+                                            var ps = document.querySelectorAll('p');
+                                            ps.forEach(function(p) {
+                                                var imgCount = p.getElementsByTagName('img').length;
+                                                if (imgCount >= 2) {
+                                                    p.className = 'scroll-gallery';
+                                                }
+                                            });
+
+                                            // Add click listeners (re-select after potential moves)
+                                            var imgs = document.getElementsByTagName('img');
+                                            for (var i = 0; i < imgs.length; i++) {
+                                                imgs[i].onclick = function() {
+                                                    try {
+                                                        Android.showImage(this.src);
+                                                    } catch(e) { console.error(e); }
+                                                }
+                                            }
+                                        }, 100);
+                                    } catch(e) {
+                                        document.getElementById('content').innerText = "Error rendering content: " + e.message;
+                                    }
+                                </script>
+                            </body>
+                            </html>
+                        """.trimIndent()
+
+                        AndroidView(
+                            factory = { ctx ->
+                                WebView(ctx).apply {
+                                    settings.javaScriptEnabled = true
+                                    settings.domStorageEnabled = true
+                                    settings.setSupportZoom(true)
+                                    
+                                    addJavascriptInterface(object : Any() {
+                                        @JavascriptInterface
+                                        fun showImage(url: String) {
+                                            Handler(Looper.getMainLooper()).post {
+                                                expandedImageUrl = url
+                                            }
+                                        }
+                                    }, "Android")
+
+                                    webViewClient = object : WebViewClient() {
+                                        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                                            if (url != null && (url.startsWith("http") || url.startsWith("https"))) {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                ctx.startActivity(intent)
+                                                return true
+                                            }
+                                            return false
+                                        }
+                                    }
+                                    setBackgroundColor(0)
+                                }
+                            },
+                            update = { webView ->
+                                webView.loadDataWithBaseURL(
+                                    "https://raw.githubusercontent.com/krit-vardhan-mishra/SyncTax/master/",
+                                    htmlContent,
+                                    "text/html",
+                                    "UTF-8",
+                                    null
+                                )
+                            },
+                            onRelease = { it.destroy() },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog to view an image fullscreen
+ */
+@Composable
+fun ImageViewerDialog(
+    imageUrl: String,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f) // Dimmed background
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                // Close button
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .zIndex(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                // Image
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.8f),
+                    contentScale = ContentScale.Fit
+                )
             }
         }
     }

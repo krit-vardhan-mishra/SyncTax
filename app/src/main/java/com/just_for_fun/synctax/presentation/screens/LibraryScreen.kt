@@ -248,7 +248,8 @@ fun LibraryScreen(
                                 playerViewModel = playerViewModel,
                                 cardBackgroundColor = cardBackgroundColor,
                                 sectionTitleColor = sectionTitleColor,
-                                sectionSubtitleColor = sectionSubtitleColor
+                                sectionSubtitleColor = sectionSubtitleColor,
+                                favoriteSongIds = uiState.favoriteSongs.map { it.id.hashCode().toLong() }.toSet()
                             )
 
                             1 -> ArtistsTab(
@@ -301,7 +302,8 @@ fun LibraryScreen(
                 icon = {
                     Icon(
                         imageVector = iconVector,
-                        contentDescription = null
+                        contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color.White
                     )
                 },
                 onClick = {

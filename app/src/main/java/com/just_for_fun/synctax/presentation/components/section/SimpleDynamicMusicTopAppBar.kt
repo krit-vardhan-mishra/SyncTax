@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.app.UserProfileDialog
@@ -93,7 +94,9 @@ fun SimpleDynamicMusicTopAppBar(
                 title,
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = titleTextColor
+                color = titleTextColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         },
         navigationIcon = {

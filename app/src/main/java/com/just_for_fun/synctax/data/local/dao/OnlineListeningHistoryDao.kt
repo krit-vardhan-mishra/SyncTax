@@ -23,6 +23,12 @@ interface OnlineListeningHistoryDao {
     suspend fun getAllHistory(): List<OnlineListeningHistory>
     
     /**
+     * Get all history records as a Flow (for reactive updates)
+     */
+    @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC")
+    fun getAllOnlineHistoryFlow(): Flow<List<OnlineListeningHistory>>
+    
+    /**
      * Get recent history as a suspend function (for analytics)
      */
     @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC LIMIT :limit")

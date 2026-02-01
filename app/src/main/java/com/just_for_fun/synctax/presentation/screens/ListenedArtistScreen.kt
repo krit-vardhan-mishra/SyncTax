@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -25,6 +26,47 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.presentation.model.ArtistUiModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
 
+/**
+ * Parses an artist string that may contain multiple artists separated by various delimiters.
+ * Returns a list of individual artist names.
+ */
+private fun parseArtistString(artistString: String): List<String> {
+    // Filter out invalid/category-like artist names
+    val invalidNames = listOf("Unknown", "Unknown Artist", "Song", "Video", "Album", "Artist", "Podcast", "Episode")
+    if (artistString.isBlank() || invalidNames.any { it.equals(artistString, ignoreCase = true) }) {
+        return emptyList()
+    }
+    
+    // Split by common delimiters
+    val delimiters = listOf(", ", " & ", " and ", " feat. ", " feat ", " ft. ", " ft ", " featuring ", " x ", " vs ", " / ", "; ")
+    var artists = listOf(artistString)
+    
+    for (delimiter in delimiters) {
+        artists = artists.flatMap { it.split(delimiter, ignoreCase = true) }
+    }
+    
+    // Leading conjunctions that might remain after splitting (e.g., "and Arohi Mhatre" -> "Arohi Mhatre")
+    val leadingConjunctions = listOf("and ", "feat ", "feat. ", "ft ", "ft. ", "featuring ", "with ")
+    
+    return artists
+        .map { name ->
+            var cleaned = name.trim()
+            // Remove leading conjunctions
+            for (conjunction in leadingConjunctions) {
+                if (cleaned.startsWith(conjunction, ignoreCase = true)) {
+                    cleaned = cleaned.removeRange(0, conjunction.length).trim()
+                }
+            }
+            cleaned
+        }
+        .filter { name -> 
+            name.isNotBlank() && 
+            !invalidNames.any { it.equals(name, ignoreCase = true) } &&
+            name.length > 1 // Filter single-character names
+        }
+        .distinct()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListenedArtistScreen(
@@ -36,10 +78,17 @@ fun ListenedArtistScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
 
-    // Handle refresh completion
+    // Handle refresh completion - also fetch artist details
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
             homeViewModel.forceRefreshLibrary()
+            // Also refresh online artist photos
+            val allOnlineArtistNames = uiState.onlineHistory
+                .flatMap { parseArtistString(it.artist) }
+                .distinct()
+            if (allOnlineArtistNames.isNotEmpty()) {
+                homeViewModel.fetchAllArtistPhotos(allOnlineArtistNames)
+            }
             isRefreshing = false
         }
     }
@@ -67,18 +116,49 @@ fun ListenedArtistScreen(
         }
     }
 
-    val onlineArtists = remember(uiState.onlineHistory) {
-         uiState.onlineHistory
-             .groupBy { it.artist }
-             .map { (name, history) ->
-                 ArtistUiModel(
-                     name = name, 
-                     songCount = history.size, 
-                     isOnline = true,
-                     imageUrl = history.firstOrNull { !it.thumbnailUrl.isNullOrEmpty() }?.thumbnailUrl
-                 )
-             }
-             .sortedByDescending { it.songCount }
+    // Process online artists - split multi-artist entries into individual artists
+    val onlineArtists = remember(uiState.onlineHistory, uiState.artistPhotos) {
+        // Create a map of individual artist -> list of history items containing that artist
+        val artistToHistoryMap = mutableMapOf<String, MutableList<com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory>>()
+        
+        uiState.onlineHistory.forEach { history ->
+            val individualArtists = parseArtistString(history.artist)
+            if (individualArtists.isEmpty()) {
+                // Fallback to original artist name if parsing returns empty
+                val name = history.artist.takeIf { it.isNotBlank() } ?: "Unknown"
+                artistToHistoryMap.getOrPut(name) { mutableListOf() }.add(history)
+            } else {
+                individualArtists.forEach { artistName ->
+                    artistToHistoryMap.getOrPut(artistName) { mutableListOf() }.add(history)
+                }
+            }
+        }
+        
+        artistToHistoryMap.map { (name, historyList) ->
+            ArtistUiModel(
+                name = name,
+                songCount = historyList.size,
+                isOnline = true,
+                // Use cached artist photo first, then fallback to thumbnail
+                imageUrl = uiState.artistPhotos[name] 
+                    ?: historyList.firstOrNull { !it.thumbnailUrl.isNullOrEmpty() }?.thumbnailUrl
+            )
+        }
+        .filter { it.name != "Unknown" && it.name != "Song" && it.name.isNotBlank() }
+        .sortedByDescending { it.songCount }
+    }
+    
+    // Fetch photos for online artists that don't have cached photos
+    val onlineArtistsWithoutPhotos = remember(onlineArtists, uiState.artistPhotos) {
+        onlineArtists.filter { artist ->
+            uiState.artistPhotos[artist.name].isNullOrEmpty()
+        }.map { it.name }
+    }
+    
+    LaunchedEffect(onlineArtistsWithoutPhotos) {
+        if (onlineArtistsWithoutPhotos.isNotEmpty()) {
+            homeViewModel.fetchAllArtistPhotos(onlineArtistsWithoutPhotos)
+        }
     }
     
     Scaffold(

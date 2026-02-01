@@ -38,7 +38,8 @@ import com.just_for_fun.synctax.core.network.OnlineResultType
 @Composable
 fun OnlineResultCard(
     result: OnlineSearchResult,
-    onPlayClick: (OnlineSearchResult) -> Unit
+    onPlayClick: (OnlineSearchResult) -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
@@ -48,7 +49,10 @@ fun OnlineResultCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = { onPlayClick(result) })
+                .combinedClickable(
+                    onClick = { onPlayClick(result) },
+                    onLongClick = onLongClick
+                )
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

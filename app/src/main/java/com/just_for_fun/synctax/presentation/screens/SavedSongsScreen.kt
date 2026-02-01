@@ -93,8 +93,9 @@ fun SavedSongsScreen(
                 OnlineSongCard(
                     history = displayItem,
                     onClick = {
-                        playerViewModel.playUrl(
-                            url = "https://music.youtube.com/watch?v=${song.videoId}",
+                        // Use offline playback function that checks for cached audio first
+                        playerViewModel.playOfflineSavedSong(
+                            videoId = song.videoId,
                             title = song.title,
                             artist = song.artist,
                             durationMs = song.duration?.times(1000L) ?: 0L,

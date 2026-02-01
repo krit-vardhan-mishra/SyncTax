@@ -55,6 +55,7 @@ import com.just_for_fun.synctax.presentation.screens.ImportPlaylistScreen
 import com.just_for_fun.synctax.presentation.screens.LibraryScreen
 import com.just_for_fun.synctax.presentation.screens.ListenedArtistScreen
 import com.just_for_fun.synctax.presentation.screens.ArtistDetailScreen
+import com.just_for_fun.synctax.presentation.screens.ListenedAlbumScreen
 import com.just_for_fun.synctax.presentation.screens.OnlineSongsScreen
 import com.just_for_fun.synctax.presentation.screens.PlaylistDetailScreen
 import com.just_for_fun.synctax.presentation.screens.PlaylistScreen
@@ -65,6 +66,7 @@ import com.just_for_fun.synctax.presentation.screens.SettingsScreen
 import com.just_for_fun.synctax.presentation.screens.StatsScreen
 import com.just_for_fun.synctax.presentation.screens.TrainingScreen
 import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputScreen
+import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs
 import com.just_for_fun.synctax.presentation.screens.WelcomeScreen
 import com.just_for_fun.synctax.presentation.viewmodels.DynamicBackgroundViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
@@ -105,6 +107,8 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     val dynamicBgViewModel: DynamicBackgroundViewModel =
         viewModel()
     val recommendationViewModel: RecommendationViewModel = viewModel()
+    // Explicitly initialize this to avoid recomposition issues if not passed in some calls
+    val playlistViewModel: PlaylistViewModel = viewModel()
 
     // Get current route to determine visibility
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -293,7 +297,8 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                         homeViewModel.setSelectedAlbum(albumName, artistName, songs)
                                         navController.navigate("album/$albumName")
                                     },
-                                    onNavigateToSavedSongs = { navController.navigate("history?tab=2") }
+                                    onNavigateToSavedSongs = { navController.navigate("history?tab=2") },
+                                    onNavigateToListenedAlbums = { navController.navigate("listened_albums") }
                                 )
                             }
                             composable(
@@ -462,6 +467,23 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 )
                             }
                             composable(
+                                "listened_albums",
+                                enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                            ) {
+                                ListenedAlbumScreen(
+                                    homeViewModel = homeViewModel,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onAlbumClick = { albumName, artistName ->
+                                        val songs = homeViewModel.getSongsByAlbum(albumName, artistName)
+                                        homeViewModel.setSelectedAlbum(albumName, artistName, songs)
+                                        navController.navigate("album/$albumName")
+                                    }
+                                )
+                            }
+                            composable(
                                 "artist_detail/{artistName}",
                                 arguments = listOf(navArgument("artistName") {
                                     type = NavType.StringType
@@ -596,7 +618,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 UserRecommendationInputScreen(
                                     recommendationViewModel = recommendationViewModel,
                                     onNavigateBack = { navController.popBackStack() },
-                                    onGenerateRecommendations = { userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs ->
+                                    onGenerateRecommendations = { userInputs: UserRecommendationInputs ->
                                         recommendationViewModel.generateUserInputRecommendations(
                                             userInputs
                                         )

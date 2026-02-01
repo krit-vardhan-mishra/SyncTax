@@ -79,6 +79,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val chaquopyDownloader = ChaquopyAudioDownloader.getInstance(application)
     private val onlineManager = OnlineSearchManager()
     
+    // User preferences for offline storage setting
+    private val userPreferences = com.just_for_fun.synctax.data.preferences.UserPreferences(application)
+    
     // Online song repository for tracking play status
     private val onlineSongRepository = OnlineSongRepository(
         MusicDatabase.getDatabase(application).onlineSongDao(),
@@ -110,12 +113,83 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         onlineSongRepository = onlineSongRepository,
         onOnlineSongPlayed = { videoId ->
             Log.d("PlayerViewModel", "🎵 Online song marked as played (5+ sec): $videoId")
+            // Notify HomeViewModel to refresh history section
+            viewModelScope.launch {
+                onOnlineSongPlayedCallback?.invoke(videoId)
+            }
         },
         onOnlineSongFullyPlayed = { videoId ->
             Log.d("PlayerViewModel", "✅ Online song fully played: $videoId")
-            // TODO: Check if offline storage option is enabled and auto-save if so
+            // Check if offline storage is enabled and auto-save the song
+            if (userPreferences.isOfflineCacheEnabled()) {
+                viewModelScope.launch {
+                    autoSaveOnlineSong(videoId)
+                }
+            }
         }
     )
+    
+    // Callback for notifying HomeViewModel when an online song is played
+    var onOnlineSongPlayedCallback: ((String) -> Unit)? = null
+    
+    /**
+     * Auto-save fully played online song to offline storage
+     */
+    private suspend fun autoSaveOnlineSong(videoId: String) {
+        try {
+            val currentSong = _uiState.value.currentSong ?: return
+            
+            Log.d("PlayerViewModel", "💾 Auto-save attempted for videoId: $videoId")
+            
+            if (!currentSong.id.contains(videoId)) {
+                Log.d("PlayerViewModel", "⚠️ Auto-save SKIPPED: Current song ID mismatch (Current: ${currentSong.id}, Expected: $videoId)")
+                return
+            }
+            
+            // Skip very long content (> 30 minutes) - these are meant for streaming only
+            // This prevents saving 10-hour videos, live streams, podcasts, etc.
+            val maxSaveDurationMs = 30 * 60 * 1000L // 30 minutes in milliseconds
+            if (currentSong.duration > maxSaveDurationMs) {
+                Log.d("PlayerViewModel", "⚠️ Auto-save SKIPPED: Duration too long (>30min) (${currentSong.duration / 60000} min): $videoId")
+                return
+            }
+            
+            // Check if already saved
+            val existingSong = onlineSongRepository.getOnlineSongByVideoId(videoId)
+            if (existingSong?.isSaved == true) {
+                Log.d("PlayerViewModel", "✅ Auto-save SKIPPED: Song already saved offline: $videoId")
+                return
+            }
+            
+            // Get stream URL for saving
+            val streamUrl = onlineManager.getStreamUrl(videoId)
+            if (streamUrl == null) {
+                Log.e("PlayerViewModel", "❌ Auto-save FAILED: Failed to get stream URL for auto-save: $videoId")
+                return
+            }
+            
+            // Create or update OnlineSong entry
+            val onlineSong = existingSong ?: OnlineSong(
+                videoId = videoId,
+                title = currentSong.title,
+                artist = currentSong.artist,
+                album = currentSong.album,
+                thumbnailUrl = currentSong.albumArtUri,
+                duration = (currentSong.duration / 1000).toInt()
+            )
+            
+            // Save to offline storage
+            onlineSongRepository.saveSong(onlineSong, streamUrl)
+            
+            // Prune cache to respect user limit
+            val limit = userPreferences.offlineCacheCount.value
+            onlineSongRepository.pruneCache(limit)
+            
+            Log.d("PlayerViewModel", "🎉 Auto-save SUCCESS: Song saved to offline storage: ${currentSong.title}")
+        } catch (e: Exception) {
+            Log.e("PlayerViewModel", "❌ Auto-save FAILED: Exception occurred: ${e.message}", e)
+        }
+    }
 
     // Track if we're currently handling song end to prevent multiple triggers
     private var isHandlingSongEnd = false
@@ -131,6 +205,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     // Track played recommendations for previous navigation
     private val playedRecommendationsHistory = mutableListOf<Song>()
+    
+    // Track if auto-save has already been triggered for the current song
+    private var hasTriggeredAutoSave = false
 
     // Sleep timer state
     private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
@@ -474,12 +551,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             lastStateSave = currentTime
                         }
                     }
-
                     // Prefetch next song when reaching 75% progress (once per song)
                     val duration = _uiState.value.duration
                     if (!hasPrefetched && duration > 0 && position >= (duration * 0.75)) {
                         prefetchNextSongIfNeeded()
                         hasPrefetched = true
+                    }
+                    
+                    // Auto-save offline cache when reaching 80% progress
+                    if (duration > 0 && position >= (duration * 0.8) && !hasTriggeredAutoSave) {
+                        // Check if offline storage is enabled
+                         if (userPreferences.isOfflineCacheEnabled()) {
+                            _uiState.value.currentSong?.let { song ->
+                                if (song.id.startsWith("online:") || song.id.startsWith("youtube:")) {
+                                    val videoId = song.id.removePrefix("online:").removePrefix("youtube:")
+                                    Log.d("PlayerViewModel", "💾 Reached 80% playback for $videoId, triggering auto-save...")
+                                    viewModelScope.launch {
+                                        autoSaveOnlineSong(videoId)
+                                    }
+                                }
+                            }
+                        } else {
+                             // Log only once that it's disabled to avoid spam, but useful for debug
+                             Log.d("PlayerViewModel", "⚠️ Auto-save SKIPPED at 80%: Offline cache setting is DISABLED")
+                        }
+                        // Mark as triggered regardless of validId so we don't spam checks
+                        hasTriggeredAutoSave = true
                     }
 
                     // Reset prefetch flag when song changes or restarts
@@ -596,6 +693,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 position = onlineState.position,
                 isPlaying = false // Don't auto-play on restore
             )
+            
+            // Reset auto-save flag
+            hasTriggeredAutoSave = false
 
             // Update notification
             updateNotification()
@@ -762,6 +862,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             player.play()
 
             playbackCollector.startCollecting(song.id)
+            
+            // Reset auto-save flag for new song
+            hasTriggeredAutoSave = false
 
             _uiState.value = _uiState.value.copy(
                 currentSong = song,
@@ -922,7 +1025,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             player.prepare(url, onlineSong.id)
             player.play()
 
-            playbackCollector.startCollecting(onlineSong.id)
+            // Pass metadata for online song tracking
+            playbackCollector.startCollecting(
+                songId = onlineSong.id,
+                title = title,
+                artist = artist,
+                thumbnailUrl = thumbnailUrl,
+                duration = durationMs
+            )
 
             // Log song details
             logSongDetails(onlineSong)
@@ -1068,6 +1178,94 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+    
+    /**
+     * Play an offline saved song - first checks for cached audio file, then falls back to streaming.
+     * This is used for songs in the "Offline Saved" tab that were cached when played fully.
+     */
+    fun playOfflineSavedSong(
+        videoId: String,
+        title: String,
+        artist: String?,
+        durationMs: Long = 0L,
+        thumbnailUrl: String?
+    ) {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val cacheFile = java.io.File(context.cacheDir, "stream_${videoId}.cache")
+            
+            if (cacheFile.exists() && cacheFile.length() > 0) {
+                // Play from cached file
+                Log.d("PlayerViewModel", "🎵 Playing offline cached song: $title")
+                
+                // Stop any previous playback
+                playbackCollector.stopCollecting(skipped = true)
+                chunkedStreamManager.stopAndCleanup(removeFinalCache = false)
+                
+                val highQualityThumbnail = thumbnailUrl?.let { url ->
+                    when {
+                        url.contains("lh3.googleusercontent.com") -> url.replace(Regex("=w\\d+-h\\d+"), "=w544-h544")
+                        url.contains("ytimg.com") && url.contains("/default.jpg") -> url.replace("/default.jpg", "/maxresdefault.jpg")
+                        url.contains("ytimg.com") && url.contains("/mqdefault.jpg") -> url.replace("/mqdefault.jpg", "/maxresdefault.jpg")
+                        url.contains("ytimg.com") && url.contains("/hqdefault.jpg") -> url.replace("/hqdefault.jpg", "/maxresdefault.jpg")
+                        else -> url
+                    }
+                } ?: "https://img.youtube.com/vi/$videoId/maxresdefault.jpg"
+                
+                val offlineSong = Song(
+                    id = "online:$videoId",
+                    title = title,
+                    artist = artist ?: "Unknown",
+                    album = null,
+                    duration = durationMs,
+                    filePath = cacheFile.absolutePath,
+                    genre = null,
+                    releaseYear = null,
+                    albumArtUri = highQualityThumbnail
+                )
+                
+                // Initialize queue with this song
+                queueManager.initializeQueue(listOf(offlineSong), 0)
+                
+                // Prepare and play from cache
+                player.prepare(cacheFile.absolutePath, offlineSong.id)
+                player.play()
+                
+                playbackCollector.startCollecting(
+                    songId = offlineSong.id,
+                    title = title,
+                    artist = artist,
+                    thumbnailUrl = highQualityThumbnail,
+                    duration = durationMs
+                )
+                
+                // Reset auto-save flag
+                hasTriggeredAutoSave = false
+                
+                logSongDetails(offlineSong)
+                
+                _uiState.value = _uiState.value.copy(
+                    currentSong = offlineSong,
+                    isPlaying = true,
+                    isBuffering = false
+                )
+                
+                checkIfSongDownloaded(offlineSong)
+                savePlaylistState()
+                updateNotification()
+            } else {
+                // Fall back to streaming
+                Log.d("PlayerViewModel", "📶 Cache not found for $videoId, streaming instead")
+                playUrl(
+                    url = "https://music.youtube.com/watch?v=$videoId",
+                    title = title,
+                    artist = artist,
+                    durationMs = durationMs,
+                    thumbnailUrl = thumbnailUrl
+                )
+            }
+        }
+    }
 
     // Function to play a recommended song from UpNext
     fun playRecommendedSong(song: Song) {
@@ -1169,7 +1367,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         player.prepareWithCacheKey(streamUrl, onlineSong.id, videoId)
         player.play()
 
-        playbackCollector.startCollecting(onlineSong.id)
+        // Pass metadata for online song tracking
+        playbackCollector.startCollecting(
+            songId = onlineSong.id,
+            title = song.title,
+            artist = song.artist,
+            thumbnailUrl = highQualityThumbnail,
+            duration = song.duration
+        )
+        
+        // Reset auto-save flag
+        hasTriggeredAutoSave = false
 
         // Start preloading next songs
         prefetchNextSongIfNeeded()
@@ -1397,6 +1605,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         thumbnailUrl: String? = null,
         skipRecommendationFetch: Boolean = false
     ) {
+        // Reset auto-save flag for new stream
+        hasTriggeredAutoSave = false
+        
         viewModelScope.launch {
             // Clean up tmp file from previous stream if it's complete
             chunkedStreamManager.cleanupTmpFile()
@@ -1457,7 +1668,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             player.prepare(tempFile.absolutePath, onlineSong.id)
             player.play()
 
-            playbackCollector.startCollecting(onlineSong.id)
+            // Pass metadata for online song tracking
+            playbackCollector.startCollecting(
+                songId = onlineSong.id,
+                title = title,
+                artist = artist,
+                thumbnailUrl = highQualityThumbnail,
+                duration = durationMs
+            )
 
             // Start preloading next songs
             prefetchNextSongIfNeeded()
@@ -1496,39 +1714,49 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (st.isComplete) {
                         // Download complete - the tmp file now contains full content
                         // No need to switch file paths since tmp file is still being used by player
-                        // The .cache file has been copied for future use
+                        // The .cache file has been copied for future use (short content only)
                         _uiState.value = _uiState.value.copy(isBuffering = false)
                     }
                 }
             }
 
-            // Monitor player position and request more chunks to keep at least 60s buffered
+            // Monitor player position and request more chunks to keep buffer ahead
+            // For long content (> 20 min), use more aggressive prefetching
             viewModelScope.launch {
                 while (true) {
                     val position = player.getCurrentPosition()
-                    val bufferedSec = chunkedStreamManager.state.value.bufferedSeconds
+                    val chunkState = chunkedStreamManager.state.value
+                    val bufferedSec = chunkState.bufferedSeconds
                     val posSec = (position / 1000).toLong()
-                    val threshold = 60L
-                    if (bufferedSec - posSec < threshold && !chunkedStreamManager.state.value.isComplete) {
-                        val prefetch = chunkedStreamManager.suggestedPrefetchCount()
+                    
+                    // Adaptive threshold: longer for long content to allow seeking
+                    val threshold = if (chunkState.isLongContent) 120L else 60L
+                    
+                    if (bufferedSec - posSec < threshold && !chunkState.isComplete) {
+                        val basePrefetch = chunkedStreamManager.suggestedPrefetchCount()
+                        // More aggressive prefetch for long content
+                        val prefetch = if (chunkState.isLongContent) (basePrefetch * 2).coerceAtMost(8) else basePrefetch
                         chunkedStreamManager.requestNextChunk(prefetch)
                     }
                     // Stop if a different song is now playing or song removed
                     if (_uiState.value.currentSong == null || _uiState.value.currentSong?.id != onlineSong.id) {
                         break
                     }
-                    delay(1000)
+                    // Faster polling for long content to stay ahead of playback
+                    val pollInterval = if (chunkState.isLongContent) 500L else 1000L
+                    delay(pollInterval)
 
                     // Update saved position periodically for online songs
+                    // Use current song from UI state to get updated metadata (artist, title, etc.)
                     _uiState.value.currentSong?.let { song ->
                         if (song.id.startsWith("online:")) {
                             val currentPosition = player.getCurrentPosition()
                             if (currentPosition % 5000 < 1000) { // Save every ~5 seconds
                                 playerPreferences.saveOnlineSongState(
                                     videoId = videoId,
-                                    title = title,
-                                    artist = artist ?: "Unknown",
-                                    thumbnailUrl = highQualityThumbnail,
+                                    title = song.title,  // Use updated title from UI state
+                                    artist = song.artist ?: "Unknown",  // Use updated artist from UI state
+                                    thumbnailUrl = song.albumArtUri ?: highQualityThumbnail,
                                     watchUrl = "https://www.youtube.com/watch?v=$videoId",
                                     position = currentPosition,
                                     isPlaying = _uiState.value.isPlaying
@@ -1575,6 +1803,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "📥 Metadata: Title=${updated.title}, Artist=${updated.artist}, Album=${updated.album}"
                         )
                         updateNotification()
+                        
+                        // Update saved state with correct metadata (fixes artist showing as "Song"/"Video")
+                        playerPreferences.saveOnlineSongState(
+                            videoId = videoId,
+                            title = fetchedTitle,
+                            artist = fetchedArtist ?: "Unknown",
+                            thumbnailUrl = highQualityThumbnail,
+                            watchUrl = "https://www.youtube.com/watch?v=$videoId",
+                            position = player.getCurrentPosition(),
+                            isPlaying = _uiState.value.isPlaying
+                        )
+                        Log.d("PlayerViewModel", "📥 Updated saved state with correct metadata for $videoId")
                     }
                 } catch (e: Exception) {
                     Log.w("PlayerViewModel", "📥 Metadata fetch failed for stream: ${e.message}")
@@ -1742,6 +1982,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun seekTo(positionMs: Long) {
+        // For long content streaming, request additional chunks when seeking forward
+        val currentPos = _uiState.value.position
+        val currentSong = _uiState.value.currentSong
+        
+        if (currentSong != null && 
+            (currentSong.id.startsWith("online:") || currentSong.id.startsWith("youtube:")) &&
+            chunkedStreamManager.isLongContent() &&
+            positionMs > currentPos) {
+            
+            // Calculate how many chunks we need to buffer ahead
+            val seekDelta = positionMs - currentPos
+            val bufferedSec = chunkedStreamManager.state.value.bufferedSeconds
+            val targetSec = positionMs / 1000
+            
+            if (targetSec > bufferedSec - 30) {
+                // Need more buffer - request chunks aggressively
+                val chunksNeeded = ((targetSec - bufferedSec + 60) / 30).toInt().coerceIn(1, 10)
+                Log.d("PlayerViewModel", "🔄 Seeking in long content: requesting $chunksNeeded chunks for position ${positionMs/1000}s")
+                chunkedStreamManager.requestNextChunk(chunksNeeded)
+            }
+        }
+        
         player.seekTo(positionMs)
         _uiState.value = _uiState.value.copy(position = positionMs)
 
@@ -2794,7 +3056,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
             } catch (e: Exception) {
-                if (e is CancellationException) {
+                if (e is CancellationException || e.message?.contains("cancelled", ignoreCase = true) == true) {
                     Log.w("PlayerViewModel", "📥 Format Download: Download cancelled by user")
                     _uiState.value = _uiState.value.copy(
                         downloadingSongs = _uiState.value.downloadingSongs - currentSong.id,

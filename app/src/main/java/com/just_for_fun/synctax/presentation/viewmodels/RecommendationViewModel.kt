@@ -62,6 +62,13 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     // Internal state for shuffle functionality
     private var allAvailableSongs = listOf<OnlineSearchResult>()
     private var currentBatchIndex = 0
+
+    // Home screen grid recommendations (persisted across scrolls)
+    private val _homeGridRecommendations = MutableStateFlow<List<OnlineSearchResult>>(emptyList())
+    val homeGridRecommendations: StateFlow<List<OnlineSearchResult>> = _homeGridRecommendations.asStateFlow()
+    
+    // Flag to track if initial load has been done (prevents reloading on recomposition)
+    private var hasInitializedData = false
     
     init {
         checkHistoryAndLoad()
@@ -70,8 +77,15 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Checks if user has enough listening history and loads recommendations.
      * First checks AppInitializer for preloaded data from splash screen.
+     * Only loads once - subsequent navigations will use cached data.
      */
     private fun checkHistoryAndLoad() {
+        // Skip if already initialized
+        if (hasInitializedData && _recommendations.value != null) {
+            Log.d(TAG, "Recommendations already loaded, skipping initialization")
+            return
+        }
+        
         viewModelScope.launch(AppDispatchers.Database) {
             val hasHistory = analyticsService.hasEnoughHistory(3)
             _hasEnoughHistory.value = hasHistory
@@ -90,12 +104,22 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
                         .shuffled()
                     currentBatchIndex = 0
                     _currentShuffleBatch.value = emptyList()
+
+                    // Prepare home grid recommendations (take 9 random)
+                    _homeGridRecommendations.value = (result.artistBased.take(10) +
+                            result.similarSongs.take(10) +
+                            result.discovery.take(10))
+                        .distinctBy { it.id }
+                        .shuffled()
+                        .take(9)
+
+                    hasInitializedData = true
                     
-                    android.util.Log.d("RecommendationViewModel", "Used preloaded recommendations from splash")
+                    Log.d(TAG, "Used preloaded recommendations from splash")
                 } else {
-                    // Fall back to network request
+                    // Fall back to network request (uses cached data if available)
                     withContext(AppDispatchers.Network) {
-                        loadRecommendations()
+                        loadRecommendationsInternal(forceRefresh = false)
                     }
                 }
             }
@@ -103,69 +127,71 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     }
     
     /**
-     * Loads recommendations from cache or generates new ones.
-     * Runs on appropriate background dispatchers.
+     * Internal function to load recommendations.
+     * This does the actual loading work.
      */
-    fun loadRecommendations() {
+    private suspend fun loadRecommendationsInternal(forceRefresh: Boolean) {
         if (_isLoading.value) return
         
-        viewModelScope.launch(AppDispatchers.Network) {
-            _isLoading.value = true
-            _error.value = null
+        _isLoading.value = true
+        _error.value = null
+        
+        try {
+            Log.d(TAG, if (forceRefresh) "Refreshing recommendations..." else "Loading recommendations...")
+            val result = recommendationService.generateRecommendations(forceRefresh = forceRefresh)
+            _recommendations.value = result
             
-            try {
-                Log.d(TAG, "Loading recommendations...")
-                val result = recommendationService.generateRecommendations()
-                _recommendations.value = result
-                
-                // Prepare shuffle pool
-                allAvailableSongs = (result.artistBased + result.similarSongs + 
-                                    result.discovery + result.trending)
-                    .distinctBy { it.id }
-                    .shuffled()
-                currentBatchIndex = 0
-                _currentShuffleBatch.value = emptyList()
-                
-                Log.d(TAG, "Loaded ${allAvailableSongs.size} total recommendations")
-            } catch (e: Exception) {
-                _error.value = "Failed to load recommendations: ${e.message}"
-                Log.e(TAG, "Error loading recommendations", e)
-            } finally {
-                _isLoading.value = false
-            }
+            // Prepare shuffle pool
+            allAvailableSongs = (result.artistBased + result.similarSongs + 
+                                result.discovery + result.trending)
+                .distinctBy { it.id }
+                .shuffled()
+            currentBatchIndex = 0
+            _currentShuffleBatch.value = emptyList()
+
+            // Prepare home grid recommendations (take 9 random)
+            _homeGridRecommendations.value = (result.artistBased.take(10) +
+                    result.similarSongs.take(10) +
+                    result.discovery.take(10))
+                .distinctBy { it.id }
+                .shuffled()
+                .take(9)
+
+            hasInitializedData = true
+            
+            Log.d(TAG, "Loaded ${allAvailableSongs.size} total recommendations")
+        } catch (e: Exception) {
+            _error.value = "Failed to load recommendations: ${e.message}"
+            Log.e(TAG, "Error loading recommendations", e)
+        } finally {
+            _isLoading.value = false
+        }
+    }
+    
+    /**
+     * Loads recommendations from cache or generates new ones.
+     * Only loads if recommendations are not already present (like Spotify/YouTube Music behavior).
+     * Use refreshRecommendations() to force a refresh.
+     */
+    fun loadRecommendations() {
+        // Skip if recommendations already exist (prevents reload on scroll/navigation)
+        if (_recommendations.value != null && hasInitializedData) {
+            Log.d(TAG, "Recommendations already loaded, use refreshRecommendations() to update")
+            return
+        }
+        
+        viewModelScope.launch(AppDispatchers.Network) {
+            loadRecommendationsInternal(forceRefresh = false)
         }
     }
     
     /**
      * Forces a refresh of recommendations from API.
+     * This should be called when user pulls to refresh or taps refresh button.
      */
     fun refreshRecommendations() {
-        if (_isLoading.value) return
-        
         viewModelScope.launch(AppDispatchers.Network) {
-            _isLoading.value = true
-            _error.value = null
-            
-            try {
-                Log.d(TAG, "Refreshing recommendations...")
-                val result = recommendationService.generateRecommendations(forceRefresh = true)
-                _recommendations.value = result
-                
-                // Refresh shuffle pool
-                allAvailableSongs = (result.artistBased + result.similarSongs + 
-                                    result.discovery + result.trending)
-                    .distinctBy { it.id }
-                    .shuffled()
-                currentBatchIndex = 0
-                _currentShuffleBatch.value = emptyList()
-                
-                Log.d(TAG, "Refreshed ${allAvailableSongs.size} recommendations")
-            } catch (e: Exception) {
-                _error.value = "Failed to refresh recommendations: ${e.message}"
-                Log.e(TAG, "Error refreshing recommendations", e)
-            } finally {
-                _isLoading.value = false
-            }
+            loadRecommendationsInternal(forceRefresh = true)
         }
     }
 
@@ -191,6 +217,14 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
                     .shuffled()
                 currentBatchIndex = 0
                 _currentShuffleBatch.value = emptyList()
+
+                // Prepare home grid recommendations (take 9 random)
+                _homeGridRecommendations.value = (result.artistBased.take(10) +
+                        result.similarSongs.take(10) +
+                        result.discovery.take(10))
+                    .distinctBy { it.id }
+                    .shuffled()
+                    .take(9)
 
                 Log.d(TAG, "Generated ${allAvailableSongs.size} user-input-based recommendations")
             } catch (e: Exception) {
@@ -266,14 +300,12 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Gets a mixed list of 9 recommendations for the home screen grid.
      */
+    /**
+     * Gets a mixed list of 9 recommendations for the home screen grid.
+     * returned from the persisted StateFlow.
+     */
     fun getGridRecommendations(): List<OnlineSearchResult> {
-        val result = _recommendations.value ?: return emptyList()
-        
-        return (result.artistBased.take(3) + 
-                result.similarSongs.take(3) + 
-                result.discovery.take(3))
-            .shuffled()
-            .take(9)
+        return _homeGridRecommendations.value
     }
     
     /**

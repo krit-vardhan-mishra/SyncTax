@@ -6,6 +6,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,14 +17,36 @@ class MusicPlayer(context: Context) {
 
     companion object {
         private const val TAG = "MusicPlayer"
+        
+        // Buffer configuration for long content streaming (like YouTube Music/Spotify)
+        // Min buffer: 30 seconds - allows quick start
+        // Max buffer: 5 minutes - keeps enough ahead for seeking
+        // Buffer for playback: 5 seconds - low threshold for smooth playback
+        // Buffer for rebuffer: 15 seconds - more buffer after stall
+        private const val MIN_BUFFER_MS = 30_000       // 30 seconds
+        private const val MAX_BUFFER_MS = 5 * 60_000   // 5 minutes
+        private const val PLAYBACK_BUFFER_MS = 5_000   // 5 seconds
+        private const val REBUFFER_MS = 15_000         // 15 seconds
     }
 
     // Use cached data source for better performance
     private val cachedDataSourceFactory = StreamCache.createCachedDataSourceFactory(context)
     private val mediaSourceFactory = DefaultMediaSourceFactory(cachedDataSourceFactory)
     
+    // Custom load control with larger buffers for long content streaming
+    private val loadControl = DefaultLoadControl.Builder()
+        .setBufferDurationsMs(
+            MIN_BUFFER_MS,      // minBufferMs
+            MAX_BUFFER_MS,      // maxBufferMs
+            PLAYBACK_BUFFER_MS, // bufferForPlaybackMs
+            REBUFFER_MS         // bufferForPlaybackAfterRebufferMs
+        )
+        .setPrioritizeTimeOverSizeThresholds(true)  // Prioritize time-based buffering
+        .build()
+    
     private val exoPlayer: ExoPlayer = ExoPlayer.Builder(context)
         .setMediaSourceFactory(mediaSourceFactory)
+        .setLoadControl(loadControl)
         .build()
     private val mainHandler = Handler(Looper.getMainLooper())
 

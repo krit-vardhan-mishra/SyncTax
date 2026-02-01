@@ -124,7 +124,7 @@ fun SongCard(
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = androidx.compose.ui.graphics.Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 },
@@ -141,7 +141,7 @@ fun SongCard(
                         Icon(
                             Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -159,7 +159,7 @@ fun SongCard(
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -177,7 +177,7 @@ fun SongCard(
                         Icon(
                             if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = null,
-                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -195,7 +195,7 @@ fun SongCard(
                         Icon(
                             Icons.Default.Add,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -213,7 +213,7 @@ fun SongCard(
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
+                            tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },

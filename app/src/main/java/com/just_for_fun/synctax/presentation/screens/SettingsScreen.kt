@@ -88,6 +88,7 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.app.TooltipIconButton
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.filled.Info
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -338,6 +339,18 @@ fun SettingsScreen(
     val userName by userPreferences.userName.collectAsState(initial = "")
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    // Read Me Dialog State
+    var showReadmeDialog by remember { mutableStateOf(false) }
+    val updateViewModel: com.just_for_fun.synctax.presentation.viewmodels.AppUpdateViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    val readmeContent by updateViewModel.readmeContent.collectAsState()
+
+    if (showReadmeDialog) {
+        com.just_for_fun.synctax.core.ui.ReadmeDialog(
+            content = readmeContent ?: "",
+            onDismiss = { showReadmeDialog = false }
+        )
+    }
 
     // Check if READ_MEDIA_IMAGES permission is granted
     var hasImagePermission by remember {
@@ -520,23 +533,15 @@ fun SettingsScreen(
                         }
 
                         Spacer(Modifier.height(8.dp))
-
-                        // Note about icon change
-                        Text(
-                            text = "⚠️ Changes take effect after app restart",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
-
 
             // --- 2. Album Art Section ---
             item {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -588,7 +593,7 @@ fun SettingsScreen(
             item {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -626,7 +631,7 @@ fun SettingsScreen(
 
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -729,7 +734,7 @@ fun SettingsScreen(
             item {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -914,6 +919,54 @@ fun SettingsScreen(
                             contentDescription = "Open link",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.rotate(180f) // Point right
+                        )
+                    }
+                }
+            }
+
+            // --- Read Me Section ---
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            updateViewModel.loadReadme()
+                            showReadmeDialog = true
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info, // Use Info icon or MenuBook if available
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Read Me",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "View app documentation and guide",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Open Read Me",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.rotate(180f)
                         )
                     }
                 }

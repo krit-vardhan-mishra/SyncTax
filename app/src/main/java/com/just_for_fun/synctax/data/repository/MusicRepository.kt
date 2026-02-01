@@ -451,10 +451,14 @@ class MusicRepository(private val context: Context) {
             // Extract embedded album art
             val embeddedArt = retriever.embeddedPicture
             if (embeddedArt != null && embeddedArt.isNotEmpty()) {
-                // Save embedded art as a separate file
-                val directory = audioFile.parentFile
-                val baseName = audioFile.nameWithoutExtension
-                val albumArtFile = File(directory, "$baseName.jpg")
+                // Save embedded art as a separate file in the app's internal cache directory
+                // This prevents "pollution" of the user's music folder with .jpg files
+                val cacheDir = context.cacheDir
+                // Use a hash or safe name to avoid conflicts/overwrites if needed, 
+                // but checking for baseName in cache is also fine.
+                // Using hash of absolute path to ensure uniqueness per file
+                val fileHash = audioFile.absolutePath.hashCode()
+                val albumArtFile = File(cacheDir, "art_$fileHash.jpg")
                 
                 // Only write if doesn't exist already
                 if (!albumArtFile.exists()) {
@@ -462,7 +466,7 @@ class MusicRepository(private val context: Context) {
                         FileOutputStream(albumArtFile).use { fos ->
                             fos.write(embeddedArt)
                         }
-                        Log.d("MusicRepository", "Extracted embedded album art to: ${albumArtFile.absolutePath}")
+                        Log.d("MusicRepository", "Extracted embedded album art to cache: ${albumArtFile.absolutePath}")
                     } catch (e: Exception) {
                         Log.w("MusicRepository", "Failed to save embedded album art: ${e.message}")
                     }

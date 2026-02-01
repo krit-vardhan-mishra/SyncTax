@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import com.just_for_fun.synctax.core.network.OnlineResultType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -79,7 +80,7 @@ import com.just_for_fun.synctax.presentation.utils.shimmer
  */
 @Composable
 fun RecommendationsSection(
-    recommendations: RecommendationService.RecommendationResult,
+    gridSongs: List<OnlineSearchResult>, // Changed from RecommendationResult
     onSongClick: (OnlineSearchResult) -> Unit,
     onViewAllClick: () -> Unit,
     getRecommendationReason: (OnlineSearchResult) -> String,
@@ -113,17 +114,17 @@ fun RecommendationsSection(
             }
         }
 
-        // 3x3 Grid of 9 recommendations - don't filter by duration since online results may not have it
-        val gridRecommendations = (recommendations.artistBased +
-                recommendations.similarSongs +
-                recommendations.discovery)
-            .distinctBy { it.id }
-            .shuffled()
-            .take(9)
+        // Log when recommendations change
+        androidx.compose.runtime.LaunchedEffect(gridSongs) {
+             android.util.Log.d("RecommendationSection", "♻️ Recommendations Section Updated: displaying ${gridSongs.size} songs")
+             if (gridSongs.isNotEmpty()) {
+                 android.util.Log.d("RecommendationSection", "🎵 First recommendation: ${gridSongs.first().title}")
+             }
+        }
 
-        if (gridRecommendations.isNotEmpty()) {
+        if (gridSongs.isNotEmpty()) {
             RecommendationsQuickAccessGrid(
-                songs = gridRecommendations,
+                songs = gridSongs,
                 onSongClick = onSongClick,
                 modifier = Modifier.height(400.dp),
                 onAddToQueue = onAddToQueue,
@@ -287,7 +288,27 @@ private fun RecommendationSpeedDialItem(
                 )
             }
 
-            // 4. Text Content
+            // 4. Type Tag (top-right corner) - uses author field if it contains type info
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .background(
+                        color = getEffectiveTypeColor(song).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = getEffectiveType(song),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp)
+                )
+            }
+
+            // 5. Text Content
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -319,7 +340,7 @@ private fun RecommendationSpeedDialItem(
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -338,7 +359,7 @@ private fun RecommendationSpeedDialItem(
                             Icon(
                                 Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -358,7 +379,7 @@ private fun RecommendationSpeedDialItem(
                             Icon(
                                 Icons.AutoMirrored.Rounded.QueueMusic,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -499,7 +520,7 @@ private fun RecommendationCarouselCard(
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -518,7 +539,7 @@ private fun RecommendationCarouselCard(
                             Icon(
                                 Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -538,7 +559,7 @@ private fun RecommendationCarouselCard(
                             Icon(
                                 Icons.AutoMirrored.Rounded.QueueMusic,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -588,6 +609,25 @@ private fun RecommendationCarouselCard(
                         )
                     )
             )
+
+            // Type Tag (top-right corner) - uses author field if it contains type info
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .background(
+                        color = getEffectiveTypeColor(song).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    text = getEffectiveType(song),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -602,14 +642,18 @@ private fun RecommendationCarouselCard(
             modifier = Modifier.width(180.dp)
         )
 
-        Text(
-            text = song.author ?: "Unknown Artist",
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(180.dp)
-        )
+        // Only show artist if it's not a type string
+        val displayArtist = getDisplayArtist(song)
+        if (displayArtist != null) {
+            Text(
+                text = displayArtist,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(180.dp)
+            )
+        }
     }
 
     // Bottom options dialog
@@ -696,6 +740,9 @@ fun SongListItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val displayArtist = getDisplayArtist(song)
+    val effectiveType = getEffectiveType(song)
+    
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -703,15 +750,36 @@ fun SongListItem(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Album art
-        AsyncImage(
-            model = song.thumbnailUrl,
-            contentDescription = song.title,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            contentScale = ContentScale.Crop
-        )
+        // Album art with type indicator
+        Box {
+            AsyncImage(
+                model = song.thumbnailUrl,
+                contentDescription = song.title,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop
+            )
+            
+            // Small type badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(2.dp)
+                    .background(
+                        color = getEffectiveTypeColor(song).copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(2.dp)
+                    )
+                    .padding(horizontal = 3.dp, vertical = 1.dp)
+            ) {
+                Text(
+                    text = effectiveType.take(1), // First letter: S, V, A, P, E
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.width(12.dp))
 
@@ -724,8 +792,9 @@ fun SongListItem(
                 overflow = TextOverflow.Ellipsis
             )
 
+            // Show artist if available, otherwise show the type
             Text(
-                text = song.author ?: "Unknown Artist",
+                text = displayArtist ?: effectiveType,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -740,5 +809,87 @@ fun SongListItem(
                 contentDescription = "Play"
             )
         }
+    }
+}
+
+/**
+ * Known type strings that may appear in the author field
+ */
+private val TYPE_STRINGS = setOf("Song", "Video", "Album", "Artist", "Podcast", "Episode")
+
+/**
+ * Check if the author field contains a type string instead of an actual artist name
+ */
+private fun isAuthorActuallyType(author: String?): Boolean {
+    return author != null && TYPE_STRINGS.contains(author)
+}
+
+/**
+ * Get the effective type from song, preferring the author field if it contains type info
+ */
+private fun getEffectiveType(song: OnlineSearchResult): String {
+    // If author contains a type string, use it directly
+    if (isAuthorActuallyType(song.author)) {
+        return song.author!!
+    }
+    // Otherwise fall back to the type enum
+    return getTypeDisplayName(song.type)
+}
+
+/**
+ * Get the effective type color, checking author field first
+ */
+@Composable
+private fun getEffectiveTypeColor(song: OnlineSearchResult): Color {
+    val typeString = if (isAuthorActuallyType(song.author)) song.author else null
+    
+    return when (typeString?.lowercase()) {
+        "song" -> Color(0xFF1DB954)      // Green for songs
+        "video" -> Color(0xFFFF0000)     // Red for videos
+        "album" -> Color(0xFF9C27B0)     // Purple for albums
+        "artist" -> Color(0xFF2196F3)    // Blue for artists
+        "podcast" -> Color(0xFFFF9800)   // Orange for podcasts
+        "episode" -> Color(0xFFFF5722)   // Deep orange for episodes
+        else -> getTypeTagColor(song.type)  // Fall back to enum-based color
+    }
+}
+
+/**
+ * Get display artist - returns null if author is actually a type string
+ */
+private fun getDisplayArtist(song: OnlineSearchResult): String? {
+    return if (isAuthorActuallyType(song.author)) {
+        null  // Don't display type as artist
+    } else {
+        song.author
+    }
+}
+
+/**
+ * Helper function to get display name for OnlineResultType
+ */
+private fun getTypeDisplayName(type: OnlineResultType): String {
+    return when (type) {
+        OnlineResultType.SONG -> "Song"
+        OnlineResultType.VIDEO -> "Video"
+        OnlineResultType.ALBUM -> "Album"
+        OnlineResultType.ARTIST -> "Artist"
+        OnlineResultType.PODCAST -> "Podcast"
+        OnlineResultType.EPISODE -> "Episode"
+    }
+}
+
+/**
+ * Helper function to get tag color for OnlineResultType
+ */
+@Composable
+private fun getTypeTagColor(type: OnlineResultType): Color {
+    return when (type) {
+        OnlineResultType.SONG -> Color(0xFF1DB954) // Green for songs
+        OnlineResultType.VIDEO -> Color(0xFFFF0000) // Red for videos
+        OnlineResultType.ALBUM -> Color(0xFF9C27B0) // Purple for albums
+        OnlineResultType.ARTIST -> Color(0xFF2196F3) // Blue for artists
+        OnlineResultType.PODCAST -> Color(0xFFFF9800) // Orange for podcasts
+        OnlineResultType.EPISODE -> Color(0xFFFF5722) // Deep orange for episodes
     }
 }

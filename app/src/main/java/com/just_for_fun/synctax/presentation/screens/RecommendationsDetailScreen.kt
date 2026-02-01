@@ -1,5 +1,6 @@
 package com.just_for_fun.synctax.presentation.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,11 +15,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,13 +53,45 @@ fun RecommendationsDetailScreen(
     val isLoading by recommendationViewModel.isLoading.collectAsState()
     val currentShuffleBatch by recommendationViewModel.currentShuffleBatch.collectAsState()
     
+    LaunchedEffect(recommendations) {
+        recommendations?.let { result ->
+            val tag = "RecommendationDetailLogger"
+
+            // Helper to determine type from author field
+            fun getTypeFromSong(song: com.just_for_fun.synctax.core.network.OnlineSearchResult): String {
+                val typeStrings = setOf("Song", "Video", "Album", "Artist", "Podcast", "Episode")
+                return if (song.author != null && typeStrings.contains(song.author)) {
+                    song.author
+                } else {
+                    song.type.name
+                }
+            }
+
+            result.artistBased.forEach { song ->
+                Log.d(tag, "Category: Based on Your Artists, Title: ${song.title}, Type: ${getTypeFromSong(song)}, ID: ${song.id}")
+            }
+
+            result.similarSongs.forEach { song ->
+                Log.d(tag, "Category: Similar Songs, Title: ${song.title}, Type: ${getTypeFromSong(song)}, ID: ${song.id}")
+            }
+
+            result.discovery.forEach { song ->
+                Log.d(tag, "Category: Discover New Music, Title: ${song.title}, Type: ${getTypeFromSong(song)}, ID: ${song.id}")
+            }
+
+            result.trending.forEach { song ->
+                Log.d(tag, "Category: Trending Now, Title: ${song.title}, Type: ${getTypeFromSong(song)}, ID: ${song.id}")
+            }
+        }
+    }
+    
     Scaffold(
         topBar = {
             SimpleDynamicMusicTopAppBar(
                 title = "Recommendations",
                 albumColors = AlbumColors.default(),
                 showShuffleButton = true,
-                showRefreshButton = true,
+                showRefreshButton = false, // User requested to remove refresh button and use pull-to-refresh
                 showPersonalizeButton = onNavigateToUserInput != null,
                 onShuffleClick = { recommendationViewModel.shuffleRecommendations() },
                 onRefreshClick = { recommendationViewModel.refreshRecommendations() },
@@ -62,18 +100,18 @@ fun RecommendationsDetailScreen(
             )
         }
     ) { padding ->
-        val pullToRefreshState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
-        androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        val pullToRefreshState = rememberPullToRefreshState()
+        PullToRefreshBox(
             isRefreshing = isLoading,
             onRefresh = { recommendationViewModel.refreshRecommendations() },
             state = pullToRefreshState,
             modifier = Modifier.fillMaxSize().padding(padding),
             indicator = {
-                androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator(
+                PullToRefreshDefaults.Indicator(
                     state = pullToRefreshState,
                     isRefreshing = isLoading,
                     modifier = Modifier.align(Alignment.TopCenter),
-                    color = androidx.compose.ui.graphics.Color(0xFFFF0033)
+                    color = Color(0xFFFF0033)
                 )
             }
         ) {

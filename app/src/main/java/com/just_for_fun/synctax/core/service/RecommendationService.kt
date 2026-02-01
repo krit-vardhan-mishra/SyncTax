@@ -2,12 +2,14 @@ package com.just_for_fun.synctax.core.service
 
 import android.util.Log
 import com.just_for_fun.synctax.core.dispatcher.AppDispatchers
+import com.just_for_fun.synctax.core.network.OnlineResultType
 import com.just_for_fun.synctax.core.network.OnlineSearchResult
 import com.just_for_fun.synctax.core.network.YouTubeInnerTubeClient
 import com.just_for_fun.synctax.data.local.dao.OnlineListeningHistoryDao
 import com.just_for_fun.synctax.data.local.dao.RecommendationCacheDao
 import com.just_for_fun.synctax.data.local.entities.OnlineListeningHistory
 import com.just_for_fun.synctax.data.local.entities.RecommendationCache
+import com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -99,7 +101,7 @@ class RecommendationService(
      * Takes precedence over cached recommendations for user-input-based results.
      */
     suspend fun generateUserInputRecommendations(
-        userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs
+        userInputs: UserRecommendationInputs
     ): RecommendationResult {
         Log.d(TAG, "Generating user-input-based recommendations")
 
@@ -120,34 +122,28 @@ class RecommendationService(
     /**
      * Filters results to only include songs (not videos, episodes, etc.).
      * Songs typically don't have typical video/episode indicators in the title.
-     * Duration filter is only applied if duration is available.
+     * Note: We allow long videos/songs to pass through - streaming handles them efficiently.
      */
     private fun filterSongsOnly(results: List<OnlineSearchResult>): List<OnlineSearchResult> {
         val filtered = results.filter { result ->
-            // Filter out common non-song indicators in title
+            // Filter out common non-song indicators in title (podcasts, tutorials, etc.)
+            // But allow music videos and long music compilations
             val title = result.title.lowercase()
-            val isLikelyNotSong = title.contains("episode") ||
+            val isLikelyNotMusic = title.contains("episode") ||
                     title.contains("podcast") ||
                     title.contains("full movie") ||
                     title.contains("official trailer") ||
                     title.contains("interview") ||
                     title.contains("documentary") ||
-                    title.contains("live stream") ||
                     title.contains("reaction") ||
                     title.contains("tutorial") ||
-                    title.contains("how to")
+                    title.contains("how to") ||
+                    title.contains("gameplay") ||
+                    title.contains("walkthrough")
             
-            // Duration check - songs are typically between 1-15 minutes
-            // Only apply this filter if duration is available
-            val hasReasonableDuration = if (result.duration != null && result.duration > 0) {
-                val durationInMinutes = result.duration / 60
-                durationInMinutes in 1..15
-            } else {
-                // If duration is not available, don't filter out (YouTube Music API already filters)
-                true
-            }
-            
-            !isLikelyNotSong && hasReasonableDuration
+            // Don't filter by duration - streaming handles long content efficiently
+            // Long music (10 hour mixes, compilations, ambient) should be allowed
+            !isLikelyNotMusic
         }
         
         Log.d(TAG, "Filtered ${results.size} results to ${filtered.size} songs")
@@ -386,7 +382,7 @@ class RecommendationService(
      * Generates discovery recommendations based on user inputs (albums and genres).
      */
     private suspend fun generateUserDiscoveryRecommendations(
-        userInputs: com.just_for_fun.synctax.presentation.screens.UserRecommendationInputs
+        userInputs: UserRecommendationInputs
     ): List<OnlineSearchResult> {
         val recommendations = mutableListOf<OnlineSearchResult>()
 

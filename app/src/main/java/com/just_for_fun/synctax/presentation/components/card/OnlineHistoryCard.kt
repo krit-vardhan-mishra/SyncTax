@@ -72,7 +72,7 @@ fun OnlineHistoryCard(
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 },
@@ -89,7 +89,7 @@ fun OnlineHistoryCard(
                         Icon(
                             Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -106,7 +106,7 @@ fun OnlineHistoryCard(
                     Icon(
                         Icons.Default.Share,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 },
@@ -130,7 +130,7 @@ fun OnlineHistoryCard(
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },

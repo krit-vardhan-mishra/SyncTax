@@ -26,11 +26,23 @@ class PlaybackCollector(
     private var playStartTime = 0L
     private var currentSongId: String? = null
     private var hasMarkedAsPlayed = false // Track if we've already marked this song as played
+    
+    // Store current song metadata for marking as played
+    private var currentSongTitle: String? = null
+    private var currentSongArtist: String? = null
+    private var currentSongThumbnail: String? = null
+    private var currentSongDuration: Int? = null
 
-    fun startCollecting(songId: String) {
+    fun startCollecting(songId: String, title: String? = null, artist: String? = null, thumbnailUrl: String? = null, duration: Long? = null) {
         currentSongId = songId
         playStartTime = System.currentTimeMillis()
         hasMarkedAsPlayed = false
+        
+        // Store metadata for later use
+        currentSongTitle = title
+        currentSongArtist = artist
+        currentSongThumbnail = thumbnailUrl
+        currentSongDuration = duration?.div(1000)?.toInt()
 
         collectJob?.cancel()
         // Use provided scope for lifecycle management
@@ -42,7 +54,14 @@ class PlaybackCollector(
                     if (!hasMarkedAsPlayed && currentSongId == songId) {
                         hasMarkedAsPlayed = true
                         val videoId = songId.removePrefix("online:").removePrefix("youtube:")
-                        onlineSongRepository?.markAsPlayed(videoId)
+                        // Pass metadata to ensure song is created if not exists
+                        onlineSongRepository?.markAsPlayed(
+                            videoId = videoId,
+                            title = currentSongTitle,
+                            artist = currentSongArtist,
+                            thumbnailUrl = currentSongThumbnail,
+                            duration = currentSongDuration
+                        )
                         onOnlineSongPlayed?.invoke(videoId)
                     }
                 }
@@ -55,6 +74,13 @@ class PlaybackCollector(
                 }
             }
         }
+    }
+    
+    /**
+     * Backward-compatible version without metadata
+     */
+    fun startCollecting(songId: String) {
+        startCollecting(songId, null, null, null, null)
     }
 
     suspend fun stopCollecting(skipped: Boolean = false) {
@@ -84,11 +110,19 @@ class PlaybackCollector(
             onPlaybackRecorded?.invoke()
         }
         
-        // Check if online song was fully played (90%+ completion)
-        if ((songId.startsWith("online:") || songId.startsWith("youtube:")) && completionRate >= 0.9f) {
+        // Check if online song was fully played (80%+ completion)
+        // Note: Actual auto-save is now handled in real-time by PlayerViewModel at 80% mark
+        // This is kept just to trigger the "fully played" event for history/stats if needed
+        if ((songId.startsWith("online:") || songId.startsWith("youtube:")) && completionRate >= 0.8f) {
             val videoId = songId.removePrefix("online:").removePrefix("youtube:")
             onlineSongRepository?.markAsFullyPlayed(videoId)
-            onOnlineSongFullyPlayed?.invoke(videoId)
+            // onOnlineSongFullyPlayed?.invoke(videoId) -- Removed to prevent double auto-save attempts
         }
+        
+        // Clear metadata
+        currentSongTitle = null
+        currentSongArtist = null
+        currentSongThumbnail = null
+        currentSongDuration = null
     }
 }

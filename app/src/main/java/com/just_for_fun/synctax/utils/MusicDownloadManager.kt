@@ -6,6 +6,12 @@ import android.net.Uri
 import android.os.Environment
 import com.just_for_fun.synctax.MusicApplication
 import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MusicDownloadManager private constructor() {
 
@@ -44,19 +50,28 @@ class MusicDownloadManager private constructor() {
      * For simplicity, using DownloadManager but to internal storage
      */
     fun saveSong(songId: String, songName: String, url: String, onComplete: (Boolean, String?) -> Unit) {
-        val fileName = "$songName${Constants.AUDIO_EXTENSION}"
+        val sanitizedName = songName.replace(Regex("[^a-zA-Z0-9._ -]"), "_")
+        val fileName = "$sanitizedName${Constants.AUDIO_EXTENSION}"
         val destinationFile = File(Constants.Path.SAVED_DIR, fileName)
 
-        val request = DownloadManager.Request(Uri.parse(url))
-            .setTitle("Saving $songName")
-            .setDescription("Saving music file")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-            .setDestinationUri(Uri.fromFile(destinationFile))
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(false)
-
-        val downloadId = downloadManager.enqueue(request)
-        onComplete(true, destinationFile.absolutePath)
+        // Use manual download for internal storage to avoid SecurityException with DownloadManager
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                URL(url).openStream().use { input ->
+                    FileOutputStream(destinationFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    onComplete(true, destinationFile.absolutePath)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    onComplete(false, null)
+                }
+            }
+        }
     }
 
     /**

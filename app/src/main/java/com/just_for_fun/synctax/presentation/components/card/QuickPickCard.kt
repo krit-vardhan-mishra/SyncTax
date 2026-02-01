@@ -107,7 +107,7 @@ fun QuickPickCard(
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
                 },
@@ -124,7 +124,7 @@ fun QuickPickCard(
                         Icon(
                             Icons.AutoMirrored.Filled.QueueMusic,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -142,7 +142,7 @@ fun QuickPickCard(
                         Icon(
                             if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             contentDescription = null,
-                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -160,7 +160,7 @@ fun QuickPickCard(
                         Icon(
                             Icons.AutoMirrored.Filled.PlaylistAdd,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },

@@ -59,15 +59,13 @@ class UpdateUtil(private val context: Context) {
     }
 
     /**
-     * Extension function to convert version tag to comparable number
+     * Clean version tag to get comparable version string (e.g., "v4.0.16-beta" -> "4.0.16")
      */
-    private fun String.tagNameToVersionNumber(): Int {
-        return this.replace("-beta", "")
+    private fun String.cleanVersionTag(): String {
+        return this.replace("v", "")
+            .replace("-beta", "")
             .replace("-alpha", "")
-            .replace("v", "")
-            .replace(".", "")
-            .padEnd(10, '0')
-            .toIntOrNull() ?: 0
+            .replace(Regex("[^0-9.]"), "")
     }
 
     // ==================== APP UPDATE METHODS ====================
@@ -89,56 +87,54 @@ class UpdateUtil(private val context: Context) {
             }
 
             val currentVersion = BuildConfig.VERSION_NAME
-            val currentVerNumber = currentVersion.tagNameToVersionNumber()
+            // We strip non-numeric characters for comparison to handle 4.0.16 correclty
+            val currentVerClean = currentVersion.cleanVersionTag()
 
             val includeBeta = sharedPreferences.getBoolean(PREF_INCLUDE_BETA, false)
-            var isInLatest = true
-
-            // Find appropriate release
-            var release: GithubRelease = if (includeBeta) {
-                releases.firstOrNull { it.tagName.contains("beta", true) || it.tagName.contains("alpha", true) }
-                    ?: releases.first()
+            
+            // Filter eligible releases
+            val eligibleReleases = if (includeBeta) {
+                releases
             } else {
-                releases.first { !it.tagName.contains("beta", true) && !it.tagName.contains("alpha", true) && !it.prerelease }
+                releases.filter { !it.tagName.contains("beta", true) && !it.tagName.contains("alpha", true) && !it.prerelease }
             }
 
-            if (includeBeta) {
-                // If user wants beta, check if stable is newer
-                val stableRelease = releases.firstOrNull { 
-                    !it.tagName.contains("beta", true) && 
-                    !it.tagName.contains("alpha", true) && 
-                    !it.prerelease 
-                }
-
-                if (stableRelease != null) {
-                    val betaVerNumber = release.tagName.removePrefix("v").tagNameToVersionNumber()
-                    val stableVerNumber = stableRelease.tagName.removePrefix("v").tagNameToVersionNumber()
-
-                    // If stable is newer than beta, use stable
-                    if (stableVerNumber > betaVerNumber) {
-                        release = stableRelease
-                        isInLatest = currentVerNumber >= stableVerNumber
-                    } else {
-                        isInLatest = currentVerNumber >= betaVerNumber
-                    }
-                }
-            } else {
-                val releaseVerNumber = release.tagName.removePrefix("v").removePrefix("v-").tagNameToVersionNumber()
-                
-                // If current version is beta but user disabled beta updates, allow downgrade to stable
-                isInLatest = if (currentVersion.contains("beta", true) || currentVersion.contains("alpha", true)) {
-                    false // Always show update option to move to stable
-                } else {
-                    currentVerNumber >= releaseVerNumber
-                }
+            if (eligibleReleases.isEmpty()) {
+                 return Result.failure(Exception("You are using the latest version"))
             }
 
-            // Check if user skipped this version
+            // Find the latest version from eligible releases
+             val release = eligibleReleases.maxWithOrNull { r1, r2 ->
+                compareVersions(r1.tagName.cleanVersionTag(), r2.tagName.cleanVersionTag())
+            } ?: eligibleReleases.first()
+            
+            val releaseVerClean = release.tagName.cleanVersionTag()
+
+            // Check if update is needed
+            // If current version is technically "greater" (dev build?) or equal, we are up to date.
+            // Exception: If we are on beta and want to be on stable (and stable is same version number or higher)
+            // But usually beta is lower.
+            
+            var isUpdateAvailable = compareVersions(releaseVerClean, currentVerClean) > 0
+            
+            // Special case: If users are on a beta build (e.g. 4.0.0-beta) and the latest stable is 4.0.0.
+            // compareVersions("4.0.0", "4.0.0") returns 0.
+            // But we might want to update from beta to stable.
+            if (!isUpdateAvailable && compareVersions(releaseVerClean, currentVerClean) == 0) {
+                 val isCurrentBeta = currentVersion.contains("beta", true) || currentVersion.contains("alpha", true)
+                 val isReleaseStable = !release.tagName.contains("beta", true) && !release.tagName.contains("alpha", true)
+                 
+                 if (isCurrentBeta && isReleaseStable) {
+                     isUpdateAvailable = true
+                 }
+            }
+
+            // Check if user skipped this specific version
             if (skippedVersions.contains(release.tagName)) {
-                isInLatest = true
+                isUpdateAvailable = false
             }
 
-            if (isInLatest) {
+            if (!isUpdateAvailable) {
                 return Result.failure(Exception("You are using the latest version"))
             }
 
@@ -409,10 +405,34 @@ class UpdateUtil(private val context: Context) {
      */
     private fun getGithubReleases(apiUrl: String): List<GithubRelease> {
         var releases = emptyList<GithubRelease>()
-        var connection: HttpURLConnection? = null
+        val json = fetchUrlContent(apiUrl) ?: return emptyList()
 
         try {
-            val url = URL(apiUrl)
+            val typeToken = object : TypeToken<List<GithubRelease>>() {}.type
+            releases = Gson().fromJson(json, typeToken)
+        } catch (e: Exception) {
+            Log.e(tag, "Error parsing GitHub releases JSON", e)
+        }
+
+        return releases
+    }
+
+    /**
+     * Fetch App README from GitHub master branch
+     */
+    fun getAppReadme(): String? {
+        // Try master branch first, could be main
+        val readmeUrl = "https://raw.githubusercontent.com/krit-vardhan-mishra/SyncTax/master/README.md"
+        return fetchUrlContent(readmeUrl)
+    }
+
+    /**
+     * Fetch text content from a URL
+     */
+    private fun fetchUrlContent(urlString: String): String? {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = URL(urlString)
             connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
@@ -421,16 +441,16 @@ class UpdateUtil(private val context: Context) {
             connection.readTimeout = 10000
 
             if (connection.responseCode < 300) {
-                val typeToken = object : TypeToken<List<GithubRelease>>() {}.type
-                releases = Gson().fromJson(InputStreamReader(connection.inputStream), typeToken)
+                return InputStreamReader(connection.inputStream).readText()
+            } else {
+                Log.e(tag, "HTTP error ${connection.responseCode} fetching $urlString")
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error fetching GitHub releases from $apiUrl", e)
+            Log.e(tag, "Error fetching URL $urlString", e)
         } finally {
             connection?.disconnect()
         }
-
-        return releases
+        return null
     }
 
     /**

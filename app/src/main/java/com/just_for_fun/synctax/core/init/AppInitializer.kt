@@ -120,6 +120,44 @@ object AppInitializer {
     }
     
     /**
+     * Parse artist string and split multiple artists into individual names.
+     * Handles common separators like comma, ampersand, "and", "feat.", "ft."
+     */
+    private fun parseArtistString(artistString: String): List<String> {
+        // Filter out invalid/category-like artist names
+        val invalidNames = listOf("Unknown", "Unknown Artist", "Song", "Video", "Album", "Artist", "Podcast", "Episode")
+        if (artistString.isBlank() || invalidNames.any { it.equals(artistString, ignoreCase = true) }) {
+            return emptyList()
+        }
+        
+        return artistString
+            // Split by common separators
+            .split(",", "&", " and ", " feat. ", " feat ", " ft. ", " ft ", " featuring ", " x ", " X ", " vs ", "/", ";")
+            .map { it.trim() }
+            // Remove common prefixes (handles cases like ", and Arohi Mhatre" -> "and Arohi Mhatre" -> "Arohi Mhatre")
+            .map { name ->
+                name.removePrefix("and ")
+                    .removePrefix("And ")
+                    .removePrefix("& ")
+                    .removePrefix("feat. ")
+                    .removePrefix("Feat. ")
+                    .removePrefix("ft. ")
+                    .removePrefix("Ft. ")
+                    .removePrefix("featuring ")
+                    .removePrefix("Featuring ")
+                    .removePrefix("with ")
+                    .removePrefix("With ")
+                    .trim()
+            }
+            .filter { name -> 
+                name.isNotEmpty() && 
+                !invalidNames.any { it.equals(name, ignoreCase = true) } &&
+                name.length > 1 // Filter single-character names
+            }
+            .distinct()
+    }
+    
+    /**
      * Run the initialization process. This should be called from the splash screen.
      * Updates progress as each phase completes.
      * 
@@ -331,8 +369,15 @@ object AppInitializer {
                 updateProgress("Loading artist photos...", 0.85f)
                 if (isOnline(context)) {
                     try {
-                        val homeViewModel = com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel(context as android.app.Application)
-                        val uniqueArtists = songs.map { it.artist }.distinct().take(10) // Preload first 10 artists
+                        val application = context.applicationContext as android.app.Application
+                        val homeViewModel = com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel(application)
+                        // Parse artists from songs, splitting multi-artist entries
+                        val uniqueArtists = songs
+                            .flatMap { song -> 
+                                parseArtistString(song.artist ?: "Unknown") 
+                            }
+                            .distinct()
+                            .take(10) // Preload first 10 artists
                         homeViewModel.fetchAllArtistPhotos(uniqueArtists)
                         Log.d(TAG, "Phase 13 complete: Started preloading artist photos for ${uniqueArtists.size} artists")
                     } catch (e: Exception) {

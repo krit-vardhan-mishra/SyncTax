@@ -244,7 +244,7 @@ private fun SpeedDialItem(
                         Icon(
                             Icons.Filled.PlayArrow,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     },
@@ -261,7 +261,7 @@ private fun SpeedDialItem(
                             Icon(
                                 Icons.AutoMirrored.Filled.PlaylistAdd,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -278,7 +278,7 @@ private fun SpeedDialItem(
                             Icon(
                                 if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                 contentDescription = null,
-                                tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },

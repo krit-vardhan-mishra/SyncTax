@@ -239,7 +239,7 @@ fun QuickPicksScreen(
                             Icon(
                                 Icons.Filled.PlayArrow,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -270,7 +270,7 @@ fun QuickPicksScreen(
                             Icon(
                                 Icons.AutoMirrored.Filled.QueueMusic,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
                         },
@@ -291,7 +291,7 @@ fun QuickPicksScreen(
                                 Icon(
                                     if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                         contentDescription = null,
-                                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                        tint = androidx.compose.ui.graphics.Color.White,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 },

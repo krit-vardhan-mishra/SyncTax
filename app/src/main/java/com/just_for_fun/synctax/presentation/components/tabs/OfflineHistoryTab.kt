@@ -17,7 +17,8 @@ import com.just_for_fun.synctax.presentation.components.utils.EmptyHistoryState
 @Composable
 fun LocalHistoryTab(
     songs: List<Song>,
-    onSongClick: (Song) -> Unit
+    onSongClick: (Song) -> Unit,
+    onLongClick: (Song) -> Unit
 ) {
     if (songs.isEmpty()) {
         EmptyHistoryState(message = "No offline listening history yet.\nPlay some local songs to see them here.")
@@ -34,7 +35,7 @@ fun LocalHistoryTab(
                 SimpleSongCard(
                     song = song,
                     onClick = { onSongClick(song) },
-                    onLongClick = { /* Options could be added here */ }
+                    onLongClick = { onLongClick(song) }
                 )
             }
             item {

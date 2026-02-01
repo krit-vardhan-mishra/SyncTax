@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -41,6 +44,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.card.AlbumCard
@@ -101,6 +105,7 @@ fun HomeScreen(
     onNavigateToStats: () -> Unit = {},
     onNavigateToListenedArtists: () -> Unit = {},
     onNavigateToArtistDetail: (String) -> Unit = {},
+    onNavigateToListenedAlbums: () -> Unit = {},
     onNavigateToAlbumDetail: (albumName: String, artistName: String) -> Unit = { _, _ -> },
     onNavigateToSavedSongs: () -> Unit = {}
 ) {
@@ -113,6 +118,7 @@ fun HomeScreen(
 
     // Recommendation state
     val recommendations by recommendationViewModel.recommendations.collectAsState()
+    val homeGridRecommendations by recommendationViewModel.homeGridRecommendations.collectAsState() // New state
     val isLoadingRecommendations by recommendationViewModel.isLoading.collectAsState()
     val hasEnoughHistory by recommendationViewModel.hasEnoughHistory.collectAsState()
 
@@ -293,6 +299,24 @@ fun HomeScreen(
 
                 // Update isRefreshing when scanning completes and refresh artist photos
                 LaunchedEffect(uiState.isScanning) {
+                    isRefreshing = uiState.isScanning
+                    if (uiState.isScanning) {
+                        android.util.Log.d("HomeScreen", "🔄 Pull-to-Refresh: Scanning started")
+                    } else {
+                        android.util.Log.d("HomeScreen", "✅ Pull-to-Refresh: Scanning completed")
+                    }
+                }
+
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    state = pullToRefreshState,
+                    onRefresh = {
+                        android.util.Log.d("HomeScreen", "👆 Pull-to-Refresh triggered by user")
+                        homeViewModel.scanMusic()
+                        recommendationViewModel.refreshRecommendations()
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     if (!uiState.isScanning && isRefreshing) {
                         // Refresh complete - re-fetch artist photos
                         val artistNames = mutableListOf<String>()
@@ -428,13 +452,37 @@ fun HomeScreen(
                                         )
                                     }
 
+                                    // Helper function to parse artist strings and split multiple artists
+                                    fun parseArtistString(artistString: String): List<String> {
+                                        val invalidNames = listOf("Unknown", "Unknown Artist", "Song", "Video", "Album", "Artist", "Podcast", "Episode")
+                                        if (artistString.isBlank() || invalidNames.any { it.equals(artistString, ignoreCase = true) }) {
+                                            return emptyList()
+                                        }
+                                        return artistString
+                                            .split(",", "&", " and ", " feat. ", " feat ", " ft. ", " ft ", " featuring ", " x ", " X ", " vs ", "/", ";")
+                                            .map { it.trim() }
+                                            .map { name ->
+                                                name.removePrefix("and ").removePrefix("And ").removePrefix("& ")
+                                                    .removePrefix("feat. ").removePrefix("Feat. ")
+                                                    .removePrefix("ft. ").removePrefix("Ft. ")
+                                                    .removePrefix("featuring ").removePrefix("Featuring ")
+                                                    .removePrefix("with ").removePrefix("With ").trim()
+                                            }
+                                            .filter { name -> name.isNotEmpty() && !invalidNames.any { it.equals(name, ignoreCase = true) } && name.length > 1 }
+                                            .distinct()
+                                    }
+                                    
                                     // Extract unique online artists from history with cached photos
+                                    // Split multi-artist entries into individual artists
                                     val onlineArtists = uiState.onlineHistory
-                                        .groupBy { it.artist }
-                                        .map { (name, history) ->
+                                        .flatMap { history -> 
+                                            parseArtistString(history.artist).map { artistName -> artistName to history }
+                                        }
+                                        .groupBy({ it.first }, { it.second })
+                                        .map { (name, histories) ->
                                             com.just_for_fun.synctax.presentation.model.ArtistUiModel(
                                                 name = name,
-                                                songCount = history.size,
+                                                songCount = histories.size,
                                                 isOnline = true,
                                                 imageUrl = uiState.artistPhotos[name] // Use cached photo
                                             )
@@ -462,6 +510,8 @@ fun HomeScreen(
                                             )
                                         }
                                     }
+
+                                    Spacer(Modifier.height(20.dp))
                                 }
                             }
                             
@@ -500,7 +550,7 @@ fun HomeScreen(
                                 item(key = "albums", contentType = "albums") {
                                     SectionHeader(
                                         title = "Albums",
-                                        onViewAllClick = null, // TODO: Navigate to all albums
+                                        onViewAllClick = onNavigateToListenedAlbums,
                                         titleColor = sectionTitleColor
                                     )
 
@@ -634,7 +684,7 @@ fun HomeScreen(
                                                                 Icon(
                                                                     Icons.Default.PlayArrow,
                                                                     contentDescription = null,
-                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    tint = Color.White,
                                                                     modifier = Modifier.size(20.dp)
                                                                 )
                                                             },
@@ -657,7 +707,7 @@ fun HomeScreen(
                                                                 Icon(
                                                                     Icons.AutoMirrored.Filled.QueueMusic,
                                                                     contentDescription = null,
-                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    tint = Color.White,
                                                                     modifier = Modifier.size(20.dp)
                                                                 )
                                                             },
@@ -677,7 +727,7 @@ fun HomeScreen(
                                                                 Icon(
                                                                     if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                                                     contentDescription = null,
-                                                                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                                                    tint = if (isFavorite) Color.White else Color.White,
                                                                     modifier = Modifier.size(20.dp)
                                                                 )
                                                             },
@@ -735,7 +785,7 @@ fun HomeScreen(
 
                                         recommendations != null -> {
                                             RecommendationsSection(
-                                                recommendations = recommendations!!,
+                                                gridSongs = homeGridRecommendations,
                                                 onSongClick = { song ->
                                                     playerViewModel.playOnlineSongWithRecommendations(
                                                         videoId = song.id,
@@ -751,7 +801,10 @@ fun HomeScreen(
                                                         )
                                                     )
                                                 },
-                                                onViewAllClick = onNavigateToRecommendations,
+                                                onViewAllClick = {
+                                                    android.util.Log.d("HomeScreen", "🚀 Navigating to Recommendations Screen")
+                                                    onNavigateToRecommendations()
+                                                },
                                                 getRecommendationReason = { song ->
                                                     recommendationViewModel.getRecommendationReason(
                                                         song
@@ -856,6 +909,73 @@ fun HomeScreen(
 
                                 item {
                                     SmallSpacer()
+                                }
+                            }
+
+                            // Offline Saved Section (Newest First)
+                            if (uiState.offlineSavedSongs.isNotEmpty()) {
+                                item(
+                                    key = "offline_saved",
+                                    contentType = "offline_saved"
+                                ) {
+                                    SectionHeader(
+                                        title = "Offline Saved",
+                                        subtitle = "Auto-saved & Downloaded",
+                                        onViewAllClick = onNavigateToSavedSongs,
+                                        titleColor = sectionTitleColor,
+                                        subtitleColor = sectionSubtitleColor
+                                    )
+
+                                    // Convert OnlineSong to Song for display
+                                    val offlineSongs = uiState.offlineSavedSongs.map { onlineSong ->
+                                        Song(
+                                            id = "online:${onlineSong.videoId}", // Prefix to distinguish
+                                            title = onlineSong.title,
+                                            artist = onlineSong.artist,
+                                            album = onlineSong.album,
+                                            duration = (onlineSong.duration?.toLong() ?: 0L) * 1000L,
+                                            filePath = "", // Not needed for UI
+                                            albumArtUri = onlineSong.thumbnailUrl,
+                                            genre = null,
+                                            releaseYear = null
+                                        )
+                                    }
+
+                                    // Display in a "Quick Access" style (2 rows horizontal scroll)
+                                    val rows = 2
+                                    val horizontalGridParams = offlineSongs.withIndex().groupBy { it.index / rows }
+
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        modifier = Modifier.padding(bottom = 24.dp)
+                                    ) {
+                                        items(horizontalGridParams.size) { columnIndex ->
+                                            Column(
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                val colItems = horizontalGridParams[columnIndex] ?: emptyList()
+                                                colItems.forEach { indexedValue ->
+                                                    val song = indexedValue.value
+                                                    val actualSong = uiState.offlineSavedSongs[indexedValue.index]
+
+                                                    SimpleSongCard(
+                                                        song = song,
+                                                        onClick = {
+                                                            // Play starting from this song, using the offline list
+                                                            // We need to pass the full list of OnlineSong to player
+                                                            playerViewModel.playOnlineSongEntitiesPlaylist(
+                                                                uiState.offlineSavedSongs,
+                                                                indexedValue.index
+                                                            )
+                                                        },
+                                                        onLongClick = {}, // Required parameter
+                                                        modifier = Modifier.width(300.dp) // Fixed width for uniformity
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
 

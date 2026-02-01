@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -59,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.just_for_fun.synctax.core.network.OnlineResultType
+import com.just_for_fun.synctax.core.network.OnlineSearchResult
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
@@ -67,6 +70,8 @@ import com.just_for_fun.synctax.presentation.components.card.OnlineResultCard
 import com.just_for_fun.synctax.presentation.components.card.SongCard
 import com.just_for_fun.synctax.presentation.components.chips.SearchFilterChips
 import com.just_for_fun.synctax.presentation.components.optimization.OptimizedLazyColumn
+import com.just_for_fun.synctax.presentation.components.player.BottomOptionsDialog
+import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.section.SimpleDynamicMusicTopAppBar
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
 import com.just_for_fun.synctax.presentation.guide.GuideContent
@@ -105,6 +110,10 @@ fun SearchScreen(
     var suggestionsJob by remember { mutableStateOf<Job?>(null) }
     var isSuggestionsExpanded by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
+    
+    // Bottom options sheet state
+    var showOptionsSheet by remember { mutableStateOf(false) }
+    var selectedOptionItem by remember { mutableStateOf<OnlineSearchResult?>(null) }
 
     // Theme-aware colors from AppColors
     val cardBackgroundColor = AppColors.homeCardBackground
@@ -551,7 +560,19 @@ fun SearchScreen(
 
                                         items(uiState.onlineSearchResults, key = { it.id }) { result ->
                                             val coroutineScope = rememberCoroutineScope()
-                                            OnlineResultCard(result) { res ->
+                                            
+                                            // Validate result type for long press options - mainly for songs
+                                            val isValidForOptions = result.type == OnlineResultType.SONG
+                                            
+                                            OnlineResultCard(
+                                                result = result,
+                                                onLongClick = if (isValidForOptions) {
+                                                    {
+                                                        selectedOptionItem = result
+                                                        showOptionsSheet = true
+                                                    }
+                                                } else null,
+                                                onPlayClick = { res ->
                                                 // Check result type and navigate accordingly
                                                 when (res.type) {
                                                     OnlineResultType.ALBUM -> {
@@ -683,7 +704,7 @@ fun SearchScreen(
                                                         )
                                                     }
                                                 }
-                                            }
+                                            })
                                         }
 
                                         item {
@@ -783,6 +804,55 @@ fun SearchScreen(
                 showGuide = false
                 userPreferences.setGuideShown(UserPreferences.GUIDE_SEARCH)
             }
+        )
+    }
+    
+    // Bottom Options Dialog for online search results
+    if (showOptionsSheet && selectedOptionItem != null) {
+        val item = selectedOptionItem!!
+        // Create a temporary Song object for validation
+        val tempSong = remember(item) {
+             Song(
+                id = if (item.id.startsWith("youtube:")) item.id else "youtube:${item.id}",
+                title = item.title,
+                artist = item.author ?: "Unknown",
+                album = item.year ?: "",
+                duration = item.duration ?: 0L,
+                filePath = "", // Not needed for validation
+                releaseYear = 0,
+                genre = null,
+                albumArtUri = item.thumbnailUrl
+             )
+        }
+        
+        val canAdd = playerViewModel.canAddToQueue(tempSong)
+        
+        BottomOptionsDialog(
+            isVisible = true,
+            onDismiss = { showOptionsSheet = false },
+            songTitle = item.title,
+            songArtist = item.author,
+            songThumbnail = item.thumbnailUrl,
+            options = listOf(
+                DialogOption(
+                    id = "add_to_queue",
+                    title = "Add to Queue",
+                    subtitle = if (canAdd) "Add to current playing queue" else playerViewModel.getQueueTypeMismatchMessage(tempSong),
+                    icon = {
+                         Icon(
+                            if (canAdd) Icons.Rounded.QueueMusic else Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = androidx.compose.ui.graphics.Color.White,
+                            modifier = Modifier.size(24.dp)
+                         )
+                    },
+                    enabled = canAdd,
+                    onClick = {
+                        playerViewModel.addToQueue(tempSong)
+                        SnackbarUtils.showGlobalSnackbar("Added to queue")
+                    }
+                )
+            )
         )
     }
 }

@@ -36,6 +36,10 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
     private val _downloadProgress = MutableStateFlow(0)
     val downloadProgress: StateFlow<Int> = _downloadProgress.asStateFlow()
 
+    // Read Me content
+    private val _readmeContent = MutableStateFlow<String?>(null)
+    val readmeContent: StateFlow<String?> = _readmeContent.asStateFlow()
+
     /**
      * Check for app updates
      */
@@ -148,6 +152,18 @@ class AppUpdateViewModel(application: Application) : AndroidViewModel(applicatio
                 updateUtil.getAppReleases()
             }
             _allReleases.value = releases
+        }
+    }
+
+    /**
+     * Load app README
+     */
+    fun loadReadme() {
+        viewModelScope.launch {
+            val content = withContext(Dispatchers.IO) {
+                updateUtil.getAppReadme()
+            }
+            _readmeContent.value = content ?: "Failed to load Read Me. Verify internet connection."
         }
     }
 

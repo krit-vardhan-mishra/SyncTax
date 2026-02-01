@@ -415,13 +415,29 @@ class YouTubeInnerTubeClient {
                 }
             }
             
+            // Determine type based on duration and title
+            // Videos over 20 minutes or with certain keywords are classified as VIDEO
+            val titleLower = title.lowercase()
+            val isLikelyVideo = (duration != null && duration > 20 * 60) || // > 20 minutes
+                    titleLower.contains("hour") ||
+                    titleLower.contains("- live") ||
+                    titleLower.contains("(live)") ||
+                    titleLower.contains("full movie") ||
+                    titleLower.contains("documentary") ||
+                    titleLower.contains("10 hours") ||
+                    titleLower.contains("1 hour") ||
+                    titleLower.contains("compilation")
+            
+            val resultType = if (isLikelyVideo) OnlineResultType.VIDEO else OnlineResultType.SONG
+            
             return OnlineSearchResult(
                 id = videoId,
                 title = title,
                 author = artist,
                 duration = duration,
                 thumbnailUrl = thumbnail,
-                streamUrl = null // Will be fetched when user tries to play
+                streamUrl = null, // Will be fetched when user tries to play
+                type = resultType
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to parse search result", e)

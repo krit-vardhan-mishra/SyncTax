@@ -140,6 +140,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             loadMostPlayedSongs()
             observeFavoriteSongs()
             observeOfflineSavedSongs()
+            
+            // Check for expired offline songs (older than 7 days)
+            viewModelScope.launch(AppDispatchers.Database) {
+                val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
+                onlineSongRepository.deleteExpiredSongs(oneWeekAgo)
+            }
         }
     }
 
@@ -291,11 +297,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun extractArtists(songs: List<Song>) {
         viewModelScope.launch(Dispatchers.Default) {
-             val artists = songs.groupBy { it.artist ?: "Unknown" }
-                .map { (name, songs) ->
+             // Parse and split multi-artist entries into individual artists
+             val artistSongCount = mutableMapOf<String, Int>()
+             
+             songs.forEach { song ->
+                 val artistString = song.artist ?: "Unknown"
+                 // Split by common separators
+                 val individualArtists = parseArtistString(artistString)
+                 
+                 individualArtists.forEach { artistName ->
+                     artistSongCount[artistName] = (artistSongCount[artistName] ?: 0) + 1
+                 }
+             }
+             
+             val artists = artistSongCount
+                .map { (name, count) ->
                     com.just_for_fun.synctax.presentation.model.ArtistUiModel(
                         name = name,
-                        songCount = songs.size
+                        songCount = count
                     )
                 }
                 .sortedByDescending { it.songCount }
@@ -304,6 +323,45 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                  _uiState.value = _uiState.value.copy(artists = artists)
              }
         }
+    }
+    
+    /**
+     * Parse artist string and split multiple artists into individual names.
+     * Handles common separators like comma, ampersand, "and", "feat.", "ft."
+     */
+    private fun parseArtistString(artistString: String): List<String> {
+        // Filter out invalid/category-like artist names
+        val invalidNames = listOf("Unknown", "Unknown Artist", "Song", "Video", "Album", "Artist", "Podcast", "Episode")
+        if (artistString.isBlank() || invalidNames.any { it.equals(artistString, ignoreCase = true) }) {
+            return emptyList()
+        }
+        
+        return artistString
+            // Split by common separators
+            .split(",", "&", " and ", " feat. ", " feat ", " ft. ", " ft ", " featuring ", " x ", " X ", " vs ", "/", ";")
+            .map { it.trim() }
+            // Remove common prefixes (handles cases like ", and Arohi Mhatre" -> "and Arohi Mhatre" -> "Arohi Mhatre")
+            .map { name ->
+                name.removePrefix("and ")
+                    .removePrefix("And ")
+                    .removePrefix("& ")
+                    .removePrefix("feat. ")
+                    .removePrefix("Feat. ")
+                    .removePrefix("ft. ")
+                    .removePrefix("Ft. ")
+                    .removePrefix("featuring ")
+                    .removePrefix("Featuring ")
+                    .removePrefix("with ")
+                    .removePrefix("With ")
+                    .trim()
+            }
+            .filter { name -> 
+                name.isNotEmpty() && 
+                !invalidNames.any { it.equals(name, ignoreCase = true) } &&
+                name.length > 1 // Filter single-character names
+            }
+            .distinct()
+            .ifEmpty { listOf(artistString) } // Fallback to original if no valid splits
     }
 
     private fun extractAlbums(songs: List<Song>) {
@@ -1441,7 +1499,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Load online listening history from database
+     * Load online listening history from database.
+     * Uses a flat flow structure to ensure proper updates.
      */
     private fun loadOnlineHistory() {
         viewModelScope.launch {
@@ -1449,15 +1508,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val database =
                     com.just_for_fun.synctax.data.local.MusicDatabase.getDatabase(getApplication())
                 val userPreferences = UserPreferences(getApplication())
-                var isFirst = true
-                userPreferences.onlineHistoryCount.collect { limit ->
-                    if (isFirst) {
-                        isFirst = false
-                    }
-                    database.onlineListeningHistoryDao().getRecentOnlineHistory(limit)
-                        .collect { history ->
-                            _uiState.value = _uiState.value.copy(onlineHistory = history)
-                        }
+                
+                // Combine limit flow with history flow
+                kotlinx.coroutines.flow.combine(
+                    userPreferences.onlineHistoryCount,
+                    database.onlineListeningHistoryDao().getAllOnlineHistoryFlow()
+                ) { limit, allHistory ->
+                    // Take only the limited number of recent history items
+                    allHistory.take(limit)
+                }.collect { history ->
+                    _uiState.value = _uiState.value.copy(onlineHistory = history)
                 }
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Error loading online listening history", e)
@@ -1624,6 +1684,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearSearchSuggestions() {
         _uiState.value = _uiState.value.copy(searchSuggestions = emptyList())
+    }
+
+    /**
+     * Delete a saved song (offline cache)
+     */
+    fun deleteSavedSong(song: OnlineSong) {
+        viewModelScope.launch {
+            try {
+                onlineSongRepository.removeSavedSong(song)
+                // Refresh list
+                val updatedList = _uiState.value.offlineSavedSongs.filter { it.videoId != song.videoId }
+                _uiState.value = _uiState.value.copy(offlineSavedSongs = updatedList)
+                Log.d("HomeViewModel", "Removed saved song: ${song.title}")
+            } catch (e: Exception) {
+                Log.e("HomeViewModel", "Error deleting saved song", e)
+            }
+        }
     }
 }
 

@@ -18,26 +18,26 @@ Before creating a release, ensure you have:
 
 ### Step 2: Tag Version (CRITICAL - App Checks This)
 ```
-Tag version: v3.5.0
+Tag version: v4.2.0
 ```
 **Important Rules:**
 - Must start with `v` or `v-` followed by the version number
 - Version number must match exactly what's in `app/build.gradle.kts` `versionName`
-- Format: `v{major}.{minor}.{patch}` (e.g., `v3.5.0`) or `v-{major}.{minor}.{patch}` (e.g., `v-3.5.0`)
+- Format: `v{major}.{minor}.{patch}` (e.g., `v4.2.0`) or `v-{major}.{minor}.{patch}` (e.g., `v-4.2.0`)
 - The app handles both formats automatically
-- **Recommended**: Use `v` prefix without hyphen for consistency (e.g., `v3.5.0`)
+- **Recommended**: Use `v` prefix without hyphen for consistency (e.g., `v4.2.0`)
 
 ### Step 3: Release Title
 ```
-Release title: SyncTax v3.5.0
+Release title: SyncTax v4.2.0
 ```
-**Format:** `SyncTax v{version}` (e.g., `SyncTax v3.5.0`)
+**Format:** `SyncTax v{version}` (e.g., `SyncTax v4.2.0`)
 
 ### Step 4: Release Description
 Write a clear description of what's new in this version. Example:
 
 ```
-## What's New in SyncTax v3.5.0
+## What's New in SyncTax v4.2.0
 
 ### ✨ New Features
 - Added automatic update checking
@@ -70,8 +70,8 @@ Write a clear description of what's new in this version. Example:
 - File name can be anything, but recommended format: `SyncTax-{version}.apk`
 
 **Example file names that work:**
-- ✅ `SyncTax-3.5.0.apk`
-- ✅ `SyncTax-v3.5.0.apk`
+- ✅ `SyncTax-4.2.0.apk`
+- ✅ `SyncTax-v4.2.0.apk`
 - ✅ `app-release.apk`
 - ✅ `SyncTax.apk`
 
@@ -92,27 +92,27 @@ GET https://api.github.com/repos/krit-vardhan-mishra/SyncTax/releases/latest
 ```
 
 It looks for:
-1. **`tag_name`**: Must be `v{version}` format (e.g., `v3.5.0`)
+1. **`tag_name`**: Must be `v{version}` format (e.g., `v4.2.0`)
 2. **Assets**: Finds the first file ending with `.apk`
 3. **Comparison**: Compares tag version with app's current version
 
 ## ⚠️ Critical Mistakes to Avoid
 
 ### ❌ Wrong Tag Format
-- `3.5.0` (missing `v` prefix) → App won't recognize version
-- `version-3.5.0` → App won't parse correctly
-- `v3.5` → Missing patch version
+- `4.2.0` (missing `v` prefix) → App won't recognize version
+- `version-4.2.0` → App won't parse correctly
+- `v4.2` → Missing patch version
 
 ### ❌ Wrong APK Extension
-- `SyncTax-3.5.0.apk.zip` → Not `.apk`
-- `SyncTax-3.5.0.APK` → Wrong case
+- `SyncTax-4.2.0.apk.zip` → Not `.apk`
+- `SyncTax-4.2.0.APK` → Wrong case
 
 ### ❌ Pre-release Set
 - Pre-releases are ignored by the update checker
 
 ### ❌ Version Mismatch
-- Tag: `v3.5.0` but app version is `3.4.0` → Won't trigger update
-- Tag: `v3.5.0` but app version is `3.5.1` → Won't show update
+- Tag: `v4.2.0` but app version is `4.1.0` → Won't trigger update
+- Tag: `v4.2.0` but app version is `4.2.1` → Won't show update
 
 ## 📝 Version Numbering Convention
 
@@ -141,7 +141,7 @@ After publishing:
 2. App fetches latest release data
 3. Compares versions
 4. If newer version available:
-   - Shows snackbar: "Update available: v3.5.0"
+   - Shows snackbar: "Update available: v4.2.0"
    - User taps "Download"
    - Downloads APK to Downloads folder
    - Opens Android installer
