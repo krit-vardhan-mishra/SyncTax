@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudQueue
@@ -840,7 +841,7 @@ fun SearchScreen(
                     subtitle = if (canAdd) "Add to current playing queue" else playerViewModel.getQueueTypeMismatchMessage(tempSong),
                     icon = {
                          Icon(
-                            if (canAdd) Icons.Rounded.QueueMusic else Icons.Rounded.Warning,
+                            if (canAdd) Icons.AutoMirrored.Rounded.QueueMusic else Icons.Rounded.Warning,
                             contentDescription = null,
                             tint = androidx.compose.ui.graphics.Color.White,
                             modifier = Modifier.size(24.dp)

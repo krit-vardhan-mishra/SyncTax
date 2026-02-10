@@ -738,33 +738,42 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 videoId = videoId,
                 limit = 50,
                 onResult = { recommendations ->
-                    if (recommendations.isEmpty()) {
-                        // Fallback: try getAllRecommendations for videos/mixed content
-                        Log.d("PlayerViewModel", "🎬 No song-only recommendations, trying all recommendations for video")
-                        fetchAllRecommendationsForVideoId(videoId)
-                    } else {
-                        Log.d(
-                            "PlayerViewModel",
-                            "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
-                        )
-                        // Convert RecommendedSong to Song, filtering out the current song
-                        val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
-                            Song(
-                                id = "youtube:${rec.videoId}",
-                                title = rec.title,
-                                artist = rec.artist,
-                                album = null,
-                                duration = 0L,
-                                filePath = rec.watchUrl,
-                                genre = null,
-                                releaseYear = null,
-                                albumArtUri = rec.thumbnail
+                    try {
+                        if (recommendations.isEmpty()) {
+                            // Fallback: try getAllRecommendations for videos/mixed content
+                            Log.d("PlayerViewModel", "🎬 No song-only recommendations, trying all recommendations for video")
+                            fetchAllRecommendationsForVideoId(videoId)
+                        } else {
+                            Log.d(
+                                "PlayerViewModel",
+                                "🎵 Got ${recommendations.size} YouTube recommendations for restored song"
                             )
+                            // Convert RecommendedSong to Song, filtering out the current song
+                            val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
+                                Song(
+                                    id = "youtube:${rec.videoId}",
+                                    title = rec.title,
+                                    artist = rec.artist,
+                                    album = null,
+                                    duration = 0L,
+                                    filePath = rec.watchUrl,
+                                    genre = null,
+                                    releaseYear = null,
+                                    albumArtUri = rec.thumbnail
+                                )
+                            }
+                            viewModelScope.launch(Dispatchers.Main) {
+                                _uiState.value = _uiState.value.copy(
+                                    upNextRecommendations = recommendedSongs,
+                                    isLoadingRecommendations = false
+                                )
+                            }
                         }
-                        _uiState.value = _uiState.value.copy(
-                            upNextRecommendations = recommendedSongs,
-                            isLoadingRecommendations = false
-                        )
+                    } catch (e: Exception) {
+                        Log.e("PlayerViewModel", "❌ Error processing recommendations", e)
+                        viewModelScope.launch(Dispatchers.Main) {
+                            _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                        }
                     }
                 },
                 onError = { error ->
@@ -785,32 +794,43 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             videoId = videoId,
             limit = 50,
             onResult = { recommendations ->
-                Log.d(
-                    "PlayerViewModel",
-                    "🎬 Got ${recommendations.size} all-type recommendations (including videos)"
-                )
-                // Convert RecommendedSong to Song, filtering out the current song
-                val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
-                    Song(
-                        id = "youtube:${rec.videoId}",
-                        title = rec.title,
-                        artist = rec.artist,
-                        album = null,
-                        duration = 0L,
-                        filePath = rec.watchUrl,
-                        genre = null,
-                        releaseYear = null,
-                        albumArtUri = rec.thumbnail
+                try {
+                    Log.d(
+                        "PlayerViewModel",
+                        "🎬 Got ${recommendations.size} all-type recommendations (including videos)"
                     )
+                    // Convert RecommendedSong to Song, filtering out the current song
+                    val recommendedSongs = recommendations.filter { it.videoId != videoId }.map { rec ->
+                        Song(
+                            id = "youtube:${rec.videoId}",
+                            title = rec.title,
+                            artist = rec.artist,
+                            album = null,
+                            duration = 0L,
+                            filePath = rec.watchUrl,
+                            genre = null,
+                            releaseYear = null,
+                            albumArtUri = rec.thumbnail
+                        )
+                    }
+                    viewModelScope.launch(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(
+                            upNextRecommendations = recommendedSongs,
+                            isLoadingRecommendations = false
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e("PlayerViewModel", "❌ Error processing all recommendations", e)
+                    viewModelScope.launch(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                    }
                 }
-                _uiState.value = _uiState.value.copy(
-                    upNextRecommendations = recommendedSongs,
-                    isLoadingRecommendations = false
-                )
             },
             onError = { error ->
                 Log.e("PlayerViewModel", "❌ Failed to fetch all recommendations: $error")
-                _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                viewModelScope.launch(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isLoadingRecommendations = false)
+                }
             }
         )
     }
@@ -1192,11 +1212,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     ) {
         viewModelScope.launch {
             val context = getApplication<Application>()
+            
+            // Check SAVED_DIR first (where saveSong() writes files with sanitized names)
+            val sanitizedTitle = title.replace(Regex("[^a-zA-Z0-9._ -]"), "_")
+            val savedFile = java.io.File(
+                com.just_for_fun.synctax.utils.Constants.Path.SAVED_DIR,
+                "$sanitizedTitle${com.just_for_fun.synctax.utils.Constants.AUDIO_EXTENSION}"
+            )
             val cacheFile = java.io.File(context.cacheDir, "stream_${videoId}.cache")
             
-            if (cacheFile.exists() && cacheFile.length() > 0) {
-                // Play from cached file
-                Log.d("PlayerViewModel", "🎵 Playing offline cached song: $title")
+            // Try saved dir first, then cache dir for backward compatibility
+            val offlineFile = when {
+                savedFile.exists() && savedFile.length() > 0 -> savedFile
+                cacheFile.exists() && cacheFile.length() > 0 -> cacheFile
+                else -> null
+            }
+            
+            if (offlineFile != null) {
+                // Play from offline file
+                Log.d("PlayerViewModel", "🎵 Playing offline song: $title from ${offlineFile.name}")
                 
                 // Stop any previous playback
                 playbackCollector.stopCollecting(skipped = true)
@@ -1218,7 +1252,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     artist = artist ?: "Unknown",
                     album = null,
                     duration = durationMs,
-                    filePath = cacheFile.absolutePath,
+                    filePath = offlineFile.absolutePath,
                     genre = null,
                     releaseYear = null,
                     albumArtUri = highQualityThumbnail
@@ -1228,7 +1262,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 queueManager.initializeQueue(listOf(offlineSong), 0)
                 
                 // Prepare and play from cache
-                player.prepare(cacheFile.absolutePath, offlineSong.id)
+                player.prepare(offlineFile.absolutePath, offlineSong.id)
                 player.play()
                 
                 playbackCollector.startCollecting(

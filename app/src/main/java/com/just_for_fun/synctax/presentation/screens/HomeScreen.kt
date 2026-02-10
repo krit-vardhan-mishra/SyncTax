@@ -49,6 +49,7 @@ import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.card.AlbumCard
 import com.just_for_fun.synctax.presentation.components.card.ArtistCard
+import com.just_for_fun.synctax.presentation.components.card.AppUpdateCard
 import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
 import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.presentation.components.onboarding.DirectorySelectionDialog
@@ -395,6 +396,14 @@ fun HomeScreen(
                             state = listState,
                             modifier = Modifier.fillMaxSize()
                         ) {
+                            // App Update Card (shown when update is available)
+                            item(
+                                key = "app_update_card",
+                                contentType = "update"
+                            ) {
+                                AppUpdateCard()
+                            }
+
                             // Greeting Section with dynamic colors
                             if (userName.isNotEmpty()) {
                                 item(

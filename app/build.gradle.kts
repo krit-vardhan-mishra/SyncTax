@@ -20,8 +20,8 @@ android {
         applicationId = "com.just_for_fun.synctax"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "4.2.0"
+        versionCode = 7
+        versionName = "4.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -62,6 +62,13 @@ android {
             "String",
             "SPOTIFY_CLIENT_SECRET",
             "\"${properties.getProperty("SPOTIFY_CLIENT_SECRET") ?: ""}\""
+        )
+
+        // NewPipe Extractor Version from libs.versions.toml
+        buildConfigField(
+            "String",
+            "NEWPIPE_EXTRACTOR_VERSION",
+            "\"${libs.versions.newpipeextractor.get().removePrefix("v")}\""
         )
 
         ndk {

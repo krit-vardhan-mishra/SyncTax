@@ -74,13 +74,10 @@ object LibraryUpdateChecker {
         }
     }
 
-    /**
-     * Get current NewPipeExtractor version from build config
-     */
     private fun getCurrentNewPipeVersion(): String {
-        // This would be set in build.gradle.kts as a buildConfigField
-        // For now, we'll hardcode it based on our libs.versions.toml
-        return "0.25.1" // Update this when you update the library
+        // Version is injected from libs.versions.toml via BuildConfig
+        // This ensures it stays in sync with the actual dependency version
+        return BuildConfig.NEWPIPE_EXTRACTOR_VERSION
     }
 
     /**

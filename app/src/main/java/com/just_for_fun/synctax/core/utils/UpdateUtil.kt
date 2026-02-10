@@ -378,7 +378,7 @@ class UpdateUtil(private val context: Context) {
      * This should be updated when the library is updated in libs.versions.toml
      */
     private fun getCurrentNewPipeVersion(): String {
-        return "0.25.1" // Matches libs.versions.toml
+        return BuildConfig.NEWPIPE_EXTRACTOR_VERSION
     }
 
     /**

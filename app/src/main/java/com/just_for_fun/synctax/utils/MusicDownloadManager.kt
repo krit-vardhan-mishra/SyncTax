@@ -78,7 +78,8 @@ class MusicDownloadManager private constructor() {
      * Check if song is saved (in internal storage)
      */
     fun isSongSaved(songId: String, songName: String): Boolean {
-        val fileName = "$songName${Constants.AUDIO_EXTENSION}"
+        val sanitizedName = songName.replace(Regex("[^a-zA-Z0-9._ -]"), "_")
+        val fileName = "$sanitizedName${Constants.AUDIO_EXTENSION}"
         val file = File(Constants.Path.SAVED_DIR, fileName)
         return file.exists()
     }
@@ -96,7 +97,8 @@ class MusicDownloadManager private constructor() {
      * Get saved song path
      */
     fun getSavedSongPath(songId: String, songName: String): String? {
-        val fileName = "$songName${Constants.AUDIO_EXTENSION}"
+        val sanitizedName = songName.replace(Regex("[^a-zA-Z0-9._ -]"), "_")
+        val fileName = "$sanitizedName${Constants.AUDIO_EXTENSION}"
         val file = File(Constants.Path.SAVED_DIR, fileName)
         return if (file.exists()) file.absolutePath else null
     }
@@ -114,7 +116,8 @@ class MusicDownloadManager private constructor() {
      * Delete saved song
      */
     fun deleteSavedSong(songId: String, songName: String): Boolean {
-        val fileName = "$songName${Constants.AUDIO_EXTENSION}"
+        val sanitizedName = songName.replace(Regex("[^a-zA-Z0-9._ -]"), "_")
+        val fileName = "$sanitizedName${Constants.AUDIO_EXTENSION}"
         val file = File(Constants.Path.SAVED_DIR, fileName)
         return file.delete()
     }

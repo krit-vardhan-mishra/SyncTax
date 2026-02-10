@@ -26,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okio.buffer
 import okio.source
+import com.just_for_fun.synctax.utils.CrashLogger
 import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
@@ -42,6 +43,9 @@ class MusicApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+
+        // Install global crash handler first to catch ALL crashes
+        CrashLogger.install(this)
 
         // Initialize WebView on main thread (required for Android 10+)
         try {

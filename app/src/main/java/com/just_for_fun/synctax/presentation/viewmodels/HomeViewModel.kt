@@ -470,8 +470,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         currentSearchJob?.cancel()
 
         currentSearchJob = viewModelScope.launch(AppDispatchers.Network) {
-            _uiState.value =
-                _uiState.value.copy(isSearchingOnline = true, onlineSearchResults = emptyList())
+            withContext(Dispatchers.Main) {
+                _uiState.value =
+                    _uiState.value.copy(isSearchingOnline = true, onlineSearchResults = emptyList())
+            }
 
             // Save search query to history
             if (query.isNotBlank()) {
@@ -657,10 +659,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                _uiState.value = _uiState.value.copy(
-                    isSearchingOnline = false,
-                    onlineSearchResults = results
-                )
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isSearchingOnline = false,
+                        onlineSearchResults = results
+                    )
+                }
 
                 // Cache results if it was a full search
                 if (filterType == SearchFilterType.ALL) {
@@ -676,13 +680,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             } catch (e: CancellationException) {
                 // Coroutine cancellation is expected, don't show as error
-                _uiState.value = _uiState.value.copy(isSearchingOnline = false)
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(isSearchingOnline = false)
+                }
                 throw e
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isSearchingOnline = false,
-                    error = e.message
-                )
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isSearchingOnline = false,
+                        error = e.message
+                    )
+                }
             }
         }
     }

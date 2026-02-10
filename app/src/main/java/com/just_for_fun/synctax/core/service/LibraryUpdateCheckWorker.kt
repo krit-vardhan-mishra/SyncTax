@@ -83,8 +83,9 @@ class LibraryUpdateCheckWorker(
     private fun showUpdateNotification(updateResult: LibraryUpdateResult) {
         createNotificationChannel()
 
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            data = Uri.parse(updateResult.releaseUrl)
+        val intent = Intent(context, com.just_for_fun.synctax.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("open_update_settings", true)
         }
 
         val pendingIntent = PendingIntent.getActivity(

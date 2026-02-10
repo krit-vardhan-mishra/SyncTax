@@ -107,6 +107,9 @@ fun UpdateSettingsSection(
             onDismiss = { 
                 showLibraryUpdateDialog = false 
                 viewModel.resetLibraryUpdateState()
+            },
+            onUpdateApp = {
+                viewModel.checkForAppUpdate()
             }
         )
     }
@@ -365,12 +368,33 @@ fun UpdateSettingsSection(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "ℹ Library updates require a new app version. Check for app updates to get the latest libraries.",
+                                text = "ℹ Library updates are bundled with app updates. Update the app to get the latest NewPipe Extractor.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            TextButton(onClick = { showLibraryUpdateDialog = true }) {
-                                Text("View Details")
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        // Trigger app update check - app updates bundle the latest library
+                                        viewModel.checkForAppUpdate()
+                                    },
+                                    enabled = appUpdateState !is AppUpdateViewModel.AppUpdateState.Checking &&
+                                              appUpdateState !is AppUpdateViewModel.AppUpdateState.Downloading
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Update,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Update App", style = MaterialTheme.typography.labelMedium)
+                                }
+                                TextButton(onClick = { showLibraryUpdateDialog = true }) {
+                                    Text("Details")
+                                }
                             }
                         }
                     }
@@ -383,7 +407,7 @@ fun UpdateSettingsSection(
                     }
                     else -> {
                         Text(
-                            text = "Version 0.25.1",
+                            text = "Version 0.25.2",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -590,16 +614,14 @@ fun AppUpdateDialog(
     )
 }
 
-/**
- * Library update info dialog
- */
 @Composable
 fun LibraryUpdateInfoDialog(
     currentVersion: String,
     latestVersion: String,
     releaseNotes: String,
     releaseUrl: String,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onUpdateApp: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -631,9 +653,9 @@ fun LibraryUpdateInfoDialog(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Library updates are bundled with app updates. " +
-                           "When a new app version is released with updated libraries, " +
-                           "you'll be notified through the app update system.",
+                    text = "The NewPipe Extractor library handles YouTube streaming. " +
+                           "To get the latest version, update the app — library updates are " +
+                           "bundled with new app releases.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -653,18 +675,28 @@ fun LibraryUpdateInfoDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, releaseUrl.toUri())
-                    context.startActivity(intent)
+                    onUpdateApp()
+                    onDismiss()
                 }
             ) {
-                Text("View on GitHub")
+                Text("Update App")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+            Row {
+                TextButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_VIEW, releaseUrl.toUri())
+                        context.startActivity(intent)
+                    }
+                ) {
+                    Text("GitHub")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("Close")
+                }
             }
         }
     )
