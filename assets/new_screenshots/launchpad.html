@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncTax Launchpad</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-0: #05060b;
+            --bg-1: #0f1020;
+            --surface: #141726;
+            --surface-2: #1a1d2f;
+            --ink: #f6f7ff;
+            --muted: #b3b7cb;
+            --aqua: #69c8ff;
+            --violet: #7e47ff;
+            --fuchsia: #cf2cb5;
+            --ruby: #ff355e;
+            --stroke: rgba(255, 255, 255, 0.12);
+            --soft-stroke: rgba(255, 255, 255, 0.07);
+            --slide-width: min(1280px, calc(100vw - 40px));
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: "Manrope", sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 10% 8%, rgba(105, 200, 255, 0.2), transparent 28%),
+                radial-gradient(circle at 86% 12%, rgba(207, 44, 181, 0.23), transparent 32%),
+                radial-gradient(circle at 75% 85%, rgba(126, 71, 255, 0.24), transparent 36%),
+                linear-gradient(160deg, #05060b 0%, #090a14 40%, #080911 100%);
+            padding: 28px 0 64px;
+        }
+
+        .deck {
+            width: 100%;
+            display: grid;
+            gap: 30px;
+            justify-items: center;
+        }
+
+        .slide {
+            position: relative;
+            width: var(--slide-width);
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
+            border-radius: 30px;
+            border: 1px solid var(--soft-stroke);
+            background:
+                radial-gradient(circle at 20% -10%, rgba(105, 200, 255, 0.28), transparent 34%),
+                radial-gradient(circle at 88% 12%, rgba(207, 44, 181, 0.26), transparent 36%),
+                radial-gradient(circle at 70% 92%, rgba(126, 71, 255, 0.28), transparent 38%),
+                linear-gradient(155deg, #0a0c14 0%, #0b0d1b 48%, #0f111f 100%);
+            box-shadow:
+                0 22px 60px rgba(0, 0, 0, 0.65),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+            padding: clamp(20px, 3.3vw, 42px);
+            animation: slide-in 0.8s ease both;
+        }
+
+        .slide:nth-child(2) { animation-delay: 0.05s; }
+        .slide:nth-child(3) { animation-delay: 0.1s; }
+        .slide:nth-child(4) { animation-delay: 0.15s; }
+        .slide:nth-child(5) { animation-delay: 0.2s; }
+        .slide:nth-child(6) { animation-delay: 0.25s; }
+        .slide:nth-child(7) { animation-delay: 0.3s; }
+
+        .slide::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 0.7px, transparent 0.7px);
+            background-size: 16px 16px;
+            opacity: 0.12;
+            pointer-events: none;
+        }
+
+        .slide-head {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 22px;
+            margin-bottom: clamp(16px, 2.2vw, 24px);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.11em;
+            color: #ffd8e5;
+            background: rgba(255, 53, 94, 0.14);
+            border: 1px solid rgba(255, 53, 94, 0.45);
+            border-radius: 999px;
+            margin-bottom: 12px;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--ruby), #ff6a8a);
+            box-shadow: 0 0 12px rgba(255, 53, 94, 0.7);
+        }
+
+        h1,
+        h2 {
+            font-family: "Sora", sans-serif;
+            letter-spacing: -0.02em;
+            line-height: 1.06;
+        }
+
+        h1 {
+            font-size: clamp(46px, 6.2vw, 82px);
+        }
+
+        h2 {
+            font-size: clamp(28px, 3.6vw, 48px);
+        }
+
+        .lead {
+            margin-top: 12px;
+            max-width: 740px;
+            color: var(--muted);
+            font-size: clamp(16px, 2vw, 28px);
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .note {
+            color: rgba(214, 220, 242, 0.88);
+            font-size: clamp(13px, 1.5vw, 20px);
+            font-weight: 600;
+        }
+
+        .chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chip {
+            padding: 9px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.05);
+            color: #eef2ff;
+            font-size: clamp(12px, 1.25vw, 16px);
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            backdrop-filter: blur(8px);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: clamp(18px, 2.6vw, 34px);
+        }
+
+        .hero-copy {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 14px;
+        }
+
+        .hero-copy .lead {
+            max-width: 560px;
+            font-size: clamp(17px, 2.2vw, 27px);
+        }
+
+        .hero-badges {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            max-width: 480px;
+            margin-top: 6px;
+        }
+
+        .metric {
+            border-radius: 16px;
+            padding: 12px 14px;
+            background: linear-gradient(140deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .metric strong {
+            display: block;
+            font-size: clamp(15px, 1.65vw, 21px);
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .metric span {
+            font-size: clamp(12px, 1.22vw, 16px);
+            color: #c8cce0;
+            font-weight: 600;
+        }
+
+        .hero-visual {
+            position: relative;
+            z-index: 2;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: linear-gradient(145deg, rgba(16, 20, 38, 0.95), rgba(20, 16, 36, 0.9));
+            min-height: 100%;
+            padding: 16px;
+        }
+
+        .hero-banner {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.3;
+            filter: saturate(1.1) contrast(1.05);
+        }
+
+        .hero-gradient {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(160deg, rgba(8, 10, 18, 0.35), rgba(10, 9, 18, 0.72));
+        }
+
+        .hero-icon {
+            position: relative;
+            width: clamp(116px, 14vw, 182px);
+            aspect-ratio: 1;
+            margin: 8px 0 10px;
+            border-radius: 28%;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.45);
+            box-shadow:
+                0 16px 30px rgba(0, 0, 0, 0.45),
+                0 0 30px rgba(207, 44, 181, 0.38);
+        }
+
+        .hero-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .hero-stack {
+            position: relative;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .shot {
+            position: relative;
+            border-radius: 22px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: linear-gradient(145deg, #090b14, #0c0e18);
+            box-shadow:
+                0 16px 26px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transform: translateY(24px) scale(0.98);
+            opacity: 0;
+            animation: shot-in 0.72s ease forwards;
+            animation-delay: var(--delay, 0ms);
+            transition: transform 0.28s ease, border-color 0.28s ease;
+        }
+
+        .shot:hover {
+            transform: translateY(-4px) scale(1.015);
+            border-color: rgba(105, 200, 255, 0.68);
+        }
+
+        .shot::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            z-index: 2;
+        }
+
+        .shot img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #05060c;
+        }
+
+        .hero-stack .shot {
+            width: min(46%, 260px);
+            aspect-ratio: 9 / 19.5;
+        }
+
+        .hero-stack .shot:nth-child(2) {
+            margin-top: 36px;
+        }
+
+        .hero-tag {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 3;
+            padding: 7px 11px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.33);
+            background: rgba(5, 8, 17, 0.55);
+            backdrop-filter: blur(8px);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #eaf3ff;
+        }
+
+        .gallery {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            gap: 14px;
+            margin-top: 8px;
+        }
+
+        .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        .cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+
+        .gallery .shot {
+            aspect-ratio: 9 / 19.5;
+            min-height: 0;
+        }
+
+        .slide-foot {
+            position: relative;
+            z-index: 2;
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .highlight {
+            padding: 10px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(105, 200, 255, 0.35);
+            color: #dff4ff;
+            background: linear-gradient(145deg, rgba(105, 200, 255, 0.12), rgba(126, 71, 255, 0.12));
+            font-size: clamp(12px, 1.3vw, 17px);
+            font-weight: 700;
+        }
+
+        .finale {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .finale::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(120deg, rgba(255, 53, 94, 0.24), transparent 36%),
+                linear-gradient(290deg, rgba(105, 200, 255, 0.2), transparent 38%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .cta-band {
+            position: relative;
+            z-index: 2;
+            margin-top: 14px;
+            padding: clamp(14px, 2vw, 18px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: linear-gradient(135deg, rgba(255, 53, 94, 0.24), rgba(126, 71, 255, 0.24), rgba(105, 200, 255, 0.2));
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .cta-title {
+            font-family: "Sora", sans-serif;
+            font-size: clamp(18px, 2.2vw, 30px);
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .cta-sub {
+            color: #f2f5ff;
+            font-size: clamp(13px, 1.3vw, 17px);
+            font-weight: 600;
+        }
+
+        .badge {
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 9px 14px;
+            background: rgba(7, 9, 18, 0.46);
+            font-size: clamp(11px, 1vw, 14px);
+            font-weight: 800;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        @keyframes slide-in {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shot-in {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @media (max-width: 1160px) {
+            .slide {
+                aspect-ratio: auto;
+                min-height: 760px;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-visual {
+                min-height: 360px;
+            }
+
+            .hero-stack {
+                justify-content: flex-start;
+            }
+
+            .cols-6,
+            .cols-5,
+            .cols-4 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 820px) {
+            body {
+                padding: 16px 0 48px;
+            }
+
+            :root {
+                --slide-width: calc(100vw - 18px);
+            }
+
+            .slide {
+                border-radius: 22px;
+                padding: 16px;
+                min-height: 680px;
+            }
+
+            .slide-head {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .hero-badges {
+                grid-template-columns: 1fr;
+                max-width: 100%;
+            }
+
+            .cols-6,
+            .cols-5,
+            .cols-4,
+            .cols-3 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .cta-band {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .slide,
+            .shot {
+                animation: none;
+                opacity: 1;
+                transform: none;
+            }
+
+            .shot:hover {
+                transform: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="deck">
+
+        <section class="slide hero">
+            <div class="hero-copy">
+                <span class="eyebrow">Play Store + GitHub Launchpad</span>
+                <h1>SyncTax</h1>
+                <p class="lead">Offline-first music player with local privacy, AI-assisted discovery, and polished dark UI.</p>
+                <div class="chip-row">
+                    <span class="chip">On-device intelligence</span>
+                    <span class="chip">No cloud lock-in</span>
+                    <span class="chip">Compose-first experience</span>
+                </div>
+                <div class="hero-badges">
+                    <div class="metric">
+                        <strong>Current Build</strong>
+                        <span>v4.2.1 visual showcase</span>
+                    </div>
+                    <div class="metric">
+                        <strong>Platform Ready</strong>
+                        <span>Play Store screenshots + GitHub README</span>
+                    </div>
+                    <div class="metric">
+                        <strong>Design System</strong>
+                        <span>Blue-violet-magenta from app branding</span>
+                    </div>
+                    <div class="metric">
+                        <strong>Core Accent</strong>
+                        <span>Ruby red from headphone icon</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hero-visual">
+                <img src="banner.jpg" alt="SyncTax banner" class="hero-banner">
+                <div class="hero-gradient"></div>
+                <span class="hero-tag">Official Brand Visual</span>
+
+                <div class="hero-icon">
+                    <img src="../app_icon.jpg" alt="SyncTax app icon">
+                </div>
+
+                <div class="hero-stack">
+                    <figure class="shot" style="--delay: 160ms;">
+                        <img src="screenshot_04_home_screen_first.png" alt="SyncTax home screen">
+                    </figure>
+                    <figure class="shot" style="--delay: 250ms;">
+                        <img src="screenshot_13_offline_player.png" alt="SyncTax offline player screen">
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <section class="slide">
+            <div class="slide-head">
+                <div>
+                    <span class="eyebrow">Onboarding Flow</span>
+                    <h2>Fast setup with clear privacy messaging</h2>
+                    <p class="lead">From welcome to folder scan in a clean guided flow designed for trust.</p>
+                </div>
+                <div class="highlight">First-run UX: permission, directory selection, and contextual guidance</div>
+            </div>
+
+            <div class="gallery cols-4">
+                <figure class="shot" style="--delay: 120ms;"><img src="screenshot_01_landing_screen.png" alt="Landing screen"></figure>
+                <figure class="shot" style="--delay: 180ms;"><img src="screenshot_00_asking_permission.png" alt="Permission screen"></figure>
+                <figure class="shot" style="--delay: 240ms;"><img src="screenshot_03_select_directory_option.png" alt="Select music folders"></figure>
+                <figure class="shot" style="--delay: 300ms;"><img src="screenshot_02_home_screen_starting_with_guide.png" alt="Home onboarding guide"></figure>
+            </div>
+        </section>
+
+        <section class="slide">
+            <div class="slide-head">
+                <div>
+                    <span class="eyebrow">Search + Online</span>
+                    <h2>Search, stream, and sync lyrics in one flow</h2>
+                    <p class="lead">Quick online results, instant playback, and synced lyric overlays for immersive listening.</p>
+                </div>
+                <div class="chip-row">
+                    <span class="chip">Smart search chips</span>
+                    <span class="chip">Online queue</span>
+                    <span class="chip">Lyrics overlay</span>
+                </div>
+            </div>
+
+            <div class="gallery cols-5">
+                <figure class="shot" style="--delay: 100ms;"><img src="screenshot_07_search_screen.png" alt="Search home"></figure>
+                <figure class="shot" style="--delay: 150ms;"><img src="screenshot_08_searching_song_online.png" alt="Online search results"></figure>
+                <figure class="shot" style="--delay: 200ms;"><img src="screenshot_09_online_song_player.png" alt="Online player"></figure>
+                <figure class="shot" style="--delay: 250ms;"><img src="screenshot_12_online_lyrics_fetched.png" alt="Online synced lyrics"></figure>
+                <figure class="shot" style="--delay: 300ms;"><img src="screenshot_14_offline_lyrics.png" alt="Offline lyrics"></figure>
+            </div>
+        </section>
+
+        <section class="slide">
+            <div class="slide-head">
+                <div>
+                    <span class="eyebrow">Discovery</span>
+                    <h2>Home built for recall, speed, and momentum</h2>
+                    <p class="lead">Adaptive modules keep listening history, speed dial, and curated picks one tap away.</p>
+                </div>
+                <div class="highlight">Core modules: history, speed dial, quick picks, and category rails</div>
+            </div>
+
+            <div class="gallery cols-4">
+                <figure class="shot" style="--delay: 110ms;"><img src="screenshot_04_home_screen_first.png" alt="Home overview"></figure>
+                <figure class="shot" style="--delay: 170ms;"><img src="screenshot_06_home_screen_third.png" alt="Home with recommendations"></figure>
+                <figure class="shot" style="--delay: 230ms;"><img src="screenshot_15_quick_pick_before_training.png" alt="Quick picks before training"></figure>
+                <figure class="shot" style="--delay: 290ms;"><img src="screenshot_16_quick_pick_after_training.png" alt="Quick picks after training"></figure>
+            </div>
+        </section>
+
+        <section class="slide">
+            <div class="slide-head">
+                <div>
+                    <span class="eyebrow">Library Experience</span>
+                    <h2>Deep browsing across songs, artists, and albums</h2>
+                    <p class="lead">Switch between list and grid patterns while preserving visual rhythm and playback context.</p>
+                </div>
+                <div class="chip-row">
+                    <span class="chip">Song-first tab</span>
+                    <span class="chip">Artist hubs</span>
+                    <span class="chip">Album detail pages</span>
+                </div>
+            </div>
+
+            <div class="gallery cols-6">
+                <figure class="shot" style="--delay: 90ms;"><img src="screenshot_17_library_screen_songs.png" alt="Library songs"></figure>
+                <figure class="shot" style="--delay: 130ms;"><img src="screenshot_18_library_screen_artists_01.png" alt="Artists grid view"></figure>
+                <figure class="shot" style="--delay: 170ms;"><img src="screenshot_18_library_screen_artists_02.png" alt="Artists list view"></figure>
+                <figure class="shot" style="--delay: 210ms;"><img src="screenshot_21_library_screen_albums.png" alt="Albums view"></figure>
+                <figure class="shot" style="--delay: 250ms;"><img src="screenshot_22_album_screen.png" alt="Album detail"></figure>
+                <figure class="shot" style="--delay: 290ms;"><img src="screenshot_20_artist_screen.png" alt="Artist detail"></figure>
+            </div>
+        </section>
+
+        <section class="slide">
+            <div class="slide-head">
+                <div>
+                    <span class="eyebrow">Controls + Intelligence</span>
+                    <h2>Settings depth with transparent ML diagnostics</h2>
+                    <p class="lead">Users can tune theme, caching, update channels, and inspect training readiness in-app.</p>
+                </div>
+                <div class="highlight">Settings surfaces + model dashboard + listening analytics</div>
+            </div>
+
+            <div class="gallery cols-4">
+                <figure class="shot" style="--delay: 120ms;"><img src="screenshot_23_settings_screen.png" alt="Settings controls"></figure>
+                <figure class="shot" style="--delay: 180ms;"><img src="screenshot_23_settings_screen_02.png" alt="Updates settings"></figure>
+                <figure class="shot" style="--delay: 240ms;"><img src="screenshot_24_train_model_screen.png" alt="Model training dashboard"></figure>
+                <figure class="shot" style="--delay: 300ms;"><img src="screenshot_28_listening_stats.png" alt="Listening stats dashboard"></figure>
+            </div>
+        </section>
+
+        <section class="slide finale">
+            <div class="slide-head">
+                <div>
+                    <span class="eyebrow">Playlists + Sharing</span>
+                    <h2>Create, import, and showcase your music world</h2>
+                    <p class="lead">Playlist management, external import support, and expressive player visuals complete the product story.</p>
+                </div>
+                <div class="chip-row">
+                    <span class="chip">Playlist creation</span>
+                    <span class="chip">YouTube import</span>
+                    <span class="chip">Immersive player</span>
+                </div>
+            </div>
+
+            <div class="gallery cols-4">
+                <figure class="shot" style="--delay: 100ms;"><img src="screenshot_25_playlist_list.png" alt="Playlist list"></figure>
+                <figure class="shot" style="--delay: 160ms;"><img src="screenshot_26_playlist.png" alt="Playlist detail"></figure>
+                <figure class="shot" style="--delay: 220ms;"><img src="screenshot_27_import_playlist.png" alt="Import playlist screen"></figure>
+                <figure class="shot" style="--delay: 280ms;"><img src="screenshot_13_offline_player.png" alt="Offline now playing screen"></figure>
+            </div>
+
+            <div class="cta-band">
+                <div>
+                    <div class="cta-title">SyncTax launch assets are ready</div>
+                    <div class="cta-sub">Use these slides for Play Store listings, GitHub repository media, and release posts.</div>
+                </div>
+                <span class="badge">krit-vardhan-mishra/SyncTax</span>
+            </div>
+        </section>
+
+    </main>
+</body>
+</html>

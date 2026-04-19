@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -440,7 +441,10 @@ fun SearchScreen(
                                         }
                                     }
 
-                                    items(uiState.searchHistory, key = { it.id }) { historyItem ->
+                                    itemsIndexed(
+                                        items = uiState.searchHistory,
+                                        key = { index, historyItem -> "${historyItem.id}_$index" }
+                                    ) { _, historyItem ->
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -559,7 +563,12 @@ fun SearchScreen(
                                             }
                                         }
 
-                                        items(uiState.onlineSearchResults, key = { it.id }) { result ->
+                                        itemsIndexed(
+                                            items = uiState.onlineSearchResults,
+                                            key = { index, result ->
+                                                "${result.type}_${result.id}_${result.browseId ?: ""}_$index"
+                                            }
+                                        ) { _, result ->
                                             val coroutineScope = rememberCoroutineScope()
                                             
                                             // Validate result type for long press options - mainly for songs
@@ -781,7 +790,10 @@ fun SearchScreen(
                                         modifier = Modifier.padding(bottom = 8.dp)
                                     )
                                 }
-                                items(filteredSongs, key = { it.id }) { song ->
+                                itemsIndexed(
+                                    items = filteredSongs,
+                                    key = { index, song -> "${song.id}_${song.filePath}_$index" }
+                                ) { _, song ->
                                     SongCard(
                                         song = song,
                                         onClick = { playerViewModel.playSong(song, filteredSongs) },
