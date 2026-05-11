@@ -77,6 +77,7 @@ import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PartyViewModel
 import com.just_for_fun.synctax.presentation.screens.PartyDashboardScreen
 import com.just_for_fun.synctax.presentation.screens.CreatePartyScreen
+import com.just_for_fun.synctax.presentation.screens.JoinPartyScreen
 import com.just_for_fun.synctax.presentation.screens.PartySessionScreen
 import kotlinx.coroutines.launch
 
@@ -373,12 +374,23 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
                             ) {
                                 PartyDashboardScreen(
-                                    partyViewModel = partyViewModel,
                                     onNavigateBack = { navController.popBackStack() },
                                     onCreatePartyClick = { navController.navigate("createParty") },
-                                    onPreviousPartyClick = { partyName -> 
-                                        // For now, jump to session screen. In reality, it should attempt to connect first.
-                                        navController.navigate("partySession/$partyName") 
+                                    onJoinPartyClick = { navController.navigate("joinParty") }
+                                )
+                            }
+                            composable(
+                                "joinParty",
+                                enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                            ) {
+                                JoinPartyScreen(
+                                    partyViewModel = partyViewModel,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onJoinSuccess = { partyName ->
+                                        navController.navigate("partySession/$partyName")
                                     }
                                 )
                             }

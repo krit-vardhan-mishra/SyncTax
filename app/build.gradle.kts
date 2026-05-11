@@ -186,11 +186,12 @@ dependencies {
     implementation("androidx.media3:media3-session:1.2.1")
     implementation("androidx.media:media:1.6.0")
 
-    // Nearby Connections for Party Mode
-    implementation("com.google.android.gms:play-services-nearby:19.3.0")
-
     // AndroidX Startup (explicit to ensure compatible version and resources)
     implementation("androidx.startup:startup-runtime:1.2.0")
+
+    // QR code generation (host sharing)
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
 
     // Lifecycle

@@ -47,6 +47,8 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
     private val _discoveredParties = connectionManager.discoveredParties
     val discoveredParties = _discoveredParties
 
+    val hostHotspotInfo = connectionManager.hostHotspotInfo
+
     // Client issue state — shown on host UI
     val clientIssues = connectionManager.clientIssues
     
@@ -151,9 +153,9 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
         connectionManager.stopDiscovery()
     }
 
-    fun joinParty(endpointId: String, userName: String) {
-        Log.d(TAG, "🎉 Joining party $endpointId as $userName")
-        connectionManager.joinParty(endpointId, userName)
+    fun joinParty(ssid: String, passphrase: String, userName: String) {
+        Log.d(TAG, "Joining party via hotspot ssid=$ssid as $userName")
+        connectionManager.joinParty(ssid, passphrase, userName)
         // Start continuous sync when joining
         syncController.startSyncing()
         startForegroundService("Party", isHost = false)

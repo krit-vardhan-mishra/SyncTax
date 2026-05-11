@@ -30,6 +30,9 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE id = :songId")
     suspend fun getSongById(songId: String): Song?
 
+    @Query("SELECT * FROM songs WHERE filePath = :filePath")
+    suspend fun getSongByFilePath(filePath: String): Song?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSong(song: Song)
 

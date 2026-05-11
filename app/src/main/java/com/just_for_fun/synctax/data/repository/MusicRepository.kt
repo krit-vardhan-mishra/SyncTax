@@ -55,18 +55,20 @@ class MusicRepository(private val context: Context) {
     suspend fun scanDeviceMusic(selectedPaths: List<String> = emptyList()): List<Song> =
         withContext(Dispatchers.IO) {
             val songs = mutableListOf<Song>()
+            // Track file paths already added to prevent duplicates across scan passes
+            val scannedFilePaths = mutableSetOf<String>()
 
             // Get app's download directory - always scan this
             val appMusicDir = getAppMusicDirectory()
 
             // First, scan app's download directory directly (not relying on MediaStore)
-            scanDirectoryDirectly(appMusicDir, songs)
+            scanDirectoryDirectly(appMusicDir, songs, scannedFilePaths)
 
             // Also scan standard Downloads directory as requested
             try {
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                 if (downloadsDir.exists() && downloadsDir.isDirectory) {
-                    scanDirectoryDirectly(downloadsDir, songs)
+                    scanDirectoryDirectly(downloadsDir, songs, scannedFilePaths)
                 }
             } catch (e: Exception) {
                 Log.e("MusicRepository", "Error scanning Downloads directory", e)
@@ -91,13 +93,76 @@ class MusicRepository(private val context: Context) {
                 songDao.deleteSongsNotIn(scannedIds)
             }
 
+            // Cleanup duplicates: Find any existing songs that share the same filePath but have different IDs
+            // This handles transitioning from absolutePath IDs to MediaStore IDs
+            try {
+                val currentSongs = songDao.getAllSongsList()
+                val duplicateIdsToDelete = mutableListOf<String>()
+                val filePathMap = mutableMapOf<String, String>() // filePath -> firstIdFound
+
+                currentSongs.forEach { song ->
+                    val firstId = filePathMap[song.filePath]
+                    if (firstId != null) {
+                        // Duplicate found! 
+                        // If one of them is a MediaStore ID (numeric) and the other is absolutePath, keep the numeric one
+                        if (song.id.startsWith("/") && !firstId.startsWith("/")) {
+                            // Current song has absolute path ID, map has numeric ID. Delete current.
+                            duplicateIdsToDelete.add(song.id)
+                        } else if (!song.id.startsWith("/") && firstId.startsWith("/")) {
+                            // Current song has numeric ID, map has absolute path ID. Delete the one in map, update map.
+                            duplicateIdsToDelete.add(firstId)
+                            filePathMap[song.filePath] = song.id
+                        } else {
+                            // Both same type (unlikely if scan works correctly), just delete current to be safe
+                            duplicateIdsToDelete.add(song.id)
+                        }
+                    } else {
+                        filePathMap[song.filePath] = song.id
+                    }
+                }
+
+                if (duplicateIdsToDelete.isNotEmpty()) {
+                    Log.d("MusicRepository", "Cleaning up ${duplicateIdsToDelete.size} duplicate entries by file path")
+                    songDao.deleteSongsByIds(duplicateIdsToDelete)
+                }
+            } catch (e: Exception) {
+                Log.e("MusicRepository", "Error during duplicate cleanup", e)
+            }
+
             songs
         }
 
     /**
+     * Get the consistent ID for a file (MediaStore ID or absolute path fallback)
+     */
+    fun getSongIdForFile(file: File): String {
+        return try {
+            val projection = arrayOf(MediaStore.Audio.Media._ID)
+            val selection = "${MediaStore.Audio.Media.DATA} = ?"
+            val selectionArgs = arrayOf(file.absolutePath)
+
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)).toString()
+                } else {
+                    file.absolutePath
+                }
+            } ?: file.absolutePath
+        } catch (e: Exception) {
+            file.absolutePath
+        }
+    }
+
+    /**
      * Scan a directory directly using File API
      */
-    private fun scanDirectoryDirectly(directory: File, songs: MutableList<Song>) {
+    private fun scanDirectoryDirectly(directory: File, songs: MutableList<Song>, scannedFilePaths: MutableSet<String> = mutableSetOf()) {
         fun scanRecursive(folder: File) {
             folder.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
@@ -116,6 +181,16 @@ class MusicRepository(private val context: Context) {
                             ignoreCase = true
                         )
                     ) {
+                        // Check if it's actually a video file (especially for .webm)
+                        if (fileName.lowercase().endsWith(".webm") && hasVideoTrack(file)) {
+                            Log.d("MusicRepository", "Skipping .webm file as it contains video: ${file.absolutePath}")
+                            return@forEach
+                        }
+                        // Skip if this file was already scanned in a previous pass
+                        if (!scannedFilePaths.add(file.absolutePath)) {
+                            Log.d("MusicRepository", "Skipping already-scanned file: ${file.absolutePath}")
+                            return@forEach
+                        }
                         try {
                             // Get metadata from MediaStore using file path
                             val projection = arrayOf(
@@ -179,6 +254,16 @@ class MusicRepository(private val context: Context) {
                                         android.net.Uri.parse("content://media/external/audio/albumart"),
                                         albumId
                                     ).toString()
+
+                                    // [FIX] Handle missing album art in MediaStore (albumId 0 or missing from system provider)
+                                    // If albumId is 0, MediaStore hasn't indexed the album art yet
+                                    if (albumId <= 0 || albumArtUri.endsWith("/0")) {
+                                        val embedded = extractEmbeddedMetadata(file)
+                                        (embedded["albumArtUri"] as? String)?.let {
+                                            albumArtUri = it
+                                            Log.d("MusicRepository", "Used embedded album art fallback for: ${file.name}")
+                                        }
+                                    }
 
                                     // Check for local album art file with same base name
                                     val localAlbumArtUri = checkForLocalAlbumArt(file)
@@ -276,6 +361,11 @@ class MusicRepository(private val context: Context) {
                             ignoreCase = true
                         )
                     ) {
+                        // Check if it's actually a video file (especially for .webm)
+                        if (fileName.lowercase().endsWith(".webm") && hasVideoTrack(file.uri)) {
+                            Log.d("MusicRepository", "Skipping .webm file from SAF as it contains video: ${file.uri}")
+                            return@forEach
+                        }
 
                         try {
                             // Get metadata from MediaStore using the document URI
@@ -437,6 +527,10 @@ class MusicRepository(private val context: Context) {
         try {
             retriever.setDataSource(audioFile.absolutePath)
             
+            // Check if it has a video track
+            val hasVideo = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)
+            result["hasVideo"] = (hasVideo == "yes")
+            
             // Extract text metadata
             result["title"] = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
             result["artist"] = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
@@ -547,6 +641,12 @@ class MusicRepository(private val context: Context) {
                     continue // Skip this song
                 }
 
+                // Check if it's actually a video file (especially for .webm)
+                if (filePath.lowercase().endsWith(".webm") && hasVideoTrack(File(filePath))) {
+                    Log.d("MusicRepository", "Skipping MediaStore .webm as it contains video: $filePath")
+                    continue
+                }
+
                 Log.d("Directory Location", "Found song in SyncTax: $filePath")
 
                 // Get album art URI - check for local image file first
@@ -579,6 +679,30 @@ class MusicRepository(private val context: Context) {
 
                 songs.add(song)
             }
+        }
+    }
+
+    private fun hasVideoTrack(file: File): Boolean {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(file.absolutePath)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"
+        } catch (e: Exception) {
+            false
+        } finally {
+            try { retriever.release() } catch (e: Exception) {}
+        }
+    }
+
+    private fun hasVideoTrack(uri: Uri): Boolean {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"
+        } catch (e: Exception) {
+            false
+        } finally {
+            try { retriever.release() } catch (e: Exception) {}
         }
     }
 
@@ -620,6 +744,13 @@ class MusicRepository(private val context: Context) {
      * Get song by ID
      */
     suspend fun getSongById(songId: String): Song? = songDao.getSongById(songId)
+
+    /**
+     * Get song by file path
+     */
+    suspend fun getSongByFilePath(filePath: String): Song? = withContext(Dispatchers.IO) {
+        songDao.getSongByFilePath(filePath)
+    }
 
     /**
      * Insert a single song into the database

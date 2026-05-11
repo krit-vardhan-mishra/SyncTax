@@ -1,11 +1,14 @@
 package com.just_for_fun.synctax.presentation.screens
 
+import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import android.util.Log
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,6 +58,11 @@ import androidx.compose.ui.unit.sp
 import com.just_for_fun.synctax.presentation.components.utils.BottomPaddingSpacer
 import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 import com.just_for_fun.synctax.presentation.viewmodels.PartyViewModel
+import com.just_for_fun.synctax.core.party.PartyHotspotInfo
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.common.BitMatrix
+import java.net.URLEncoder
 
 private const val TAG = "CreatePartyScreen"
 
@@ -68,6 +79,7 @@ fun CreatePartyScreen(
 
     val isHosting by partyViewModel.isHosting.collectAsState()
     val members by partyViewModel.members.collectAsState()
+    val hotspotInfo by partyViewModel.hostHotspotInfo.collectAsState()
 
     var partyName by remember { mutableStateOf("My Party") }
 
@@ -135,100 +147,179 @@ fun CreatePartyScreen(
         },
         containerColor = darkBackground
     ) { paddingValues ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             // Party Name Input (only visible before hosting starts)
             if (!isHosting) {
-                OutlinedTextField(
-                    value = partyName,
-                    onValueChange = { partyName = it },
-                    label = { Text("Party Name", color = AppColors.textBody) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accentOrange,
-                        unfocusedBorderColor = AppColors.textBody,
-                        focusedTextColor = AppColors.textTitle,
-                        unfocusedTextColor = AppColors.textTitle,
-                        cursorColor = accentOrange
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    singleLine = true
-                )
+                item {
+                    OutlinedTextField(
+                        value = partyName,
+                        onValueChange = { partyName = it },
+                        label = { Text("Party Name", color = AppColors.textBody) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = accentOrange,
+                            unfocusedBorderColor = AppColors.textBody,
+                            focusedTextColor = AppColors.textTitle,
+                            unfocusedTextColor = AppColors.textTitle,
+                            cursorColor = accentOrange
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        singleLine = true
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "This name will be visible to nearby devices looking to join.",
-                    color = AppColors.textBody,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    textAlign = TextAlign.Center
-                )
+                    Text(
+                        text = "This name will be visible to guests during the session.",
+                        color = AppColors.textBody,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             // Radar Animation Box
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (isHosting) 200.dp else 180.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Pulsing rings
+            item {
                 Box(
                     modifier = Modifier
-                        .size((pulseRadius * 2).dp)
-                        .clip(CircleShape)
-                        .background(accentOrange.copy(alpha = pulseAlpha * 0.3f))
-                )
-
-                // Central Icon
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(accentOrange),
+                        .fillMaxWidth()
+                        .height(if (isHosting) 200.dp else 180.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Group, contentDescription = null, tint = Color.White)
+                    // Pulsing rings
+                    Box(
+                        modifier = Modifier
+                            .size((pulseRadius * 2).dp)
+                            .clip(CircleShape)
+                            .background(accentOrange.copy(alpha = pulseAlpha * 0.3f))
+                    )
+
+                    // Central Icon
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(accentOrange),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Group, contentDescription = null, tint = Color.White)
+                    }
                 }
             }
 
             if (isHosting) {
-                Text(
-                    text = "Waiting for devices to join...",
-                    color = AppColors.textBody,
-                    fontSize = 14.sp
-                )
+                item {
+                    Text(
+                        text = "Waiting for devices to join...",
+                        color = AppColors.textBody,
+                        fontSize = 14.sp
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (isHosting && hotspotInfo != null) {
+                item {
+                    val qrPayload = remember(hotspotInfo) {
+                        hotspotInfo?.let { buildPartyQrPayload(it) }
+                    }
+                    val qrSizeDp = 180.dp
+                    val qrSizePx = with(LocalDensity.current) { qrSizeDp.roundToPx() }
+                    val qrBitmap = remember(qrPayload, qrSizePx) {
+                        qrPayload?.let { createQrBitmap(it, qrSizePx) }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(AppColors.cardBackground)
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Hotspot Details",
+                            color = AppColors.textTitle,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "SSID: ${hotspotInfo?.ssid ?: ""}",
+                            color = AppColors.textBody,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "Passphrase: ${hotspotInfo?.passphrase ?: ""}",
+                            color = AppColors.textBody,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "Port: ${hotspotInfo?.port ?: 0}",
+                            color = AppColors.textBody,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Share these details so others can join the party.",
+                            color = AppColors.textBody,
+                            fontSize = 12.sp
+                        )
+
+                        if (qrBitmap != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Image(
+                                bitmap = qrBitmap.asImageBitmap(),
+                                contentDescription = "Party QR code",
+                                modifier = Modifier
+                                    .size(qrSizeDp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .align(Alignment.CenterHorizontally),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Scan to join",
+                                color = AppColors.textBody,
+                                fontSize = 12.sp,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // Connected Members Section (visible when hosting)
             if (isHosting && members.isNotEmpty()) {
-                Text(
-                    text = "Connected Members (${members.size})",
-                    color = lavenderColor,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                item {
+                    Text(
+                        text = "Connected Members (${members.size})",
+                        color = lavenderColor,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(members) { member ->
+                items(members) { member ->
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -260,21 +351,46 @@ fun CreatePartyScreen(
                             )
                         }
                     }
+                }
 
-                    item {
-                        BottomPaddingSpacer()
-                    }
+                item {
+                    BottomPaddingSpacer()
                 }
             } else if (isHosting) {
                 // Hosting but no one connected yet
-                Text(
-                    text = "No devices connected yet",
-                    color = AppColors.textBody,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(16.dp),
-                    textAlign = TextAlign.Center
-                )
+                item {
+                    Text(
+                        text = "No devices connected yet",
+                        color = AppColors.textBody,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
+}
+
+private fun buildPartyQrPayload(info: PartyHotspotInfo): String {
+    val ssid = URLEncoder.encode(info.ssid, Charsets.UTF_8.name())
+    val passphrase = URLEncoder.encode(info.passphrase, Charsets.UTF_8.name())
+    return "synctax://party?ssid=$ssid&pass=$passphrase&port=${info.port}"
+}
+
+private fun createQrBitmap(payload: String, sizePx: Int): Bitmap {
+    val matrix = MultiFormatWriter().encode(payload, BarcodeFormat.QR_CODE, sizePx, sizePx)
+    return matrixToBitmap(matrix)
+}
+
+private fun matrixToBitmap(matrix: BitMatrix): Bitmap {
+    val width = matrix.width
+    val height = matrix.height
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    for (x in 0 until width) {
+        for (y in 0 until height) {
+            bitmap.setPixel(x, y, if (matrix[x, y]) AndroidColor.BLACK else AndroidColor.WHITE)
+        }
+    }
+    return bitmap
 }

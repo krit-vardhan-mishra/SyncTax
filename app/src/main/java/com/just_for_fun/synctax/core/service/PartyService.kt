@@ -18,7 +18,7 @@ import com.just_for_fun.synctax.R
 /**
  * Foreground service to keep Party Mode alive during Doze Mode and App Standby.
  * Holds a partial wake lock and shows a persistent notification so Android
- * does not kill the Nearby Connections sync process in the background.
+ * does not kill the party networking process in the background.
  */
 class PartyService : Service() {
 

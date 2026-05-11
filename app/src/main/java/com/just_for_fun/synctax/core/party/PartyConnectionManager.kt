@@ -1,42 +1,49 @@
 package com.just_for_fun.synctax.core.party
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.net.wifi.WifiManager
+import android.net.wifi.WifiNetworkSpecifier
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import com.google.android.gms.nearby.Nearby
-import com.google.android.gms.nearby.connection.AdvertisingOptions
-import com.google.android.gms.nearby.connection.ConnectionInfo
-import com.google.android.gms.nearby.connection.ConnectionLifecycleCallback
-import com.google.android.gms.nearby.connection.ConnectionResolution
-import com.google.android.gms.nearby.connection.ConnectionsClient
-import com.google.android.gms.nearby.connection.DiscoveredEndpointInfo
-import com.google.android.gms.nearby.connection.DiscoveryOptions
-import com.google.android.gms.nearby.connection.EndpointDiscoveryCallback
-import com.google.android.gms.nearby.connection.Payload
-import com.google.android.gms.nearby.connection.PayloadCallback
-import com.google.android.gms.nearby.connection.PayloadTransferUpdate
-import com.google.android.gms.nearby.connection.Strategy
+import com.just_for_fun.synctax.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import com.just_for_fun.synctax.core.party.DiscoveredParty
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 data class PartyMember(val endpointId: String, val name: String, val isHost: Boolean)
 
 /**
- * Holds a discovered party endpoint with its real endpointId AND display name.
- * DiscoveredEndpointInfo from Nearby only carries the name — we must carry
- * the endpointId ourselves so the UI can pass it to requestConnection().
+ * Holds a discovered party endpoint with its SSID AND display name.
+ * Hotspot discovery is manual in this implementation.
  */
 data class DiscoveredParty(val endpointId: String, val name: String)
 
+data class PartyHotspotInfo(val ssid: String, val passphrase: String, val port: Int)
+
 class PartyConnectionManager(private val context: Context) {
-    private val connectionsClient: ConnectionsClient = Nearby.getConnectionsClient(context)
-    private val serviceId = "com.just_for_fun.synctax.PARTY_MODE"
-    private val strategy = Strategy.P2P_STAR
+    private val appContext = context.applicationContext
+    private val wifiManager = appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    private val connectivityManager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private val _isHosting = MutableStateFlow(false)
     val isHosting: StateFlow<Boolean> = _isHosting.asStateFlow()
@@ -50,12 +57,27 @@ class PartyConnectionManager(private val context: Context) {
     private val _discoveredParties = MutableStateFlow<List<DiscoveredParty>>(emptyList())
     val discoveredParties: StateFlow<List<DiscoveredParty>> = _discoveredParties.asStateFlow()
 
-    // Client issue state — tracks which clients have reported media issues
-    private val _clientIssues = MutableStateFlow<Map<String, String>>(emptyMap()) // endpointId -> issueType
+    private val _clientIssues = MutableStateFlow<Map<String, String>>(emptyMap())
     val clientIssues: StateFlow<Map<String, String>> = _clientIssues.asStateFlow()
 
+    private val _hostHotspotInfo = MutableStateFlow<PartyHotspotInfo?>(null)
+    val hostHotspotInfo: StateFlow<PartyHotspotInfo?> = _hostHotspotInfo.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var hostEndpointId: String? = null
+
+    private var hotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
+    private var serverSocket: ServerSocket? = null
+    private val clients = mutableMapOf<String, ClientConnection>()
+    private var hostConnection: ClientConnection? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var activeNetwork: Network? = null
+    private var hostDisplayName: String = "Host"
+
+    private data class ClientConnection(
+        val endpointId: String,
+        val socket: Socket,
+        val writer: BufferedWriter
+    )
 
     // Callbacks for receiving messages
     var onMessageReceived: ((PartyMessage) -> Unit)? = null
@@ -70,237 +92,152 @@ class PartyConnectionManager(private val context: Context) {
     // Callback for media issue notifications from clients
     var onClientIssueReceived: ((endpointId: String, PartyMessage.MediaIssue) -> Unit)? = null
 
-    private val payloadCallback = object : PayloadCallback() {
-        override fun onPayloadReceived(endpointId: String, payload: Payload) {
-            if (payload.type == Payload.Type.BYTES) {
-                payload.asBytes()?.let { bytes ->
-                    try {
-                        val message = PartyMessage.fromByteArray(bytes)
-                        Log.d(TAG, "📩 Received message from $endpointId: ${message::class.simpleName}")
-                        
-                        when (message) {
-                            is PartyMessage.MediaRequest -> {
-                                Log.d(TAG, "📥 MediaRequest from $endpointId: type=${message.requestType}")
-                                onMediaRequestReceived?.invoke(endpointId, message)
-                            }
-                            is PartyMessage.MediaIssue -> {
-                                Log.d(TAG, "⚠️ MediaIssue from ${message.userName}: ${message.issueType}")
-                                // Update client issues map
-                                val updated = _clientIssues.value.toMutableMap()
-                                updated[endpointId] = "${message.userName}: ${message.issueType}"
-                                _clientIssues.value = updated
-                                onClientIssueReceived?.invoke(endpointId, message)
-                            }
-                            is PartyMessage.EndParty -> {
-                                Log.d(TAG, "🛑 EndParty received: ${message.reason}")
-                                // Host ended the party
-                                leaveParty()
-                                onHostDisconnected?.invoke()
-                            }
-                            else -> {
-                                onMessageReceived?.invoke(message)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "❌ Error parsing message from $endpointId", e)
-                    }
-                }
-            }
-        }
-
-        override fun onPayloadTransferUpdate(endpointId: String, update: PayloadTransferUpdate) {
-            // Track file/stream transfer progress here in future
-        }
-    }
-
-    private val connectionLifecycleCallback = object : ConnectionLifecycleCallback() {
-        override fun onConnectionInitiated(endpointId: String, connectionInfo: ConnectionInfo) {
-            val endpointName = connectionInfo.endpointName
-            if (_isHosting.value) {
-                Log.d(TAG, "🎉 HOST: Join request from $endpointName (endpoint=$endpointId)")
-            } else {
-                Log.d(TAG, "🤝 CLIENT: Connection initiated with host $endpointName (endpoint=$endpointId)")
-            }
-            // Automatically accept connection for now
-            connectionsClient.acceptConnection(endpointId, payloadCallback)
-            if (_isHosting.value) {
-                Log.d(TAG, "✅ HOST: Accepted join request from $endpointName (endpoint=$endpointId)")
-            }
-        }
-
-        override fun onConnectionResult(endpointId: String, result: ConnectionResolution) {
-            if (result.status.isSuccess) {
-                Log.d(TAG, "✅ Connected successfully to $endpointId")
-                if (!_isHosting.value) {
-                    _isConnected.value = true
-                    hostEndpointId = endpointId
-                }
-                val currentMembers = _members.value.toMutableList()
-                currentMembers.add(PartyMember(endpointId, "Guest $endpointId", false))
-                _members.value = currentMembers
-                Log.d(TAG, "👥 Members count: ${_members.value.size}")
-            } else {
-                Log.e(TAG, "❌ Connection failed to $endpointId — status: ${result.status}")
-            }
-        }
-
-        override fun onDisconnected(endpointId: String) {
-            Log.d(TAG, "⚡ Disconnected from $endpointId")
-
-            // Remove from members
-            val currentMembers = _members.value.toMutableList()
-            currentMembers.removeAll { it.endpointId == endpointId }
-            _members.value = currentMembers
-
-            // Clear any issues from this endpoint
-            val updatedIssues = _clientIssues.value.toMutableMap()
-            updatedIssues.remove(endpointId)
-            _clientIssues.value = updatedIssues
-
-            if (_isHosting.value) {
-                // A client disconnected from the host
-                Log.d(TAG, "👤 Client $endpointId left the party. Remaining: ${_members.value.size}")
-                onClientDisconnected?.invoke(endpointId)
-            } else if (endpointId == hostEndpointId) {
-                // The HOST disconnected — the party is over for this client
-                Log.d(TAG, "🛑 Host disconnected! Party is over.")
-                _isConnected.value = false
-                hostEndpointId = null
-                onHostDisconnected?.invoke()
-            }
-        }
-    }
-
-    private val endpointDiscoveryCallback = object : EndpointDiscoveryCallback() {
-        override fun onEndpointFound(endpointId: String, info: DiscoveredEndpointInfo) {
-            Log.d(TAG, "🔍 Found party: ${info.endpointName} (endpoint=$endpointId)")
-            val current = _discoveredParties.value.toMutableList()
-            // Deduplicate by endpointId (the real unique key, not the name)
-            if (current.none { it.endpointId == endpointId }) {
-                current.add(DiscoveredParty(endpointId = endpointId, name = info.endpointName))
-                _discoveredParties.value = current
-            }
-        }
-
-        override fun onEndpointLost(endpointId: String) {
-            Log.d(TAG, "❌ Lost party endpoint: $endpointId")
-            // Remove the lost party from the list so the UI stays accurate
-            _discoveredParties.value = _discoveredParties.value.filter { it.endpointId != endpointId }
-        }
-    }
-
     fun startHosting(partyName: String) {
-        Log.d(TAG, "=========================================")
-        Log.d(TAG, "🎤 HOST ACTION: Starting to host party: $partyName")
-        Log.d(TAG, "=========================================")
-        
-        // Stop any ongoing discovery or advertising before starting
-        connectionsClient.stopDiscovery()
-        connectionsClient.stopAdvertising()
-        
-        val options = AdvertisingOptions.Builder().setStrategy(strategy).build()
-        connectionsClient.startAdvertising(
-            partyName,
-            serviceId,
-            connectionLifecycleCallback,
-            options
-        ).addOnSuccessListener {
-            Log.d(TAG, "✅ Started advertising party: $partyName")
-            _isHosting.value = true
-            _isConnected.value = true
-        }.addOnFailureListener { e ->
-            Log.e(TAG, "❌ Failed to start advertising", e)
+        Log.d(TAG, "Starting hotspot for party: $partyName")
+        stopDiscovery()
+        if (_isHosting.value) {
+            stopHosting()
         }
+        hostDisplayName = partyName
+
+        val handler = Handler(Looper.getMainLooper())
+        wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
+            override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
+                hotspotReservation = reservation
+                val config = reservation.wifiConfiguration
+                val ssid = config?.SSID?.trim('"') ?: "PartyHotspot"
+                val passphrase = config?.preSharedKey?.trim('"') ?: ""
+                _hostHotspotInfo.value = PartyHotspotInfo(ssid, passphrase, PARTY_PORT)
+                _isHosting.value = true
+                _isConnected.value = true
+                startServer()
+                Log.d(TAG, "Hotspot started with SSID=$ssid")
+            }
+
+            override fun onStopped() {
+                Log.d(TAG, "Hotspot stopped")
+                if (_isHosting.value) {
+                    stopHosting()
+                }
+            }
+
+            override fun onFailed(reason: Int) {
+                Log.e(TAG, "Hotspot start failed: reason=$reason")
+                _hostHotspotInfo.value = null
+                _isHosting.value = false
+                _isConnected.value = false
+            }
+        }, handler)
     }
 
     fun stopHosting() {
-        Log.d(TAG, "🛑 Stopping hosting. Broadcasting EndParty to all members.")
-        // Notify all clients that the party is ending
+        Log.d(TAG, "Stopping hosting. Broadcasting EndParty to all members.")
         try {
             sendMessageToAll(PartyMessage.EndParty("Host ended the party"))
         } catch (e: Exception) {
-            Log.e(TAG, "⚠️ Could not broadcast EndParty", e)
+            Log.e(TAG, "Failed to broadcast EndParty", e)
         }
-        connectionsClient.stopAdvertising()
-        connectionsClient.stopAllEndpoints()
+
         _isHosting.value = false
         _isConnected.value = false
+        stopServer()
+        hotspotReservation?.close()
+        hotspotReservation = null
+
+        _hostHotspotInfo.value = null
         _members.value = emptyList()
         _clientIssues.value = emptyMap()
     }
 
     fun startDiscovery() {
-        Log.d(TAG, "=========================================")
-        Log.d(TAG, "🔍 CLIENT ACTION: Starting discovery...")
-        Log.d(TAG, "=========================================")
-        
-        // Stop any ongoing discovery to prevent STATUS_ALREADY_DISCOVERING
-        connectionsClient.stopDiscovery()
-        connectionsClient.stopAdvertising()
-        val options = DiscoveryOptions.Builder().setStrategy(strategy).build()
+        Log.d(TAG, "Manual join flow started")
         _discoveredParties.value = emptyList()
-        connectionsClient.startDiscovery(
-            serviceId,
-            endpointDiscoveryCallback,
-            options
-        ).addOnSuccessListener {
-            Log.d(TAG, "✅ Started discovery")
-        }.addOnFailureListener { e ->
-            Log.e(TAG, "❌ Failed to start discovery", e)
-        }
     }
 
     fun stopDiscovery() {
-        Log.d(TAG, "🔍 Stopping discovery")
-        connectionsClient.stopDiscovery()
+        // Manual join flow uses text inputs, no active discovery
     }
 
-    fun joinParty(endpointId: String, userName: String) {
-        Log.d(TAG, "🎉 Requesting connection to party: $endpointId as $userName")
-        connectionsClient.requestConnection(
-            userName,
-            endpointId,
-            connectionLifecycleCallback
-        ).addOnSuccessListener {
-            Log.d(TAG, "✅ Requested connection to $endpointId")
-        }.addOnFailureListener { e ->
-            Log.e(TAG, "❌ Failed to request connection", e)
+    fun joinParty(ssid: String, passphrase: String, userName: String) {
+        Log.d(TAG, "Joining hotspot ssid=$ssid as $userName")
+        leaveParty()
+
+        if (ssid.isBlank() || passphrase.length < 8) {
+            Log.e(TAG, "Invalid hotspot credentials")
+            return
         }
+
+        val specifier = WifiNetworkSpecifier.Builder()
+            .setSsid(ssid)
+            .setWpa2Passphrase(passphrase)
+            .build()
+
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .setNetworkSpecifier(specifier)
+            .build()
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                activeNetwork = network
+                connectivityManager.bindProcessToNetwork(network)
+                connectToHost(network, userName)
+            }
+
+            override fun onUnavailable() {
+                Log.e(TAG, "Hotspot connection unavailable")
+                handleHostDisconnected()
+            }
+
+            override fun onLost(network: Network) {
+                if (activeNetwork == network) {
+                    Log.d(TAG, "Hotspot network lost")
+                    handleHostDisconnected()
+                }
+            }
+        }
+
+        networkCallback = callback
+        connectivityManager.requestNetwork(request, callback)
     }
 
     fun leaveParty() {
-        Log.d(TAG, "👋 Leaving party")
-        connectionsClient.stopAllEndpoints()
+        Log.d(TAG, "Leaving party")
+        hostConnection?.let { closeConnection(it) }
+        hostConnection = null
+        activeNetwork = null
         _isConnected.value = false
         _members.value = emptyList()
-        hostEndpointId = null
         _clientIssues.value = emptyMap()
+        connectivityManager.bindProcessToNetwork(null)
+        networkCallback?.let { callback ->
+            runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+        }
+        networkCallback = null
     }
 
     fun sendMessageToAll(message: PartyMessage) {
-        val bytes = message.toByteArray()
-        val payload = Payload.fromBytes(bytes)
-        val endpointIds = _members.value.map { it.endpointId }
-        if (endpointIds.isNotEmpty()) {
-            Log.d(TAG, "📤 Sending ${message::class.simpleName} to ${endpointIds.size} members")
-            connectionsClient.sendPayload(endpointIds, payload)
+        val snapshot = clients.values.toList()
+        if (snapshot.isNotEmpty()) {
+            snapshot.forEach { connection ->
+                sendMessage(connection, message)
+            }
         }
     }
 
     fun sendMessageToHost(message: PartyMessage) {
-        hostEndpointId?.let { hostId ->
-            val bytes = message.toByteArray()
-            val payload = Payload.fromBytes(bytes)
-            Log.d(TAG, "📤 Sending ${message::class.simpleName} to host ($hostId)")
-            connectionsClient.sendPayload(hostId, payload)
+        val connection = hostConnection
+        if (connection == null) {
+            Log.d(TAG, "Host connection not available")
+            return
         }
+        sendMessage(connection, message)
     }
 
     fun sendMessageToUser(endpointId: String, message: PartyMessage) {
-        val bytes = message.toByteArray()
-        val payload = Payload.fromBytes(bytes)
-        Log.d(TAG, "📤 Sending ${message::class.simpleName} to $endpointId")
-        connectionsClient.sendPayload(endpointId, payload)
+        val connection = clients[endpointId] ?: return
+        sendMessage(connection, message)
     }
 
     /**
@@ -312,7 +249,184 @@ class PartyConnectionManager(private val context: Context) {
         _clientIssues.value = updated
     }
 
+    private fun startServer() {
+        scope.launch {
+            try {
+                serverSocket = ServerSocket(PARTY_PORT)
+                while (_isHosting.value) {
+                    val socket = serverSocket?.accept() ?: break
+                    val endpointId = UUID.randomUUID().toString()
+                    val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))
+                    val connection = ClientConnection(endpointId, socket, writer)
+                    clients[endpointId] = connection
+                    addMember(PartyMember(endpointId, "Guest", false))
+                    sendMessage(connection, PartyMessage.Handshake(BuildConfig.VERSION_NAME, hostDisplayName))
+                    listenToClient(connection)
+                }
+            } catch (e: Exception) {
+                if (_isHosting.value) {
+                    Log.e(TAG, "Server socket error", e)
+                }
+            }
+        }
+    }
+
+    private fun stopServer() {
+        clients.values.forEach { closeConnection(it) }
+        clients.clear()
+        serverSocket?.close()
+        serverSocket = null
+    }
+
+    private fun listenToClient(connection: ClientConnection) {
+        scope.launch {
+            val reader = BufferedReader(InputStreamReader(connection.socket.getInputStream(), StandardCharsets.UTF_8))
+            try {
+                while (true) {
+                    val line = reader.readLine() ?: break
+                    val message = PartyMessage.fromByteArray(line.toByteArray(StandardCharsets.UTF_8))
+                    handleIncomingMessage(connection.endpointId, message)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Client connection closed: ${connection.endpointId}")
+            } finally {
+                handleClientDisconnected(connection.endpointId)
+            }
+        }
+    }
+
+    private fun connectToHost(network: Network, userName: String) {
+        scope.launch {
+            val gateway = resolveGateway(connectivityManager.getLinkProperties(network))
+            if (gateway == null) {
+                Log.e(TAG, "Gateway not available for hotspot")
+                handleHostDisconnected()
+                return@launch
+            }
+            try {
+                val socket = Socket()
+                socket.connect(InetSocketAddress(gateway, PARTY_PORT), CONNECT_TIMEOUT_MS)
+                val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))
+                val connection = ClientConnection(HOST_ENDPOINT_ID, socket, writer)
+                hostConnection = connection
+                _isConnected.value = true
+                _members.value = listOf(PartyMember(HOST_ENDPOINT_ID, "Host", true))
+                sendMessage(connection, PartyMessage.Handshake(BuildConfig.VERSION_NAME, userName))
+                listenToHost(connection)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to connect to host", e)
+                handleHostDisconnected()
+            }
+        }
+    }
+
+    private fun listenToHost(connection: ClientConnection) {
+        scope.launch {
+            val reader = BufferedReader(InputStreamReader(connection.socket.getInputStream(), StandardCharsets.UTF_8))
+            try {
+                while (true) {
+                    val line = reader.readLine() ?: break
+                    val message = PartyMessage.fromByteArray(line.toByteArray(StandardCharsets.UTF_8))
+                    handleIncomingMessage(connection.endpointId, message)
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "Host connection closed")
+            } finally {
+                handleHostDisconnected()
+            }
+        }
+    }
+
+    private fun resolveGateway(linkProperties: LinkProperties?): InetAddress? {
+        return linkProperties?.routes?.firstOrNull { it.hasGateway() }?.gateway
+    }
+
+    private fun handleIncomingMessage(endpointId: String, message: PartyMessage) {
+        when (message) {
+            is PartyMessage.Handshake -> {
+                updateMemberName(endpointId, message.userName)
+                onMessageReceived?.invoke(message)
+            }
+            is PartyMessage.MediaRequest -> {
+                onMediaRequestReceived?.invoke(endpointId, message)
+            }
+            is PartyMessage.MediaIssue -> {
+                val updated = _clientIssues.value.toMutableMap()
+                updated[endpointId] = "${message.userName}: ${message.issueType}"
+                _clientIssues.value = updated
+                onClientIssueReceived?.invoke(endpointId, message)
+            }
+            is PartyMessage.EndParty -> {
+                leaveParty()
+                onHostDisconnected?.invoke()
+            }
+            else -> {
+                onMessageReceived?.invoke(message)
+            }
+        }
+    }
+
+    private fun addMember(member: PartyMember) {
+        val current = _members.value.toMutableList()
+        current.add(member)
+        _members.value = current
+    }
+
+    private fun updateMemberName(endpointId: String, name: String) {
+        val updated = _members.value.map { member ->
+            if (member.endpointId == endpointId) member.copy(name = name) else member
+        }
+        _members.value = updated
+    }
+
+    private fun handleClientDisconnected(endpointId: String) {
+        val currentMembers = _members.value.toMutableList()
+        currentMembers.removeAll { it.endpointId == endpointId }
+        _members.value = currentMembers
+
+        val updatedIssues = _clientIssues.value.toMutableMap()
+        updatedIssues.remove(endpointId)
+        _clientIssues.value = updatedIssues
+
+        clients.remove(endpointId)?.let { closeConnection(it) }
+        if (_isHosting.value) {
+            onClientDisconnected?.invoke(endpointId)
+        }
+    }
+
+    private fun handleHostDisconnected() {
+        if (!_isConnected.value) return
+        leaveParty()
+        onHostDisconnected?.invoke()
+    }
+
+    private fun closeConnection(connection: ClientConnection) {
+        runCatching { connection.writer.close() }
+        runCatching { connection.socket.close() }
+    }
+
+    private fun sendMessage(connection: ClientConnection, message: PartyMessage) {
+        val json = String(message.toByteArray(), StandardCharsets.UTF_8)
+        try {
+            synchronized(connection) {
+                connection.writer.write(json)
+                connection.writer.newLine()
+                connection.writer.flush()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send message", e)
+            if (_isHosting.value) {
+                handleClientDisconnected(connection.endpointId)
+            } else {
+                handleHostDisconnected()
+            }
+        }
+    }
+
     companion object {
         private const val TAG = "PartyConnectionManager"
+        private const val PARTY_PORT = 45123
+        private const val CONNECT_TIMEOUT_MS = 5000
+        private const val HOST_ENDPOINT_ID = "host"
     }
 }

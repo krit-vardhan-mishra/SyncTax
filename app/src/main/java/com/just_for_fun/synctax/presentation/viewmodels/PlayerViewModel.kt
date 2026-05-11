@@ -2968,9 +2968,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val (finalSuccess, finalFilePath, finalMessage) = if (!newPipeResult.success) {
                     Log.d(
                         "PlayerViewModel",
-                        "📥 Format Download: NewPipe failed, trying yt-dlp fallback..."
+                        "📥 Format Download: NewPipe failed, yt-dlp fallback is DISABLED (Verification Mode)"
                     )
-                    try {
+                    /* try {
                         val result = chaquopyDownloader.downloadAudio(
                             url,
                             downloadDir.absolutePath,
@@ -2998,7 +2998,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             newPipeResult.filePath ?: "",
                             newPipeResult.message
                         )
-                    }
+                    } */
+                    Triple(
+                        newPipeResult.success,
+                        newPipeResult.filePath ?: "",
+                        newPipeResult.message
+                    )
                 } else {
                     Log.d("PlayerViewModel", "📥 Format Download: ✅ NewPipe download successful!")
                     Triple(
@@ -3035,8 +3040,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "📥 Format Download: Using embedded metadata from file - Title: $embeddedTitle, Artist: $embeddedArtist, Album: $embeddedAlbum"
                         )
 
+                        val officialId = repository.getSongIdForFile(downloadedFile)
+                        Log.d("PlayerViewModel", "📥 Format Download: Official ID for file: $officialId")
+
                         val downloadedSong = Song(
-                            id = downloadedFile.absolutePath,
+                            id = officialId,
                             title = embeddedTitle,
                             artist = embeddedArtist,
                             album = embeddedAlbum,
@@ -3048,8 +3056,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 ?: currentSong.albumArtUri
                         )
 
-                        // Insert into database if not already present
-                        val existingSong = repository.getSongById(downloadedFile.absolutePath)
+                        // Insert into database if not already present (check by both ID and path)
+                        val existingSong = repository.getSongByFilePath(downloadedFile.absolutePath)
+                            ?: repository.getSongById(officialId)
+                            
                         if (existingSong == null) {
                             repository.insertSong(downloadedSong)
                             Log.d(
@@ -3059,8 +3069,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         } else {
                             Log.d(
                                 "PlayerViewModel",
-                                "📥 Format Download: Song already exists in database"
+                                "📥 Format Download: Song already exists, updating metadata with ID: ${existingSong.id}"
                             )
+                            repository.insertSong(downloadedSong.copy(id = existingSong.id))
                         }
 
                         _uiState.value = _uiState.value.copy(
