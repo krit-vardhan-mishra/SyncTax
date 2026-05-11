@@ -89,6 +89,7 @@ fun ArtistDetailScreen(
     isOnline: Boolean = false,
     artistDetails: ArtistDetails? = null,
     onOnlineSongClick: (RecommendedSong) -> Unit = {},
+    artistImageUrl: String? = null,
     onGetArtistDetails: ((String, (ArtistDetails?) -> Unit) -> Unit)? = null,
     onLoadMoreSongs: ((String, (List<RecommendedSong>) -> Unit) -> Unit)? = null,
     onRefresh: () -> Unit = {}
@@ -143,7 +144,9 @@ fun ArtistDetailScreen(
     // Use fetched details if available for name, image, description
     val displayName = effectiveDetails?.name ?: artistName
 
-    val imageUri = effectiveDetails?.thumbnail ?: songs.firstOrNull()?.albumArtUri.orEmpty()
+    val imageUri = effectiveDetails?.thumbnail?.takeIf { it.isNotEmpty() } 
+        ?: artistImageUrl 
+        ?: songs.firstOrNull()?.albumArtUri.orEmpty()
 
     // Calculate total song count: local songs + fetched online songs + additional loaded songs
     val songCount = when {

@@ -74,6 +74,10 @@ import com.just_for_fun.synctax.presentation.viewmodels.OnlineSongsViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PlaylistViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.RecommendationViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PartyViewModel
+import com.just_for_fun.synctax.presentation.screens.PartyDashboardScreen
+import com.just_for_fun.synctax.presentation.screens.CreatePartyScreen
+import com.just_for_fun.synctax.presentation.screens.PartySessionScreen
 import kotlinx.coroutines.launch
 
 // Global snackbar host state for consistent snackbar positioning
@@ -109,6 +113,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     val recommendationViewModel: RecommendationViewModel = viewModel()
     // Explicitly initialize this to avoid recomposition issues if not passed in some calls
     val playlistViewModel: PlaylistViewModel = viewModel()
+    val partyViewModel: PartyViewModel = viewModel()
 
     // Get current route to determine visibility
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -226,6 +231,62 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
         }
     }
 
+    // Collect party mode player commands
+    val partyPlayerCommands by partyViewModel.playerCommands.collectAsState()
+    LaunchedEffect(partyPlayerCommands) {
+        partyPlayerCommands?.let { command ->
+            when (command) {
+                is com.just_for_fun.synctax.core.party.PartyMessage.PlayCommand -> {
+                    val localTime = partyViewModel.syncController.hostTimeToLocalTime(command.startTimestamp)
+                    val pos = playerState.position
+                    playerViewModel.playAt(localTime, pos)
+                }
+                is com.just_for_fun.synctax.core.party.PartyMessage.PauseCommand -> {
+                    if (playerState.isPlaying) {
+                        playerViewModel.togglePlayPause() // Pause
+                    }
+                }
+                is com.just_for_fun.synctax.core.party.PartyMessage.SeekCommand -> {
+                    playerViewModel.seekTo(command.position)
+                    if (playerState.isPlaying) {
+                        val localTime = partyViewModel.syncController.hostTimeToLocalTime(command.timestamp)
+                        playerViewModel.playAt(localTime, command.position)
+                    }
+                }
+                is com.just_for_fun.synctax.core.party.PartyMessage.NowPlaying -> {
+                    // Sync the playing song
+                    val currentSongId = playerState.currentSong?.id
+                    if (currentSongId != command.songId) {
+                        // Try to find the song locally
+                        val localSong = playerViewModel.findSongById(command.songId)
+                        if (localSong != null) {
+                            // Song exists locally — play it
+                            playerViewModel.playSong(localSong)
+                            partyViewModel.clearPlaceholder()
+                        } else {
+                            // Song NOT available locally — use placeholder metadata
+                            val placeholderSong = com.just_for_fun.synctax.data.local.entities.Song(
+                                id = "placeholder:${command.songId}",
+                                title = command.title ?: "Unknown Song",
+                                artist = command.artist ?: "Unknown Artist",
+                                album = command.album,
+                                duration = 0L,
+                                filePath = "",
+                                genre = null,
+                                releaseYear = null,
+                                albumArtUri = command.thumbnailUrl
+                            )
+                            playerViewModel.setPlaceholderSong(placeholderSong)
+                            partyViewModel.reportMissingSong("Guest")
+                            snackbarHostState.showSnackbar("Song not found locally. Showing host's metadata.")
+                        }
+                    }
+                }
+                else -> {}
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalSnackbarHostState provides snackbarHostState) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -253,7 +314,9 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
 
                         downloadPercent = playerState.downloadPercent,
                         onExpandedChange = { isPlayerExpanded = it },
-                        showPlayer = currentRoute != "quick_picks" && currentRoute != "settings"
+                        showPlayer = currentRoute != "quick_picks" && 
+                                    currentRoute != "settings" && 
+                                    currentRoute?.startsWith("partySession") != true
                     ) { innerPadding ->
                         // Provide bottom padding to all screens via CompositionLocal
                         NavHost(
@@ -298,7 +361,56 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                         navController.navigate("album/$albumName")
                                     },
                                     onNavigateToSavedSongs = { navController.navigate("history?tab=2") },
-                                    onNavigateToListenedAlbums = { navController.navigate("listened_albums") }
+                                    onNavigateToListenedAlbums = { navController.navigate("listened_albums") },
+                                    onNavigateToPartyDashboard = { navController.navigate("partyDashboard") }
+                                )
+                            }
+                            composable(
+                                "partyDashboard",
+                                enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                            ) {
+                                PartyDashboardScreen(
+                                    partyViewModel = partyViewModel,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onCreatePartyClick = { navController.navigate("createParty") },
+                                    onPreviousPartyClick = { partyName -> 
+                                        // For now, jump to session screen. In reality, it should attempt to connect first.
+                                        navController.navigate("partySession/$partyName") 
+                                    }
+                                )
+                            }
+                            composable(
+                                "createParty",
+                                enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                            ) {
+                                CreatePartyScreen(
+                                    partyViewModel = partyViewModel,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onStartPartyClick = { navController.navigate("partySession/NewParty") }
+                                )
+                            }
+                            composable(
+                                "partySession/{partyName}",
+                                arguments = listOf(navArgument("partyName") { type = NavType.StringType }),
+                                enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+                                exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+                                popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                            ) {
+                                PartySessionScreen(
+                                    partyViewModel = partyViewModel,
+                                    song = playerState.currentSong,
+                                    isPlaying = playerState.isPlaying,
+                                    onNavigateBack = { navController.popBackStack() },
+                                    onEndPartyClick = { 
+                                        navController.popBackStack("partyDashboard", inclusive = false) 
+                                    }
                                 )
                             }
                             composable(
@@ -499,6 +611,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 ArtistDetailScreen(
                                     artistName = artistName,
                                     songs = songs,
+                                    artistImageUrl = homeState.artistPhotos[artistName],
                                     onBackClick = { navController.popBackStack() },
                                     onSongClick = { song -> playerViewModel.playSong(song) },
                                     onPlayAll = {
@@ -642,6 +755,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                     ArtistDetailScreen(
                                         artistName = uiState.selectedArtist ?: "",
                                         songs = songs,
+                                        artistImageUrl = uiState.artistPhotos[uiState.selectedArtist ?: ""],
                                         onBackClick = { navController.popBackStack() },
                                         onSongClick = { song ->
                                             playerViewModel.playSong(song, songs)
@@ -674,6 +788,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                     ArtistDetailScreen(
                                         artistName = "", // not used
                                         songs = emptyList(), // not used
+                                        artistImageUrl = artist.thumbnail,
                                         onBackClick = {
                                             navController.popBackStack()
                                         },

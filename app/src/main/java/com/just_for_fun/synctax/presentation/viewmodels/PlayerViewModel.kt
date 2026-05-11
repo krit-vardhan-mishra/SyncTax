@@ -3178,6 +3178,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
 
+    /**
+     * Proxies the playAt command to the MusicPlayer.
+     * This is used by Party Mode to schedule playback at an exact system time.
+     */
+    fun playAt(systemTimeMs: Long, startPositionMs: Long) {
+        player.playAt(systemTimeMs, startPositionMs)
+    }
+
     fun setCurrentLyrics(lyrics: String?) {
         currentLyrics = lyrics
     }
@@ -3210,5 +3218,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             PlayerSheetState.COLLAPSED
         }
         _uiState.value = _uiState.value.copy(playerSheetState = newState)
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Party Mode: Song Lookup & Placeholder Support
+    // ════════════════════════════════════════════════════════════════════
+
+    /**
+     * Looks up a song by its ID in the local database.
+     * Returns null if the song is not found locally.
+     */
+    suspend fun findSongById(songId: String): Song? {
+        return withContext(Dispatchers.IO) {
+            repository.getSongById(songId)
+        }
+    }
+
+    /**
+     * Sets a placeholder song in the UI state.
+     * This is used when a guest receives a NowPlaying command for a song
+     * they don't have locally. The UI shows the metadata (title, artist, album art)
+     * but does not attempt actual playback.
+     */
+    fun setPlaceholderSong(song: Song) {
+        Log.d("PlayerViewModel", "🎵 Setting placeholder song: ${song.title} by ${song.artist}")
+        _uiState.value = _uiState.value.copy(
+            currentSong = song,
+            isPlaying = false,
+            isBuffering = false,
+            position = 0L,
+            duration = 0L
+        )
     }
 }

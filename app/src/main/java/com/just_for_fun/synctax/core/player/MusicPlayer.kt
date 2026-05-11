@@ -179,10 +179,52 @@ class MusicPlayer(context: Context) {
     }
 
     fun play() {
-        exoPlayer.play()
-        _playerState.value = _playerState.value.copy(
-            playStartTime = System.currentTimeMillis()
-        )
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            exoPlayer.play()
+            _playerState.value = _playerState.value.copy(
+                playStartTime = System.currentTimeMillis()
+            )
+        } else {
+            mainHandler.post {
+                exoPlayer.play()
+                _playerState.value = _playerState.value.copy(
+                    playStartTime = System.currentTimeMillis()
+                )
+            }
+        }
+    }
+
+    /**
+     * Schedules playback to start exactly at the given system time.
+     * @param systemTimeMs The time in SystemClock.elapsedRealtime() when playback should begin
+     * @param startPositionMs The position in the track to start playing from
+     */
+    fun playAt(systemTimeMs: Long, startPositionMs: Long) {
+        val delay = systemTimeMs - android.os.SystemClock.elapsedRealtime()
+        
+        mainHandler.post {
+            exoPlayer.seekTo(startPositionMs)
+            exoPlayer.pause() // Ensure it doesn't play immediately
+        }
+        
+        if (delay > 0) {
+            mainHandler.postDelayed({
+                exoPlayer.play()
+                _playerState.value = _playerState.value.copy(
+                    playStartTime = System.currentTimeMillis()
+                )
+            }, delay)
+        } else {
+            // Already past the time, play immediately but account for the offset
+            mainHandler.post {
+                val offset = -delay
+                exoPlayer.seekTo(startPositionMs + offset)
+                exoPlayer.play()
+                _playerState.value = _playerState.value.copy(
+                    playStartTime = System.currentTimeMillis()
+                )
+            }
+        }
     }
 
     fun pause() {

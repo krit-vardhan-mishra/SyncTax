@@ -47,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
 import com.just_for_fun.synctax.presentation.components.SnackbarUtils
+import com.just_for_fun.synctax.presentation.components.InteractiveMatchTasteCard
 import com.just_for_fun.synctax.presentation.components.card.AlbumCard
 import com.just_for_fun.synctax.presentation.components.card.ArtistCard
 import com.just_for_fun.synctax.presentation.components.card.AppUpdateCard
@@ -108,7 +109,8 @@ fun HomeScreen(
     onNavigateToArtistDetail: (String) -> Unit = {},
     onNavigateToListenedAlbums: () -> Unit = {},
     onNavigateToAlbumDetail: (albumName: String, artistName: String) -> Unit = { _, _ -> },
-    onNavigateToSavedSongs: () -> Unit = {}
+    onNavigateToSavedSongs: () -> Unit = {},
+    onNavigateToPartyDashboard: () -> Unit = {}
 ) {
     val uiState by homeViewModel.uiState.collectAsState()
     val playerState by playerViewModel.uiState.collectAsState()
@@ -1030,6 +1032,29 @@ fun HomeScreen(
                                         isScanning = uiState.isScanning
                                     )
                                 }
+                            }
+
+                            // Match Taste Section (placeholder for future functionality)
+                            item(
+                                key = "match_taste",
+                                contentType = "match_taste"
+                            ) {
+                                SectionDivider()
+
+                                SectionHeader(
+                                    title = "Match Taste",
+                                    subtitle = "Match your taste with friends",
+                                    onViewAllClick = null,
+                                    titleColor = sectionTitleColor,
+                                    subtitleColor = sectionSubtitleColor
+                                )
+
+                                InteractiveMatchTasteCard(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    onClick = onNavigateToPartyDashboard
+                                )
+
+                                SmallSpacer()
                             }
 
                             // Bottom padding for mini player

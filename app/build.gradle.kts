@@ -21,7 +21,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 7
-        versionName = "4.2.1"
+        versionName = "4.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -185,6 +185,9 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.2.1")
     implementation("androidx.media3:media3-session:1.2.1")
     implementation("androidx.media:media:1.6.0")
+
+    // Nearby Connections for Party Mode
+    implementation("com.google.android.gms:play-services-nearby:19.3.0")
 
     // AndroidX Startup (explicit to ensure compatible version and resources)
     implementation("androidx.startup:startup-runtime:1.2.0")
