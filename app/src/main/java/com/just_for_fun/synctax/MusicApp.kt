@@ -95,6 +95,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     val context = LocalContext.current
     val isFirstLaunch by userPreferences.isFirstLaunch.collectAsState()
     val userName by userPreferences.userName.collectAsState()
+    val recentPartyNames by userPreferences.recentPartyNames.collectAsState()
 
     // Show welcome screen on first launch
     if (isFirstLaunch) {
@@ -236,18 +237,23 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     val partyPlayerCommands by partyViewModel.playerCommands.collectAsState()
     LaunchedEffect(partyPlayerCommands) {
         partyPlayerCommands?.let { command ->
+            android.util.Log.d("MusicApp", "🎵 [PARTY CMD] Received: ${command::class.simpleName}")
             when (command) {
                 is com.just_for_fun.synctax.core.party.PartyMessage.PlayCommand -> {
+                    android.util.Log.d("MusicApp", "▶️ [PARTY] PlayCommand: songId='${command.songId}', title='${command.title}', startTs=${command.startTimestamp}")
                     val localTime = partyViewModel.syncController.hostTimeToLocalTime(command.startTimestamp)
                     val pos = playerState.position
+                    android.util.Log.d("MusicApp", "▶️ [PARTY] playAt localTime=$localTime, pos=$pos")
                     playerViewModel.playAt(localTime, pos)
                 }
                 is com.just_for_fun.synctax.core.party.PartyMessage.PauseCommand -> {
+                    android.util.Log.d("MusicApp", "⏸️ [PARTY] PauseCommand: isPlaying=${playerState.isPlaying}")
                     if (playerState.isPlaying) {
                         playerViewModel.togglePlayPause() // Pause
                     }
                 }
                 is com.just_for_fun.synctax.core.party.PartyMessage.SeekCommand -> {
+                    android.util.Log.d("MusicApp", "⏩ [PARTY] SeekCommand: position=${command.position}")
                     playerViewModel.seekTo(command.position)
                     if (playerState.isPlaying) {
                         val localTime = partyViewModel.syncController.hostTimeToLocalTime(command.timestamp)
@@ -255,17 +261,22 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                     }
                 }
                 is com.just_for_fun.synctax.core.party.PartyMessage.NowPlaying -> {
+                    android.util.Log.d("MusicApp", "🎵 [PARTY] NowPlaying: songId='${command.songId}', title='${command.title}', artist='${command.artist}'")
                     // Sync the playing song
                     val currentSongId = playerState.currentSong?.id
+                    android.util.Log.d("MusicApp", "🎵 [PARTY] currentSongId='$currentSongId' vs commandSongId='${command.songId}'")
                     if (currentSongId != command.songId) {
                         // Try to find the song locally
                         val localSong = playerViewModel.findSongById(command.songId)
+                        android.util.Log.d("MusicApp", "🎵 [PARTY] localSong found: ${localSong != null} — '${localSong?.title}'")
                         if (localSong != null) {
                             // Song exists locally — play it
+                            android.util.Log.d("MusicApp", "✅ [PARTY] Playing local song: '${localSong.title}'")
                             playerViewModel.playSong(localSong)
                             partyViewModel.clearPlaceholder()
                         } else {
                             // Song NOT available locally — use placeholder metadata
+                            android.util.Log.d("MusicApp", "⚠️ [PARTY] Song NOT found locally, using placeholder")
                             val placeholderSong = com.just_for_fun.synctax.data.local.entities.Song(
                                 id = "placeholder:${command.songId}",
                                 title = command.title ?: "Unknown Song",
@@ -281,9 +292,13 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                             partyViewModel.reportMissingSong("Guest")
                             snackbarHostState.showSnackbar("Song not found locally. Showing host's metadata.")
                         }
+                    } else {
+                        android.util.Log.d("MusicApp", "🎵 [PARTY] Song already playing, skipping NowPlaying")
                     }
                 }
-                else -> {}
+                else -> {
+                    android.util.Log.d("MusicApp", "❓ [PARTY] Unhandled command: ${command::class.simpleName}")
+                }
             }
         }
     }
@@ -342,7 +357,7 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                     playerViewModel = playerViewModel,
                                     recommendationViewModel = recommendationViewModel,
                                     userPreferences = userPreferences,
-                                    onTrainClick = { navController.navigate("train") },
+                                    onTrainClick = { navController.navigate("playlists") },
                                     onOpenSettings = { navController.navigate("settings") },
                                     onNavigateToPlaylist = { playlistId ->
                                         navController.navigate("playlist_detail/$playlistId")
@@ -376,7 +391,15 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 PartyDashboardScreen(
                                     onNavigateBack = { navController.popBackStack() },
                                     onCreatePartyClick = { navController.navigate("createParty") },
-                                    onJoinPartyClick = { navController.navigate("joinParty") }
+                                    onJoinPartyClick = { navController.navigate("joinParty") },
+                                    recentParties = recentPartyNames,
+                                    onQuickStartParty = { partyName ->
+                                        val encoded = Uri.encode(partyName)
+                                        navController.navigate("createParty?name=$encoded&autoStart=true")
+                                    },
+                                    onDeleteParty = { partyName ->
+                                        userPreferences.removeRecentPartyName(partyName)
+                                    }
                                 )
                             }
                             composable(
@@ -395,16 +418,33 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                                 )
                             }
                             composable(
-                                "createParty",
+                                "createParty?name={partyName}&autoStart={autoStart}",
                                 enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
                                 exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
                                 popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
-                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
+                                popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() },
+                                arguments = listOf(
+                                    navArgument("partyName") {
+                                        type = NavType.StringType
+                                        defaultValue = ""
+                                    },
+                                    navArgument("autoStart") {
+                                        type = NavType.BoolType
+                                        defaultValue = false
+                                    }
+                                )
                             ) {
+                                val partyName = it.arguments?.getString("partyName").orEmpty()
+                                val autoStart = it.arguments?.getBoolean("autoStart") ?: false
                                 CreatePartyScreen(
                                     partyViewModel = partyViewModel,
                                     onNavigateBack = { navController.popBackStack() },
-                                    onStartPartyClick = { navController.navigate("partySession/NewParty") }
+                                    onStartPartyClick = { name ->
+                                        val encoded = Uri.encode(name)
+                                        navController.navigate("partySession/$encoded")
+                                    },
+                                    initialPartyName = partyName.ifBlank { null },
+                                    autoStart = autoStart
                                 )
                             }
                             composable(
@@ -417,12 +457,21 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                             ) {
                                 PartySessionScreen(
                                     partyViewModel = partyViewModel,
+                                    homeViewModel = homeViewModel,
+                                    playerViewModel = playerViewModel,
                                     song = playerState.currentSong,
                                     isPlaying = playerState.isPlaying,
+                                    position = playerState.position,
+                                    duration = playerState.duration,
                                     onNavigateBack = { navController.popBackStack() },
                                     onEndPartyClick = { 
                                         navController.popBackStack("partyDashboard", inclusive = false) 
-                                    }
+                                    },
+                                    onOpenSearch = {
+                                        navController.navigate("search")
+                                    },
+                                    onPlayPause = { playerViewModel.togglePlayPause() },
+                                    onSeek = { playerViewModel.seekTo(it) }
                                 )
                             }
                             composable(

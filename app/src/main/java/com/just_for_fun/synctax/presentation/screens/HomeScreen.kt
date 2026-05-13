@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -44,13 +43,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.just_for_fun.synctax.data.local.entities.Song
 import com.just_for_fun.synctax.data.preferences.UserPreferences
-import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.InteractiveMatchTasteCard
-import com.just_for_fun.synctax.presentation.components.card.AlbumCard
-import com.just_for_fun.synctax.presentation.components.card.ArtistCard
+import com.just_for_fun.synctax.presentation.components.SnackbarUtils
 import com.just_for_fun.synctax.presentation.components.card.AppUpdateCard
+import com.just_for_fun.synctax.presentation.components.card.ArtistCard
 import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
 import com.just_for_fun.synctax.presentation.components.chips.FilterChipsRow
 import com.just_for_fun.synctax.presentation.components.onboarding.DirectorySelectionDialog
@@ -60,10 +57,8 @@ import com.just_for_fun.synctax.presentation.components.player.DialogOption
 import com.just_for_fun.synctax.presentation.components.section.EmptyMusicState
 import com.just_for_fun.synctax.presentation.components.section.EmptyRecommendationsPrompt
 import com.just_for_fun.synctax.presentation.components.section.HistorySection
-import com.just_for_fun.synctax.presentation.components.section.MostPlayedSection
 import com.just_for_fun.synctax.presentation.components.section.QuickAccessGrid
 import com.just_for_fun.synctax.presentation.components.section.QuickShortcutsRow
-import com.just_for_fun.synctax.presentation.components.section.RecentlyAddedSection
 import com.just_for_fun.synctax.presentation.components.section.RecommendationSkeleton
 import com.just_for_fun.synctax.presentation.components.section.RecommendationsSection
 import com.just_for_fun.synctax.presentation.components.section.SavedPlaylistsSection
@@ -74,7 +69,6 @@ import com.just_for_fun.synctax.presentation.components.utils.BottomPaddingSpace
 import com.just_for_fun.synctax.presentation.components.utils.ExtraLargeSpacer
 import com.just_for_fun.synctax.presentation.components.utils.LargeSpacer
 import com.just_for_fun.synctax.presentation.components.utils.SectionDivider
-import com.just_for_fun.synctax.presentation.components.utils.SectionSpacer
 import com.just_for_fun.synctax.presentation.components.utils.SmallSpacer
 import com.just_for_fun.synctax.presentation.components.utils.SortOption
 import com.just_for_fun.synctax.presentation.dynamic.DynamicAlbumBackground
@@ -556,6 +550,7 @@ fun HomeScreen(
                                 }
                             }
 
+/*
                             // Album Section
                             if (uiState.albums.isNotEmpty()) {
                                 item(key = "albums", contentType = "albums") {
@@ -605,6 +600,7 @@ fun HomeScreen(
                                     )
                                 }
                             }
+*/
 
                             if (selectedFilter == "All" || selectedFilter == "Quick Picks") {
                                 item {
@@ -885,6 +881,7 @@ fun HomeScreen(
                                 }
                             }
 
+/*
                             // Most Played Section (only show if there are most played songs)
                             if ((selectedFilter == "All" || selectedFilter == "Speed Dial") && uiState.mostPlayedSongs.isNotEmpty()) {
                                 item {
@@ -989,26 +986,9 @@ fun HomeScreen(
                                     }
                                 }
                             }
+*/
 
-                            // Quick Access Grid (only show if there are local songs)
-                            if (uiState.quickAccessSongs.isNotEmpty()) {
-                                item {
-                                    QuickAccessGrid(
-                                        songs = uiState.quickAccessSongs,
-                                        onSongClick = { song ->
-                                            playerViewModel.playSong(
-                                                song,
-                                                uiState.quickAccessSongs
-                                            )
-                                        },
-                                        currentSong = playerState.currentSong
-                                    )
-                                }
 
-                                item {
-                                    ExtraLargeSpacer()
-                                }
-                            }
 
                             // Empty Music State - Show when no local songs available
                             if (uiState.allSongs.isEmpty()) {
@@ -1054,7 +1034,31 @@ fun HomeScreen(
                                     onClick = onNavigateToPartyDashboard
                                 )
 
-                                SmallSpacer()
+                                LargeSpacer()
+                            }
+
+                            // Quick Access Grid (only show if there are local songs)
+                            if (uiState.quickAccessSongs.isNotEmpty()) {
+                                item {
+                                    SectionDivider()
+                                }
+
+                                item {
+                                    QuickAccessGrid(
+                                        songs = uiState.quickAccessSongs,
+                                        onSongClick = { song ->
+                                            playerViewModel.playSong(
+                                                song,
+                                                uiState.quickAccessSongs
+                                            )
+                                        },
+                                        currentSong = playerState.currentSong
+                                    )
+                                }
+
+                                item {
+                                    ExtraLargeSpacer()
+                                }
                             }
 
                             // Bottom padding for mini player

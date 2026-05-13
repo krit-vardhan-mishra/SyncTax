@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Singleton that manages app initialization during splash screen.
@@ -351,7 +352,9 @@ object AppInitializer {
                         // Check if user has enough history before loading
                         val hasHistory = analyticsService.hasEnoughHistory(3)
                         if (hasHistory) {
-                            recommendationService.generateRecommendations()
+                            withTimeoutOrNull(3000L) {
+                                recommendationService.generateRecommendations()
+                            }
                         } else {
                             null
                         }
@@ -378,7 +381,9 @@ object AppInitializer {
                             }
                             .distinct()
                             .take(10) // Preload first 10 artists
-                        homeViewModel.fetchAllArtistPhotos(uniqueArtists)
+                        withTimeoutOrNull(3000L) {
+                            homeViewModel.fetchAllArtistPhotos(uniqueArtists)
+                        }
                         Log.d(TAG, "Phase 13 complete: Started preloading artist photos for ${uniqueArtists.size} artists")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to preload artist photos: ${e.message}")
@@ -410,7 +415,9 @@ object AppInitializer {
                         updateProgress("Fetching stream...", 0.87f)
                         lastPlayedStreamUrl = try {
                             val ytClient = YouTubeInnerTubeClient()
-                            ytClient.getStreamUrl(onlineSongState.videoId)
+                            withTimeoutOrNull(3000L) {
+                                ytClient.getStreamUrl(onlineSongState.videoId)
+                            }
                         } catch (e: Exception) {
                             Log.e(TAG, "Failed to preload stream URL: ${e.message}")
                             null

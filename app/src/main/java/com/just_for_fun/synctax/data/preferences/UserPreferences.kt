@@ -34,6 +34,13 @@ class UserPreferences(context: Context) {
     private val _recommendationsCount = MutableStateFlow(getRecommendationsCount())
     val recommendationsCount: StateFlow<Int> = _recommendationsCount.asStateFlow()
 
+    // --- recent parties (names and SSIDs) ---
+    private val _recentPartyNames = MutableStateFlow(getRecentPartyNames())
+    val recentPartyNames: StateFlow<List<String>> = _recentPartyNames.asStateFlow()
+
+    private val _recentPartySsids = MutableStateFlow(getRecentPartySsids())
+    val recentPartySsids: StateFlow<List<String>> = _recentPartySsids.asStateFlow()
+
     fun isScanLocalAlbumArtEnabled(): Boolean {
         return prefs.getBoolean(KEY_SCAN_LOCAL_ALBUM_ART, false)
     }
@@ -61,6 +68,48 @@ class UserPreferences(context: Context) {
         val clamped = count.coerceIn(1, 100)
         prefs.edit().putInt(KEY_RECOMMENDATIONS_COUNT, clamped).apply()
         _recommendationsCount.value = clamped
+    }
+
+    private fun getRecentPartyNames(): List<String> {
+        val raw = prefs.getString(KEY_RECENT_PARTY_NAMES, "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    fun addRecentPartyName(name: String) {
+        val normalized = name.trim()
+        if (normalized.isBlank()) return
+        val current = getRecentPartyNames().toMutableList()
+        current.removeAll { it.equals(normalized, ignoreCase = true) }
+        current.add(0, normalized)
+        val limited = current.take(MAX_RECENT_PARTIES)
+        prefs.edit().putString(KEY_RECENT_PARTY_NAMES, limited.joinToString("|")).apply()
+        _recentPartyNames.value = limited
+    }
+
+    fun removeRecentPartyName(name: String) {
+        val current = getRecentPartyNames().toMutableList()
+        if (current.removeAll { it.equals(name, ignoreCase = true) }) {
+            prefs.edit().putString(KEY_RECENT_PARTY_NAMES, current.joinToString("|")).apply()
+            _recentPartyNames.value = current
+        }
+    }
+
+    private fun getRecentPartySsids(): List<String> {
+        val raw = prefs.getString(KEY_RECENT_PARTY_SSIDS, "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split("|").map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    fun addRecentPartySsid(ssid: String) {
+        val normalized = ssid.trim()
+        if (normalized.isBlank()) return
+        val current = getRecentPartySsids().toMutableList()
+        current.removeAll { it.equals(normalized, ignoreCase = true) }
+        current.add(0, normalized)
+        val limited = current.take(MAX_RECENT_PARTIES)
+        prefs.edit().putString(KEY_RECENT_PARTY_SSIDS, limited.joinToString("|")).apply()
+        _recentPartySsids.value = limited
     }
 
     // --- new: persisted scan paths (list of tree URIs as strings) ---
@@ -298,6 +347,9 @@ class UserPreferences(context: Context) {
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_FIRST_LAUNCH = "first_launch"
         private const val KEY_SHOW_QUICK_PICKS_GUIDE = "show_quick_picks_guide"
+        private const val KEY_RECENT_PARTY_NAMES = "recent_party_names"
+        private const val KEY_RECENT_PARTY_SSIDS = "recent_party_ssids"
+        private const val MAX_RECENT_PARTIES = 6
         private const val KEY_YOUTUBE_API_KEY = "youtube_api_key"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_DIRECTORY_SELECTION_SHOWN = "directory_selection_shown"

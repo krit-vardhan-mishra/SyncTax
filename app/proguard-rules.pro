@@ -1,21 +1,47 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Room
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    public <init>(...);
+}
+-keep class * extends androidx.room.Entity
+-keep class * extends androidx.room.Dao
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Compose
+-keepclassmembers class * extends androidx.compose.ui.Modifier { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Media3
+-keep class androidx.media3.exoplayer.** { *; }
+-keep class androidx.media3.common.** { *; }
+-keep class androidx.media3.session.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Coil
+-keep class coil.** { *; }
+
+# kotlinx.serialization
+-keepattributes *Annotation*, EnclosingMethod, InnerClasses
+-keep class kotlinx.serialization.json.** { *; }
+-keepclassmembers class * {
+    @kotlinx.serialization.SerialName <fields>;
+}
+
+# Retrofit & OkHttp
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-keepclassmembers class * {
+    @retrofit2.http.** <methods>;
+}
+
+# Chaquopy (if still needed for other features)
+-keep class com.chaquo.python.** { *; }
+
+# SyncTax Models
+-keep class com.just_for_fun.synctax.core.ml.models.** { *; }
+-keep class com.just_for_fun.synctax.data.local.entities.** { *; }
+-keep class com.just_for_fun.synctax.presentation.viewmodels.** { *; }
+
+# Optimization
+-repackageclasses ''
+-allowaccessmodification
+-optimizations !code/simplification/arithmetic,!field/*,!class/merging/*

@@ -1,5 +1,6 @@
 package com.just_for_fun.synctax.presentation.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,54 +21,164 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.just_for_fun.synctax.data.local.entities.Song
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.presentation.components.card.SimpleSongCard
 import com.just_for_fun.synctax.presentation.components.player.PartyPlayer
 import com.just_for_fun.synctax.presentation.components.utils.BottomPaddingSpacer
 import com.just_for_fun.synctax.presentation.ui.theme.AppColors
+import com.just_for_fun.synctax.presentation.viewmodels.HomeViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PlayerViewModel
 import com.just_for_fun.synctax.presentation.viewmodels.PartyViewModel
+import com.just_for_fun.synctax.presentation.viewmodels.PartyUiEvent
+import android.os.SystemClock
+
+private const val TAG = "PartySessionScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PartySessionScreen(
     partyViewModel: PartyViewModel,
+    homeViewModel: HomeViewModel,
+    playerViewModel: PlayerViewModel,
     song: Song?,
     isPlaying: Boolean,
+    position: Long,
+    duration: Long,
     onNavigateBack: () -> Unit,
     onEndPartyClick: () -> Unit,
+    onOpenSearch: () -> Unit,
+    onPlayPause: () -> Unit,
+    onSeek: (Long) -> Unit,
     isAdmin: Boolean = true
 ) {
     val lavenderColor = AppColors.textTitle
     val accentOrange = AppColors.accentPrimary
     val darkBackground = AppColors.mainBackground
+    val context = LocalContext.current
+    val userPreferences = remember { UserPreferences(context) }
 
     val members by partyViewModel.members.collectAsState()
     val isHosting by partyViewModel.isHosting.collectAsState()
     val clientIssues by partyViewModel.clientIssues.collectAsState()
+    val homeState by homeViewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
+    var showLibrarySheet by remember { mutableStateOf(false) }
+    var songQuery by remember { mutableStateOf("") }
+    val librarySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val offlineSongs = homeState.allSongs
+    val filteredSongs = remember(songQuery, offlineSongs) {
+        if (songQuery.isBlank()) {
+            offlineSongs
+        } else {
+            val query = songQuery.trim().lowercase()
+            offlineSongs.filter { song ->
+                song.title.lowercase().contains(query) ||
+                    (song.artist ?: "").lowercase().contains(query) ||
+                    (song.album ?: "").lowercase().contains(query)
+            }
+        }
+    }
+
+    // Host transfer request dialog state
+    var showTransferDialog by remember { mutableStateOf(false) }
+    var transferRequestEndpoint by remember { mutableStateOf("") }
+    var transferRequestUserName by remember { mutableStateOf("") }
+
+    // Collect host transfer request events
+    LaunchedEffect(Unit) {
+        partyViewModel.uiEvents.collect { event ->
+            if (event is PartyUiEvent.HostTransferRequested) {
+                Log.d(TAG, "👑 Showing host transfer dialog for '${event.userName}'")
+                transferRequestEndpoint = event.endpointId
+                transferRequestUserName = event.userName
+                showTransferDialog = true
+            }
+        }
+    }
+
+    // Host transfer request dialog (shown to host)
+    if (showTransferDialog && isHosting) {
+        AlertDialog(
+            onDismissRequest = { showTransferDialog = false },
+            containerColor = AppColors.cardBackground,
+            title = {
+                Text("Host Transfer Request", color = lavenderColor, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "$transferRequestUserName wants to become the host. Do you want to transfer host controls?",
+                    color = AppColors.textBody
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        partyViewModel.respondToHostTransfer(transferRequestEndpoint, true)
+                        showTransferDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = accentOrange)
+                ) {
+                    Text("Accept", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    partyViewModel.respondToHostTransfer(transferRequestEndpoint, false)
+                    showTransferDialog = false
+                }) {
+                    Text("Deny", color = AppColors.textBody)
+                }
+            }
+        )
+    }
+
+    PartyPlayer(
+        song = song,
+        isPlaying = isPlaying,
+        position = position,
+        duration = duration,
+        isHost = isHosting,
+        onPlayPause = onPlayPause,
+        onSeek = onSeek
+    ) { playerPadding ->
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -89,6 +200,17 @@ fun PartySessionScreen(
                     }
                 },
                 actions = {
+                    // Songs and Search only for host
+                    if (isHosting) {
+                        TextButton(onClick = {
+                            showLibrarySheet = true
+                        }) {
+                            Text("Songs", color = accentOrange)
+                        }
+                        TextButton(onClick = onOpenSearch) {
+                            Text("Search", color = accentOrange)
+                        }
+                    }
                     IconButton(onClick = {
                         if (isHosting) {
                             partyViewModel.stopHosting()
@@ -109,6 +231,7 @@ fun PartySessionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(bottom = playerPadding.calculateBottomPadding())
         ) {
             // Host banner: show client issues if any
             if (isHosting && clientIssues.isNotEmpty()) {
@@ -149,25 +272,15 @@ fun PartySessionScreen(
                 }
             }
 
-            // Main Player Area
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                if (song != null) {
-                    PartyPlayer(
-                        song = song,
-                        isPlaying = isPlaying,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No song playing", color = lavenderColor)
-                    }
+            // Main Content Area
+            if (song == null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.3f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No song playing", color = lavenderColor)
                 }
             }
 
@@ -175,7 +288,7 @@ fun PartySessionScreen(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .weight(1f),
                 shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 color = AppColors.cardBackground
             ) {
@@ -191,11 +304,23 @@ fun PartySessionScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        if (isAdmin && isHosting) {
-                            TextButton(onClick = { /* Transfer Host */ }) {
+                        if (isHosting && isAdmin) {
+                            // Host can see Transfer Host button (placeholder for now)
+                            TextButton(onClick = { /* Transfer Host via selection */ }) {
                                 Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = accentOrange)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Transfer Host", color = accentOrange)
+                            }
+                        } else if (!isHosting) {
+                            // Client can request to be host
+                            val myName = userPreferences.getUserName().ifBlank { "Guest" } + "_SyncTax"
+                            TextButton(onClick = {
+                                Log.d(TAG, "👑 Requesting host transfer as '$myName'")
+                                partyViewModel.requestHostTransfer(myName)
+                            }) {
+                                Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = accentOrange)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Request Host", color = accentOrange, fontSize = 13.sp)
                             }
                         }
                     }
@@ -203,9 +328,15 @@ fun PartySessionScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Show Me/Host first
+                        // Show "Me" entry first
                         item {
-                            val name = if (isHosting) "Host (Me) \uD83D\uDC51" else "Me"
+                            val myName = if (isHosting) {
+                                val name = userPreferences.getUserName().ifBlank { "Host" }
+                                "${name}_SyncTax (Me) \uD83D\uDC51"
+                            } else {
+                                val name = userPreferences.getUserName().ifBlank { "Guest" }
+                                "${name}_SyncTax (Me)"
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -219,7 +350,7 @@ fun PartySessionScreen(
                                             .background(Color.Green)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(name, color = AppColors.textTitle)
+                                    Text(myName, color = AppColors.textTitle)
                                 }
                                 Text("Connected", color = AppColors.textBody, fontSize = 12.sp)
                             }
@@ -227,6 +358,11 @@ fun PartySessionScreen(
 
                         items(members) { member ->
                             val hasIssue = clientIssues.containsKey(member.endpointId)
+                            val displayName = if (member.isHost) {
+                                "${member.name} \uD83D\uDC51"
+                            } else {
+                                member.name
+                            }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -244,7 +380,7 @@ fun PartySessionScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
-                                        Text(member.name, color = AppColors.textTitle)
+                                        Text(displayName, color = AppColors.textTitle)
                                         if (hasIssue) {
                                             Text(
                                                 text = clientIssues[member.endpointId] ?: "",
@@ -268,6 +404,98 @@ fun PartySessionScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (showLibrarySheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showLibrarySheet = false },
+            sheetState = librarySheetState,
+            containerColor = AppColors.cardBackground
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Party Songs",
+                    color = lavenderColor,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = songQuery,
+                    onValueChange = { songQuery = it },
+                    label = { Text("Search offline songs", color = AppColors.textBody) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentOrange,
+                        unfocusedBorderColor = AppColors.textBody,
+                        focusedTextColor = AppColors.textTitle,
+                        unfocusedTextColor = AppColors.textTitle,
+                        cursorColor = accentOrange
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (filteredSongs.isEmpty()) {
+                    Text(
+                        text = "No songs match your search.",
+                        color = AppColors.textBody,
+                        fontSize = 13.sp
+                    )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(items = filteredSongs.take(50)) { itemSong: Song ->
+                            SimpleSongCard(
+                                song = itemSong,
+                                onClick = {
+                                    Log.d(TAG, "🎵 Host selected song: '${itemSong.title}' by '${itemSong.artist}' (id=${itemSong.id})")
+                                    // 1. Send NowPlaying so client knows WHICH song
+                                    partyViewModel.sendNowPlaying(
+                                        songId = itemSong.id,
+                                        title = itemSong.title,
+                                        artist = itemSong.artist,
+                                        album = itemSong.album,
+                                        thumbnailUrl = itemSong.albumArtUri,
+                                        isOffline = true
+                                    )
+                                    // 2. Send PlayCommand for timing sync
+                                    val now = SystemClock.elapsedRealtime() + 1500L
+                                    partyViewModel.sendPlayCommand(
+                                        songId = itemSong.id,
+                                        startTimestamp = now,
+                                        title = itemSong.title,
+                                        artist = itemSong.artist,
+                                        album = itemSong.album,
+                                        thumbnailUrl = itemSong.albumArtUri,
+                                        isOffline = true
+                                    )
+                                    // 3. Play locally on host
+                                    playerViewModel.playSong(itemSong)
+                                    showLibrarySheet = false
+                                },
+                                onLongClick = {
+                                    playerViewModel.placeNext(itemSong)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Long press adds the song next. Use Search for offline and online search.",
+                    color = AppColors.textBody,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+        }
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.just_for_fun.synctax.core.ml
 
 import android.content.Context
-import com.just_for_fun.synctax.core.chaquopy.ChaquopyMusicAnalyzer
+import com.just_for_fun.synctax.core.ml.agents.HeuristicMLAgent
 import com.just_for_fun.synctax.core.chaquopy.ModelStatus
 import com.just_for_fun.synctax.core.ml.agents.CollaborativeFilteringAgent
 import com.just_for_fun.synctax.core.ml.agents.FusionAgent
@@ -51,7 +51,7 @@ class MusicRecommendationManager(private val context: Context) {
     private val collaborativeAgent = CollaborativeFilteringAgent(vectorDb)
     private val fusionAgent = FusionAgent()
     private val recommendationAgent = RecommendationAgent()
-    private val chaquopyAnalyzer = ChaquopyMusicAnalyzer.getInstance(context)
+    private val heuristicAgent = HeuristicMLAgent(context)
 
     // New agents for enhanced recommendations
     val sequenceAgent = SequenceRecommenderAgent(database.songTransitionDao())
@@ -153,8 +153,8 @@ class MusicRecommendationManager(private val context: Context) {
                 // Train collaborative filtering
                 collaborativeAgent.trainFromHistory(songFeaturesList)
 
-                // Train Python ML model
-                chaquopyAnalyzer.trainModel(songFeaturesList)
+                // Train Native Heuristic ML model
+                heuristicAgent.train(songFeaturesList)
                 
                 // Perform maintenance on sequence agent (prune old transitions)
                 sequenceAgent.performMaintenance()
@@ -312,8 +312,8 @@ class MusicRecommendationManager(private val context: Context) {
                 // Reset skip handler tracking
                 skipHandler.resetSkipTracking()
 
-                // Reset python ML model via Chaquopy analyzer
-                val reset = chaquopyAnalyzer.resetModel()
+                // Reset native ML model
+                val reset = heuristicAgent.reset()
                 if (!reset) {
                     // Log if needed - for now, silently continue
                 }
@@ -335,7 +335,7 @@ class MusicRecommendationManager(private val context: Context) {
     suspend fun getModelStatus(): ModelStatus {
         return withContext(Dispatchers.IO) {
             try {
-                chaquopyAnalyzer.getModelStatus()
+                heuristicAgent.getStatus()
             } catch (e: Exception) {
                 // Return default status if unable to get model status
                 ModelStatus(isTrained = false, hasScorer = false, nClusters = 0)
@@ -353,13 +353,13 @@ class MusicRecommendationManager(private val context: Context) {
         // Run agents in parallel
         val statisticalResult = async { statisticalAgent.analyze(songFeatures) }
         val collaborativeResult = async { collaborativeAgent.analyze(songFeatures, userHistory) }
-        val pythonMlResult = async { chaquopyAnalyzer.getRecommendation(songFeatures) }
+        val heuristicResult = async<RecommendationResult> { heuristicAgent.analyze(songFeatures) }
 
         // Fuse results
         fusionAgent.fuseRecommendations(
             statisticalResult.await(),
             collaborativeResult.await(),
-            pythonMlResult.await()
+            heuristicResult.await()
         )
     }
 

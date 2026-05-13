@@ -32,6 +32,8 @@ import com.just_for_fun.synctax.utils.MusicDownloadManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +42,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -78,6 +81,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     // Callback for refreshing downloaded songs check
     var onSongsRefreshed: ((List<Song>) -> Unit)? = null
 
+    private val initStartTime = System.currentTimeMillis()
+
     init {
         // Check if AppInitializer has pre-computed data from splash screen
         val preComputedData = AppInitializer.getInitializedData()
@@ -85,7 +90,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         if (preComputedData != null) {
             Log.d(TAG, "Using pre-computed data from AppInitializer")
             
-            // Apply pre-computed data immediately
+            // Compute artists and albums synchronously BEFORE the state update
+            val artists = extractArtistsSync(preComputedData.songs)
+            val albums = extractAlbumsSync(preComputedData.songs)
+            
+            // Apply ALL pre-computed data in a SINGLE state update (one recomposition)
             _uiState.value = _uiState.value.copy(
                 allSongs = preComputedData.songs,
                 mostPlayedSongs = preComputedData.mostPlayedSongs,
@@ -98,55 +107,90 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 trainingStatistics = preComputedData.trainingStatistics ?: TrainingStatistics(),
                 modelStatus = preComputedData.modelStatus ?: ModelTrainingStatus(),
                 trainingDataSize = preComputedData.trainingDataSize,
+                artists = artists,
+                albums = albums,
                 isLoading = false,
                 scanComplete = true
             )
-
-            extractArtists(preComputedData.songs)
-            extractAlbums(preComputedData.songs)
             
             // Clear the pre-computed data to free memory
             AppInitializer.clearData()
             
-            // Only start the lightweight continuous observers and periodic tasks
-            observeListeningHistoryForTraining()
-            observeListenAgain()
-            observeRecommendationsCount()
-            startPeriodicRefresh()
-            observeFavoriteSongs()
-            observeOfflineSavedSongs()
+            // Start lightweight observers (non-blocking)
+            startLightweightObservers()
             
-            // Generate quick picks based on pre-loaded songs
+            // Generate quick picks in background (deferred, low priority)
             if (preComputedData.songs.isNotEmpty()) {
                 viewModelScope.launch(AppDispatchers.MachineLearning) {
+                    delay(300) // Give UI time to render first frame
                     generateQuickPicks()
                 }
             }
-        } else {
-            Log.d(TAG, "No pre-computed data, running full initialization")
-            // Fall back to full initialization (e.g., after process death)
-            loadData()
-            scanMusic()
-            observeListeningHistoryForTraining()
-            observeListenAgain()
-            loadOnlineHistory()
-            loadSearchHistory()
-            observeRecommendationsCount()
-            startPeriodicRefresh()
-            refreshAlbumArtForSongs()
-            loadTrainingStatistics()
-            loadModelStatus()
-            loadSavedPlaylists()
-            loadMostPlayedSongs()
-            observeFavoriteSongs()
-            observeOfflineSavedSongs()
             
-            // Check for expired offline songs (older than 7 days)
-            viewModelScope.launch(AppDispatchers.Database) {
-                val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
-                onlineSongRepository.deleteExpiredSongs(oneWeekAgo)
+            Log.d(TAG, "✅ Pre-computed init completed in ${System.currentTimeMillis() - initStartTime}ms")
+        } else {
+            Log.d(TAG, "No pre-computed data, running optimized initialization")
+            
+            viewModelScope.launch {
+                // PHASE 1: Critical path — load core data sequentially
+                Log.d(TAG, "Phase 1: Loading core data...")
+                loadData()
+                
+                // PHASE 2: Parallel independent operations
+                Log.d(TAG, "Phase 2: Loading parallel data...")
+                val jobs = listOf(
+                    async(AppDispatchers.MusicScanning) { scanMusicSuspend() },
+                    async(AppDispatchers.Database) { loadMostPlayedSongsSuspend() },
+                    async(AppDispatchers.Database) { loadTrainingStatisticsSuspend() },
+                    async(AppDispatchers.Database) { loadModelStatusSuspend() }
+                )
+                
+                try {
+                    jobs.awaitAll()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in parallel phase: ${e.message}")
+                }
+                
+                // PHASE 3: Lightweight observers (non-blocking)
+                Log.d(TAG, "Phase 3: Starting observers...")
+                startLightweightObservers()
+                loadOnlineHistory()
+                loadSearchHistory()
+                loadSavedPlaylists()
+                
+                // PHASE 4: Deferred background operations
+                Log.d(TAG, "Phase 4: Queuing background tasks...")
+                launch(AppDispatchers.MachineLearning) {
+                    delay(500) // Give UI time to render first
+                    generateQuickPicks()
+                }
+                
+                launch(AppDispatchers.Database) {
+                    refreshAlbumArtForSongs()
+                }
+                
+                // Check for expired offline songs (older than 7 days)
+                launch(AppDispatchers.Database) {
+                    val oneWeekAgo = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000L)
+                    onlineSongRepository.deleteExpiredSongs(oneWeekAgo)
+                }
+                
+                Log.d(TAG, "✅ Full init completed in ${System.currentTimeMillis() - initStartTime}ms")
             }
         }
+    }
+
+    /**
+     * Lightweight observers that don't do heavy I/O.
+     * These can start immediately without blocking the UI.
+     */
+    private fun startLightweightObservers() {
+        observeListeningHistoryForTraining()
+        observeListenAgain()
+        observeRecommendationsCount()
+        startPeriodicRefresh()
+        observeFavoriteSongs()
+        observeOfflineSavedSongs()
     }
 
     private fun observeListenAgain() {
@@ -175,6 +219,34 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 Log.e("HomeViewModel", "Failed to load most played songs: ${e.message}")
             }
+        }
+    }
+
+    /** Suspend version for phased init — runs inline, no new coroutine */
+    private suspend fun loadMostPlayedSongsSuspend() {
+        try {
+            val mostPlayed = repository.getMostPlayedSongs(10)
+            _uiState.value = _uiState.value.copy(mostPlayedSongs = mostPlayed)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load most played songs: ${e.message}")
+        }
+    }
+
+    /** Suspend version of scanMusic for phased init */
+    private suspend fun scanMusicSuspend() {
+        try {
+            val userPrefs = UserPreferences(getApplication())
+            val scanPaths = userPrefs.scanPaths.value
+            val songs = repository.scanDeviceMusic(scanPaths)
+
+            _uiState.value = _uiState.value.copy(
+                allSongs = songs,
+                isScanning = false,
+                scanComplete = true
+            )
+            onSongsRefreshed?.invoke(songs)
+        } catch (e: Exception) {
+            Log.e(TAG, "Scan music failed: ${e.message}")
         }
     }
 
@@ -267,21 +339,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             try {
                 repository.getAllSongs().collect { songs ->
-                    withContext(Dispatchers.Main) {  // Switch back to Main for UI updates
+                    // Compute derived state synchronously before updating UI
+                    val artists = extractArtistsSync(songs)
+                    val albums = extractAlbumsSync(songs)
+
+                    // SINGLE state update = ONE recomposition
+                    withContext(Dispatchers.Main) {
                         _uiState.value = _uiState.value.copy(
                             allSongs = songs,
+                            artists = artists,
+                            albums = albums,
                             isLoading = false
                         )
-                    }
-
-                    extractArtists(songs)
-                    extractAlbums(songs)
-
-                    // Generate recommendations in ML dispatcher
-                    if (songs.isNotEmpty()) {
-                        launch(AppDispatchers.MachineLearning) {
-                            generateQuickPicks()
-                        }
                     }
                 }
             } catch (e: Exception) {
@@ -293,6 +362,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    /**
+     * SYNCHRONOUS version of extractArtists — computes without triggering state update.
+     */
+    fun extractArtistsSync(songs: List<Song>): List<com.just_for_fun.synctax.presentation.model.ArtistUiModel> {
+        val artistSongCount = mutableMapOf<String, Int>()
+        
+        songs.forEach { song ->
+            val artistString = song.artist ?: "Unknown"
+            val individualArtists = parseArtistString(artistString)
+            
+            individualArtists.forEach { artistName ->
+                artistSongCount[artistName] = (artistSongCount[artistName] ?: 0) + 1
+            }
+        }
+        
+        return artistSongCount
+            .map { (name, count) ->
+                com.just_for_fun.synctax.presentation.model.ArtistUiModel(
+                    name = name,
+                    songCount = count
+                )
+            }
+            .sortedByDescending { it.songCount }
     }
 
     private fun extractArtists(songs: List<Song>) {
@@ -364,20 +458,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .ifEmpty { listOf(artistString) } // Fallback to original if no valid splits
     }
 
+    /**
+     * SYNCHRONOUS version of extractAlbums — computes without triggering state update.
+     */
+    private fun extractAlbumsSync(songs: List<Song>): List<AlbumUiModel> {
+        return songs.groupBy { Pair(it.album ?: "Unknown", it.artist ?: "Unknown") }
+            .map { (albumArtist, groupedSongs) ->
+                val firstSong = groupedSongs.firstOrNull()
+                AlbumUiModel(
+                    name = albumArtist.first,
+                    artist = albumArtist.second,
+                    songCount = groupedSongs.size,
+                    albumArtUri = firstSong?.albumArtUri
+                )
+            }
+            .sortedByDescending { it.songCount }
+    }
+
+    /**
+     * Legacy async version — delegates to sync version and updates state.
+     */
     private fun extractAlbums(songs: List<Song>) {
         viewModelScope.launch(Dispatchers.Default) {
-            val albums = songs.groupBy { Pair(it.album ?: "Unknown", it.artist ?: "Unknown") }
-                .map { (albumArtist, songs) ->
-                    val firstSong = songs.firstOrNull()
-                    AlbumUiModel(
-                        name = albumArtist.first,
-                        artist = albumArtist.second,
-                        songCount = songs.size,
-                        albumArtUri = firstSong?.albumArtUri
-                    )
-                }
-                .sortedByDescending { it.songCount }
-
+            val albums = extractAlbumsSync(songs)
             withContext(Dispatchers.Main) {
                 _uiState.value = _uiState.value.copy(albums = albums)
             }
@@ -834,8 +937,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Fetch all artist photos once when home screen loads.
-     * This prevents repeated API calls when scrolling.
+     * Fetch all artist photos in PARALLEL instead of sequential.
+     * Uses async/awaitAll with per-artist timeouts.
      * @param artistNames List of artist names to fetch photos for
      * @param forceRefresh If true, will re-fetch even if photos are cached
      */
@@ -848,10 +951,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         
         val currentPhotos = _uiState.value.artistPhotos
         val artistsToFetch = if (forceRefresh) {
-            // Force refresh: fetch all requested artists
             artistNames
         } else {
-            // Normal: only fetch artists not already cached
             artistNames.filter { !currentPhotos.containsKey(it) }
         }
         
@@ -861,52 +962,63 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         _uiState.value = _uiState.value.copy(isLoadingArtistPhotos = true)
-        Log.d(TAG, "Fetching photos for ${artistsToFetch.size} artists (forceRefresh=$forceRefresh)")
+        Log.d(TAG, "Fetching photos for ${artistsToFetch.size} artists in PARALLEL (forceRefresh=$forceRefresh)")
+        val photoStartTime = System.currentTimeMillis()
         
         viewModelScope.launch(AppDispatchers.Network) {
-            val photosMap = mutableMapOf<String, String?>()
-            
-            // Fetch photos for each artist
-            artistsToFetch.forEach { artistName ->
-                try {
-                    kotlinx.coroutines.suspendCancellableCoroutine<String?> { continuation ->
-                        YTMusicRecommender.searchArtists(
-                            query = artistName,
-                            limit = 1,
-                            onResult = { artists ->
-                                val thumbnail = artists.firstOrNull()?.thumbnail
-                                Log.d(TAG, "Artist photo for '$artistName': ${if (thumbnail != null) "found" else "not found"}")
-                                continuation.resume(thumbnail, null)
-                            },
-                            onError = { error ->
-                                Log.e(TAG, "Failed to fetch artist photo for '$artistName': $error")
-                                continuation.resume(null, null)
-                            }
-                        )
-                    }?.let { thumbnail ->
-                        photosMap[artistName] = thumbnail
-                    } ?: run {
-                        photosMap[artistName] = null
+            try {
+                // Create parallel tasks for each artist
+                val photoJobs = artistsToFetch.map { artistName ->
+                    async {
+                        try {
+                            withTimeoutOrNull(5000L) { // 5-second timeout per artist
+                                suspendCancellableCoroutine<Pair<String, String?>> { continuation ->
+                                    YTMusicRecommender.searchArtists(
+                                        query = artistName,
+                                        limit = 1,
+                                        onResult = { artists ->
+                                            val thumbnail = artists.firstOrNull()?.thumbnail
+                                            Log.d(TAG, "Artist photo for '$artistName': ${if (thumbnail != null) "found" else "not found"}")
+                                            if (continuation.isActive) {
+                                                continuation.resume(Pair(artistName, thumbnail)) {}
+                                            }
+                                        },
+                                        onError = { error ->
+                                            Log.e(TAG, "Failed to fetch artist photo for '$artistName': $error")
+                                            if (continuation.isActive) {
+                                                continuation.resume(Pair(artistName, null)) {}
+                                            }
+                                        }
+                                    )
+                                }
+                            } ?: Pair(artistName, null) // Timeout fallback
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Exception fetching photo for '$artistName': ${e.message}")
+                            Pair(artistName, null)
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Exception fetching photo for '$artistName': ${e.message}")
-                    photosMap[artistName] = null
                 }
+                
+                // Wait for ALL photos in parallel
+                val results = photoJobs.awaitAll()
+                val photosMap = results.associate { (name, thumb) -> name to thumb }
+                
+                // Update state with all fetched photos
+                val updatedPhotos = if (forceRefresh) {
+                    currentPhotos.filterKeys { it !in artistsToFetch } + photosMap
+                } else {
+                    currentPhotos + photosMap
+                }
+                
+                _uiState.value = _uiState.value.copy(
+                    artistPhotos = updatedPhotos,
+                    isLoadingArtistPhotos = false
+                )
+                Log.d(TAG, "✅ Fetched ${artistsToFetch.size} artist photos in ${System.currentTimeMillis() - photoStartTime}ms (PARALLEL)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in parallel photo fetch: ${e.message}")
+                _uiState.value = _uiState.value.copy(isLoadingArtistPhotos = false)
             }
-            
-            // Update state with all fetched photos (merge with existing if not force refresh)
-            val updatedPhotos = if (forceRefresh) {
-                // Replace cached photos for fetched artists
-                currentPhotos.filterKeys { it !in artistsToFetch } + photosMap
-            } else {
-                currentPhotos + photosMap
-            }
-            
-            _uiState.value = _uiState.value.copy(
-                artistPhotos = updatedPhotos,
-                isLoadingArtistPhotos = false
-            )
-            Log.d(TAG, "Finished fetching artist photos. Total cached: ${_uiState.value.artistPhotos.size}")
         }
     }
 
@@ -1057,85 +1169,95 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadTrainingStatistics() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingStats = true)
-            try {
-                val history =
-                    repository.getRecentHistory(1000).first() // Get more history for better stats
-                val preferences = repository.getTopPreferences(200).first()
+            loadTrainingStatisticsSuspend()
+        }
+    }
 
-                // Calculate statistics
-                val totalPlays = history.size
-                val uniqueSongsPlayed = history.distinctBy { it.songId }.size
-                val averageCompletionRate = if (history.isNotEmpty()) {
-                    history.map { it.completionRate }.average().toFloat()
-                } else 0f
+    /** Suspend version for phased init */
+    private suspend fun loadTrainingStatisticsSuspend() {
+        _uiState.value = _uiState.value.copy(isLoadingStats = true)
+        try {
+            val history =
+                repository.getRecentHistory(1000).first() // Get more history for better stats
+            val preferences = repository.getTopPreferences(200).first()
 
-                // Find most active hour and day
-                val hourCounts = history.groupBy { it.timeOfDay }.mapValues { it.value.size }
-                val dayCounts = history.groupBy { it.dayOfWeek }.mapValues { it.value.size }
-                val mostActiveHour = hourCounts.maxByOrNull { it.value }?.key ?: 0
-                val mostActiveDay = dayCounts.maxByOrNull { it.value }?.key ?: 0
+            // Calculate statistics
+            val totalPlays = history.size
+            val uniqueSongsPlayed = history.distinctBy { it.songId }.size
+            val averageCompletionRate = if (history.isNotEmpty()) {
+                history.map { it.completionRate }.average().toFloat()
+            } else 0f
 
-                // Get top songs
-                val topSongs = preferences
-                    .sortedByDescending { it.playCount }
-                    .take(5)
-                    .mapNotNull { pref ->
-                        repository.getSongById(pref.songId)?.let { song ->
-                            SongPlayCount(
-                                songId = pref.songId,
-                                title = song.title,
-                                artist = song.artist,
-                                playCount = pref.playCount
-                            )
-                        }
+            // Find most active hour and day
+            val hourCounts = history.groupBy { it.timeOfDay }.mapValues { it.value.size }
+            val dayCounts = history.groupBy { it.dayOfWeek }.mapValues { it.value.size }
+            val mostActiveHour = hourCounts.maxByOrNull { it.value }?.key ?: 0
+            val mostActiveDay = dayCounts.maxByOrNull { it.value }?.key ?: 0
+
+            // Get top songs
+            val topSongs = preferences
+                .sortedByDescending { it.playCount }
+                .take(5)
+                .mapNotNull { pref ->
+                    repository.getSongById(pref.songId)?.let { song ->
+                        SongPlayCount(
+                            songId = pref.songId,
+                            title = song.title,
+                            artist = song.artist,
+                            playCount = pref.playCount
+                        )
                     }
-
-                // Create listening patterns heatmap data
-                val listeningPatterns = mutableMapOf<String, Int>()
-                history.forEach { entry ->
-                    val key = "${entry.timeOfDay}:${entry.dayOfWeek}"
-                    listeningPatterns[key] = listeningPatterns.getOrDefault(key, 0) + 1
                 }
 
-                val statistics = TrainingStatistics(
-                    totalPlays = totalPlays,
-                    uniqueSongsPlayed = uniqueSongsPlayed,
-                    averageCompletionRate = averageCompletionRate,
-                    mostActiveHour = mostActiveHour,
-                    mostActiveDay = mostActiveDay,
-                    topSongs = topSongs,
-                    listeningPatterns = listeningPatterns
-                )
-
-                _uiState.value = _uiState.value.copy(
-                     trainingStatistics = statistics,
-                     isLoadingStats = false
-                )
-            } catch (e: Exception) {
-                // Silently handle errors for statistics loading
-                _uiState.value = _uiState.value.copy(isLoadingStats = false)
+            // Create listening patterns heatmap data
+            val listeningPatterns = mutableMapOf<String, Int>()
+            history.forEach { entry ->
+                val key = "${entry.timeOfDay}:${entry.dayOfWeek}"
+                listeningPatterns[key] = listeningPatterns.getOrDefault(key, 0) + 1
             }
+
+            val statistics = TrainingStatistics(
+                totalPlays = totalPlays,
+                uniqueSongsPlayed = uniqueSongsPlayed,
+                averageCompletionRate = averageCompletionRate,
+                mostActiveHour = mostActiveHour,
+                mostActiveDay = mostActiveDay,
+                topSongs = topSongs,
+                listeningPatterns = listeningPatterns
+            )
+
+            _uiState.value = _uiState.value.copy(
+                 trainingStatistics = statistics,
+                 isLoadingStats = false
+            )
+        } catch (e: Exception) {
+            // Silently handle errors for statistics loading
+            _uiState.value = _uiState.value.copy(isLoadingStats = false)
         }
     }
 
     private fun loadModelStatus() {
         viewModelScope.launch {
-            try {
-                // Check if models are trained by attempting to get model status
-                val modelStatus = recommendationManager.getModelStatus()
-                val currentStatus = ModelTrainingStatus(
-                    statisticalAgentTrained = true, // Statistical agent is always ready
-                    collaborativeAgentTrained = modelStatus.isTrained, // Based on vector DB
-                    pythonModelTrained = modelStatus.isTrained,
-                    fusionAgentReady = true, // Fusion agent is always ready
-                    lastTrainingTime = System.currentTimeMillis(), // TODO: Store this persistently
-                    modelVersion = "1.0.0"
-                )
-                _uiState.value = _uiState.value.copy(modelStatus = currentStatus)
-            } catch (e: Exception) {
-                // Model status check failed, keep defaults
-            }
+            loadModelStatusSuspend()
+        }
+    }
+
+    /** Suspend version for phased init */
+    private suspend fun loadModelStatusSuspend() {
+        try {
+            // Check if models are trained by attempting to get model status
+            val modelStatus = recommendationManager.getModelStatus()
+            val currentStatus = ModelTrainingStatus(
+                statisticalAgentTrained = true, // Statistical agent is always ready
+                collaborativeAgentTrained = modelStatus.isTrained, // Based on vector DB
+                pythonModelTrained = modelStatus.isTrained,
+                fusionAgentReady = true, // Fusion agent is always ready
+                lastTrainingTime = System.currentTimeMillis(), // TODO: Store this persistently
+                modelVersion = "1.0.0"
+            )
+            _uiState.value = _uiState.value.copy(modelStatus = currentStatus)
+        } catch (e: Exception) {
+            // Model status check failed, keep defaults
         }
     }
 

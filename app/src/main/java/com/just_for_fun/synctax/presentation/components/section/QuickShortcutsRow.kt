@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.ModelTraining
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,7 +48,7 @@ fun QuickShortcutsRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ShortcutCard("History", Icons.Default.History, onHistoryClick, Modifier.weight(1f))
-            ShortcutCard("Training Data", Icons.Default.ModelTraining, onTrainClick, Modifier.weight(1f))
+            ShortcutCard("Saved Playlist", Icons.AutoMirrored.Filled.PlaylistPlay, onTrainClick, Modifier.weight(1f))
         }
 
         // Row 2: Most Played (Stats) and Shuffle (Saved Songs)

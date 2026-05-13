@@ -1,6 +1,7 @@
 package com.just_for_fun.synctax.core.party
 
 import android.content.Context
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
@@ -8,6 +9,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -63,6 +65,9 @@ class PartyConnectionManager(private val context: Context) {
     private val _hostHotspotInfo = MutableStateFlow<PartyHotspotInfo?>(null)
     val hostHotspotInfo: StateFlow<PartyHotspotInfo?> = _hostHotspotInfo.asStateFlow()
 
+    private val _hotspotError = MutableStateFlow<String?>(null)
+    val hotspotError: StateFlow<String?> = _hotspotError.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var hotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
@@ -71,7 +76,7 @@ class PartyConnectionManager(private val context: Context) {
     private var hostConnection: ClientConnection? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var activeNetwork: Network? = null
-    private var hostDisplayName: String = "Host"
+    internal var hostDisplayName: String = "Host"
 
     private data class ClientConnection(
         val endpointId: String,
@@ -92,42 +97,104 @@ class PartyConnectionManager(private val context: Context) {
     // Callback for media issue notifications from clients
     var onClientIssueReceived: ((endpointId: String, PartyMessage.MediaIssue) -> Unit)? = null
 
+    // Callback for host transfer requests from clients
+    var onHostTransferRequested: ((endpointId: String, userName: String) -> Unit)? = null
+
+    fun clearHotspotError() {
+        _hotspotError.value = null
+    }
+
     fun startHosting(partyName: String) {
-        Log.d(TAG, "Starting hotspot for party: $partyName")
+        Log.d(TAG, "▶▶▶ startHosting() called for party: $partyName")
+        _hotspotError.value = null
         stopDiscovery()
         if (_isHosting.value) {
+            Log.d(TAG, "Already hosting — stopping first")
             stopHosting()
         }
         hostDisplayName = partyName
 
+        // Pre-check: Wi-Fi must be enabled
+        if (!wifiManager.isWifiEnabled) {
+            val msg = "Wi-Fi is turned off. Please enable Wi-Fi to host a party."
+            Log.e(TAG, msg)
+            _hotspotError.value = msg
+            return
+        }
+
+        // Pre-check: Location Services must be enabled (required for hotspot on most devices)
+        val locationManager = appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        if (!locationEnabled) {
+            val msg = "Location Services are turned off. Please enable Location to host a party."
+            Log.e(TAG, msg)
+            _hotspotError.value = msg
+            return
+        }
+
+        Log.d(TAG, "Pre-checks passed. Wi-Fi=ON, Location=ON. Calling startLocalOnlyHotspot...")
+
         val handler = Handler(Looper.getMainLooper())
-        wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
-            override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
-                hotspotReservation = reservation
-                val config = reservation.wifiConfiguration
-                val ssid = config?.SSID?.trim('"') ?: "PartyHotspot"
-                val passphrase = config?.preSharedKey?.trim('"') ?: ""
-                _hostHotspotInfo.value = PartyHotspotInfo(ssid, passphrase, PARTY_PORT)
-                _isHosting.value = true
-                _isConnected.value = true
-                startServer()
-                Log.d(TAG, "Hotspot started with SSID=$ssid")
-            }
-
-            override fun onStopped() {
-                Log.d(TAG, "Hotspot stopped")
-                if (_isHosting.value) {
-                    stopHosting()
+        try {
+            wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
+                override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
+                    Log.d(TAG, "✅ onStarted() callback fired")
+                    hotspotReservation = reservation
+                    val ssid: String
+                    val passphrase: String
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        val config = reservation.softApConfiguration
+                        ssid = config?.ssid ?: "PartyHotspot"
+                        passphrase = config?.passphrase ?: ""
+                        Log.d(TAG, "softApConfiguration: ssid=$ssid, passphrase length=${passphrase.length}")
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val config = reservation.wifiConfiguration
+                        ssid = config?.SSID?.trim('"') ?: "PartyHotspot"
+                        passphrase = config?.preSharedKey?.trim('"') ?: ""
+                        Log.d(TAG, "wifiConfiguration: ssid=$ssid, passphrase length=${passphrase.length}")
+                    }
+                    _hostHotspotInfo.value = PartyHotspotInfo(ssid, passphrase, PARTY_PORT)
+                    _isHosting.value = true
+                    _isConnected.value = true
+                    _hotspotError.value = null
+                    startServer()
+                    Log.d(TAG, "✅ Hotspot started with SSID=$ssid, port=$PARTY_PORT")
                 }
-            }
 
-            override fun onFailed(reason: Int) {
-                Log.e(TAG, "Hotspot start failed: reason=$reason")
-                _hostHotspotInfo.value = null
-                _isHosting.value = false
-                _isConnected.value = false
-            }
-        }, handler)
+                override fun onStopped() {
+                    Log.d(TAG, "⛔ Hotspot stopped callback")
+                    if (_isHosting.value) {
+                        stopHosting()
+                    }
+                }
+
+                override fun onFailed(reason: Int) {
+                    val reasonStr = when (reason) {
+                        ERROR_NO_CHANNEL -> "ERROR_NO_CHANNEL"
+                        ERROR_GENERIC -> "ERROR_GENERIC"
+                        ERROR_INCOMPATIBLE_MODE -> "ERROR_INCOMPATIBLE_MODE"
+                        ERROR_TETHERING_DISALLOWED -> "ERROR_TETHERING_DISALLOWED"
+                        else -> "UNKNOWN($reason)"
+                    }
+                    Log.e(TAG, "❌ Hotspot onFailed: $reasonStr (code=$reason)")
+                    _hotspotError.value = "Hotspot failed: $reasonStr. Make sure Wi-Fi and Location are ON, and no other hotspot is active."
+                    _hostHotspotInfo.value = null
+                    _isHosting.value = false
+                    _isConnected.value = false
+                }
+            }, handler)
+            Log.d(TAG, "startLocalOnlyHotspot() called — waiting for callback...")
+        } catch (e: SecurityException) {
+            val msg = "Permission denied: ${e.message}"
+            Log.e(TAG, msg, e)
+            _hotspotError.value = msg
+        } catch (e: Exception) {
+            val msg = "Failed to start hotspot: ${e.message}"
+            Log.e(TAG, msg, e)
+            _hotspotError.value = msg
+        }
     }
 
     fun stopHosting() {
@@ -253,9 +320,11 @@ class PartyConnectionManager(private val context: Context) {
         scope.launch {
             try {
                 serverSocket = ServerSocket(PARTY_PORT)
+                Log.d(TAG, "🖥️ Server started on port $PARTY_PORT")
                 while (_isHosting.value) {
                     val socket = serverSocket?.accept() ?: break
                     val endpointId = UUID.randomUUID().toString()
+                    Log.d(TAG, "🤝 New client connected: $endpointId from ${socket.inetAddress?.hostAddress}")
                     val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))
                     val connection = ClientConnection(endpointId, socket, writer)
                     clients[endpointId] = connection
@@ -282,9 +351,12 @@ class PartyConnectionManager(private val context: Context) {
         scope.launch {
             val reader = BufferedReader(InputStreamReader(connection.socket.getInputStream(), StandardCharsets.UTF_8))
             try {
+                Log.d(TAG, "👂 Listening to client: ${connection.endpointId}")
                 while (true) {
                     val line = reader.readLine() ?: break
+                    Log.d(TAG, "📨 [HOST←CLIENT:${connection.endpointId}] raw=$line")
                     val message = PartyMessage.fromByteArray(line.toByteArray(StandardCharsets.UTF_8))
+                    Log.d(TAG, "📨 [HOST←CLIENT:${connection.endpointId}] parsed=${message::class.simpleName}")
                     handleIncomingMessage(connection.endpointId, message)
                 }
             } catch (e: Exception) {
@@ -299,10 +371,11 @@ class PartyConnectionManager(private val context: Context) {
         scope.launch {
             val gateway = resolveGateway(connectivityManager.getLinkProperties(network))
             if (gateway == null) {
-                Log.e(TAG, "Gateway not available for hotspot")
+                Log.e(TAG, "❌ Gateway not available for hotspot")
                 handleHostDisconnected()
                 return@launch
             }
+            Log.d(TAG, "🔌 Connecting to host at $gateway:$PARTY_PORT as '$userName'")
             try {
                 val socket = Socket()
                 socket.connect(InetSocketAddress(gateway, PARTY_PORT), CONNECT_TIMEOUT_MS)
@@ -311,10 +384,11 @@ class PartyConnectionManager(private val context: Context) {
                 hostConnection = connection
                 _isConnected.value = true
                 _members.value = listOf(PartyMember(HOST_ENDPOINT_ID, "Host", true))
+                Log.d(TAG, "✅ Connected to host! Sending handshake as '$userName'")
                 sendMessage(connection, PartyMessage.Handshake(BuildConfig.VERSION_NAME, userName))
                 listenToHost(connection)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to connect to host", e)
+                Log.e(TAG, "❌ Failed to connect to host", e)
                 handleHostDisconnected()
             }
         }
@@ -324,9 +398,12 @@ class PartyConnectionManager(private val context: Context) {
         scope.launch {
             val reader = BufferedReader(InputStreamReader(connection.socket.getInputStream(), StandardCharsets.UTF_8))
             try {
+                Log.d(TAG, "👂 Listening to host...")
                 while (true) {
                     val line = reader.readLine() ?: break
+                    Log.d(TAG, "📨 [CLIENT←HOST] raw=$line")
                     val message = PartyMessage.fromByteArray(line.toByteArray(StandardCharsets.UTF_8))
+                    Log.d(TAG, "📨 [CLIENT←HOST] parsed=${message::class.simpleName}")
                     handleIncomingMessage(connection.endpointId, message)
                 }
             } catch (e: Exception) {
@@ -342,25 +419,51 @@ class PartyConnectionManager(private val context: Context) {
     }
 
     private fun handleIncomingMessage(endpointId: String, message: PartyMessage) {
+        Log.d(TAG, "📬 handleIncomingMessage from=$endpointId type=${message::class.simpleName}")
         when (message) {
             is PartyMessage.Handshake -> {
+                Log.d(TAG, "🤝 Handshake from $endpointId: user='${message.userName}', version='${message.appVersion}'")
                 updateMemberName(endpointId, message.userName)
                 onMessageReceived?.invoke(message)
             }
+            is PartyMessage.PlayCommand -> {
+                Log.d(TAG, "▶️ PlayCommand received: songId='${message.songId}', title='${message.title}', artist='${message.artist}'")
+                onMessageReceived?.invoke(message)
+            }
+            is PartyMessage.PauseCommand -> {
+                Log.d(TAG, "⏸️ PauseCommand received: timestamp=${message.timestamp}")
+                onMessageReceived?.invoke(message)
+            }
+            is PartyMessage.SeekCommand -> {
+                Log.d(TAG, "⏩ SeekCommand received: position=${message.position}")
+                onMessageReceived?.invoke(message)
+            }
+            is PartyMessage.NowPlaying -> {
+                Log.d(TAG, "🎵 NowPlaying received: songId='${message.songId}', title='${message.title}', artist='${message.artist}'")
+                onMessageReceived?.invoke(message)
+            }
             is PartyMessage.MediaRequest -> {
+                Log.d(TAG, "📥 MediaRequest from $endpointId: type='${message.requestType}', songId='${message.songId}'")
                 onMediaRequestReceived?.invoke(endpointId, message)
             }
             is PartyMessage.MediaIssue -> {
+                Log.d(TAG, "⚠️ MediaIssue from $endpointId: user='${message.userName}', issue='${message.issueType}'")
                 val updated = _clientIssues.value.toMutableMap()
                 updated[endpointId] = "${message.userName}: ${message.issueType}"
                 _clientIssues.value = updated
                 onClientIssueReceived?.invoke(endpointId, message)
             }
             is PartyMessage.EndParty -> {
+                Log.d(TAG, "🛑 EndParty received: reason='${message.reason}'")
                 leaveParty()
                 onHostDisconnected?.invoke()
             }
+            is PartyMessage.HostTransferRequest -> {
+                Log.d(TAG, "👑 HostTransferRequest from $endpointId: user='${message.userName}'")
+                onHostTransferRequested?.invoke(endpointId, message.userName)
+            }
             else -> {
+                Log.d(TAG, "📩 Other message from $endpointId: ${message::class.simpleName}")
                 onMessageReceived?.invoke(message)
             }
         }
@@ -407,14 +510,16 @@ class PartyConnectionManager(private val context: Context) {
 
     private fun sendMessage(connection: ClientConnection, message: PartyMessage) {
         val json = String(message.toByteArray(), StandardCharsets.UTF_8)
+        Log.d(TAG, "📤 sendMessage to=${connection.endpointId} type=${message::class.simpleName}")
         try {
             synchronized(connection) {
                 connection.writer.write(json)
                 connection.writer.newLine()
                 connection.writer.flush()
             }
+            Log.d(TAG, "📤 sendMessage SUCCESS to=${connection.endpointId}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send message", e)
+            Log.e(TAG, "❌ Failed to send message to=${connection.endpointId}", e)
             if (_isHosting.value) {
                 handleClientDisconnected(connection.endpointId)
             } else {

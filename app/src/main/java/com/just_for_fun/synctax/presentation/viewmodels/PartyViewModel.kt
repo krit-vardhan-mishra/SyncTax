@@ -10,6 +10,7 @@ import com.just_for_fun.synctax.core.party.PartyConnectionManager
 import com.just_for_fun.synctax.core.party.PartyMessage
 import com.just_for_fun.synctax.core.party.PartySyncController
 import com.just_for_fun.synctax.core.service.PartyService
+import com.just_for_fun.synctax.data.preferences.UserPreferences
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,7 @@ private const val TAG = "PartyViewModel"
 class PartyViewModel(application: Application) : AndroidViewModel(application) {
     val connectionManager = PartyConnectionManager(application)
     val syncController = PartySyncController(connectionManager, viewModelScope)
+    private val userPreferences = UserPreferences(application)
 
     private val _isHosting = connectionManager.isHosting
     val isHosting = _isHosting
@@ -48,6 +50,7 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
     val discoveredParties = _discoveredParties
 
     val hostHotspotInfo = connectionManager.hostHotspotInfo
+    val hotspotError = connectionManager.hotspotError
 
     // Client issue state — shown on host UI
     val clientIssues = connectionManager.clientIssues
@@ -121,6 +124,27 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
                 _uiEvents.emit(PartyUiEvent.ClientIssueReported(endpointId, issue.userName, issue.issueType))
             }
         }
+
+        // ── Host transfer request from client ────────────────────────────
+        connectionManager.onHostTransferRequested = { endpointId, userName ->
+            Log.d(TAG, "👑 Host transfer requested by '$userName' (endpoint=$endpointId)")
+            viewModelScope.launch {
+                _uiEvents.emit(PartyUiEvent.HostTransferRequested(endpointId, userName))
+            }
+        }
+
+        viewModelScope.launch {
+            hostHotspotInfo.collect { info ->
+                if (info != null) {
+                    userPreferences.addRecentPartySsid(info.ssid)
+                    // Start foreground service only when hotspot actually starts
+                    val partyName = connectionManager.hostDisplayName ?: "Party"
+                    startForegroundService(partyName, isHost = true)
+                    onPartyModeChanged?.invoke(true)
+                    Log.d(TAG, "🔔 Hotspot up — started foreground service for '$partyName'")
+                }
+            }
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -130,8 +154,9 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
     fun startHosting(partyName: String) {
         Log.d(TAG, "🎤 Starting party: $partyName")
         connectionManager.startHosting(partyName)
-        startForegroundService(partyName, isHost = true)
-        onPartyModeChanged?.invoke(true) // Pause ML/background tasks
+        userPreferences.addRecentPartyName(partyName)
+        // NOTE: Foreground service is started when hotspot actually comes up
+        // (observed via hostHotspotInfo flow in init block)
     }
 
     fun stopHosting() {
@@ -298,6 +323,31 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Client sends a request to the host to become the new host.
+     */
+    fun requestHostTransfer(userName: String) {
+        if (!_isHosting.value) {
+            Log.d(TAG, "📤 Sending HostTransferRequest as '$userName'")
+            connectionManager.sendMessageToHost(
+                PartyMessage.HostTransferRequest(userName)
+            )
+        }
+    }
+
+    /**
+     * Host responds to a host transfer request.
+     */
+    fun respondToHostTransfer(endpointId: String, accepted: Boolean) {
+        if (_isHosting.value) {
+            Log.d(TAG, "📤 HostTransferResponse to $endpointId: accepted=$accepted")
+            connectionManager.sendMessageToUser(
+                endpointId,
+                PartyMessage.HostTransferResponse(accepted, connectionManager.hostDisplayName)
+            )
+        }
+    }
+
     // ════════════════════════════════════════════════════════════════════
     // Foreground Service
     // ════════════════════════════════════════════════════════════════════
@@ -347,4 +397,6 @@ sealed class PartyUiEvent {
     data class MediaRequestReceived(val endpointId: String, val request: PartyMessage.MediaRequest) : PartyUiEvent()
     /** A client reported a media issue */
     data class ClientIssueReported(val endpointId: String, val userName: String, val issueType: String) : PartyUiEvent()
+    /** A client requested to become host */
+    data class HostTransferRequested(val endpointId: String, val userName: String) : PartyUiEvent()
 }

@@ -59,6 +59,12 @@ sealed class PartyMessage {
     @Serializable
     data class EndParty(val reason: String = "Host disconnected") : PartyMessage()
 
+    @Serializable
+    data class HostTransferRequest(val userName: String) : PartyMessage()
+
+    @Serializable
+    data class HostTransferResponse(val accepted: Boolean, val fromHost: String) : PartyMessage()
+
     fun toByteArray(): ByteArray {
         val jsonString = Json.encodeToString(this)
         return jsonString.toByteArray(StandardCharsets.UTF_8)

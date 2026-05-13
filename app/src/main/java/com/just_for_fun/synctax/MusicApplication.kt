@@ -19,14 +19,12 @@ import com.just_for_fun.synctax.core.network.NewPipeUtils
 import com.just_for_fun.synctax.core.utils.YTMusicRecommender
 import com.just_for_fun.synctax.core.worker.RecommendationUpdateWorker
 import com.just_for_fun.synctax.core.worker.scheduleUpdateCheckIfEnabled
-import com.yausername.youtubedl_android.YoutubeDL
+import com.just_for_fun.synctax.utils.CrashLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import okio.buffer
 import okio.source
-import com.just_for_fun.synctax.utils.CrashLogger
 import java.io.File
 
 class MusicApplication : Application(), ImageLoaderFactory {
@@ -60,11 +58,6 @@ class MusicApplication : Application(), ImageLoaderFactory {
         // applicationScope.launch {
         //     initializePython()
         // }
-
-        // Initialize YoutubeDL and SpotDL on background thread
-        applicationScope.launch {
-            initializeYoutubeDLAndFFmpeg()
-        }
 
         // Initialize NewPipe early to avoid delays on first use
         try {
@@ -145,19 +138,9 @@ class MusicApplication : Application(), ImageLoaderFactory {
     }
 
     private fun initializeYoutubeDLAndFFmpeg() {
-        try {
-            // Initialize YoutubeDL
-            Log.d(TAG, "🔧 Initializing YoutubeDL...")
-            YoutubeDL.getInstance().init(this)
-            Log.d(TAG, "✅ YoutubeDL initialized successfully")
-
-            // FFmpeg library removed to reduce APK size (~136MB savings)
-            // We use Mutagen (Python) for metadata embedding instead
-            isFFmpegInitialized = false
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to initialize YoutubeDL: ${e.message}", e)
-            isFFmpegInitialized = false
-        }
+        // FFmpeg library removed to reduce APK size (~136MB savings)
+        // We use Mutagen (Python) for metadata embedding instead
+        isFFmpegInitialized = false
     }
 
     companion object {

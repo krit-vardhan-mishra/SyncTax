@@ -12,6 +12,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
@@ -96,12 +97,15 @@ private fun getPermissionIcon(permission: String): ImageVector {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PartyDashboardScreen(
     onNavigateBack: () -> Unit,
     onCreatePartyClick: () -> Unit,
-    onJoinPartyClick: () -> Unit
+    onJoinPartyClick: () -> Unit,
+    recentParties: List<String>,
+    onQuickStartParty: (String) -> Unit,
+    onDeleteParty: (String) -> Unit
 ) {
     val context = LocalContext.current
     val lavenderColor = AppColors.textTitle
@@ -110,6 +114,11 @@ fun PartyDashboardScreen(
 
     var showPermissionSheet by remember { mutableStateOf(false) }
     var pendingPermissions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pendingPartyName by remember { mutableStateOf<String?>(null) }
+
+    // Bottom sheet state for party options (delete)
+    var selectedPartyForOptions by remember { mutableStateOf<String?>(null) }
+    val optionsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val partyPermissions = remember { getRequiredPartyPermissions() }
     val permissionSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -119,18 +128,29 @@ fun PartyDashboardScreen(
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (allGranted) {
-            onCreatePartyClick()
+            val name = pendingPartyName
+            if (name != null) {
+                onQuickStartParty(name)
+            } else {
+                onCreatePartyClick()
+            }
             pendingPermissions = emptyList()
+            pendingPartyName = null
         } else {
             showPermissionSheet = true
         }
     }
 
-    fun checkPermissionsAndProceed() {
+    fun checkPermissionsAndProceed(partyName: String? = null) {
         if (arePartyPermissionsGranted(context)) {
-            onCreatePartyClick()
+            if (partyName != null) {
+                onQuickStartParty(partyName)
+            } else {
+                onCreatePartyClick()
+            }
         } else {
             pendingPermissions = partyPermissions
+            pendingPartyName = partyName
             showPermissionSheet = true
         }
     }
@@ -242,6 +262,69 @@ fun PartyDashboardScreen(
         }
     }
 
+    // Party Options Bottom Sheet (for Deleting)
+    if (selectedPartyForOptions != null) {
+        ModalBottomSheet(
+            onDismissRequest = { selectedPartyForOptions = null },
+            sheetState = optionsSheetState,
+            containerColor = AppColors.cardBackground
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Party Options",
+                    color = AppColors.textTitle,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = selectedPartyForOptions ?: "",
+                    color = AppColors.textBody,
+                    fontSize = 16.sp
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        val partyToDelete = selectedPartyForOptions
+                        if (partyToDelete != null) {
+                            onDeleteParty(partyToDelete)
+                        }
+                        selectedPartyForOptions = null
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Delete History", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = { selectedPartyForOptions = null },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.mainBackground)
+                ) {
+                    Text("Cancel", color = AppColors.textBody, fontWeight = FontWeight.Medium)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -326,6 +409,59 @@ fun PartyDashboardScreen(
                 }
             }
 
+            if (recentParties.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = "Recent Parties",
+                    color = lavenderColor,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+                Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)) {
+                    recentParties.forEach { partyName ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(AppColors.cardBackground)
+                                .combinedClickable(
+                                    onClick = { checkPermissionsAndProceed(partyName) },
+                                    onLongClick = { selectedPartyForOptions = partyName }
+                                )
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = partyName,
+                                        color = AppColors.textTitle,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "Tap to host again",
+                                        color = AppColors.textBody,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Button(
+                                    onClick = { checkPermissionsAndProceed(partyName) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) {
+                                    Text("Start", color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = "Start a party to host, or join an existing party nearby.",
@@ -338,4 +474,4 @@ fun PartyDashboardScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
-}
+}

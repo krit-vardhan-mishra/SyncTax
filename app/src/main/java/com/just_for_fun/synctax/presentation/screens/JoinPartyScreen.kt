@@ -43,12 +43,14 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,8 +64,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import com.just_for_fun.synctax.data.preferences.UserPreferences
+import com.just_for_fun.synctax.presentation.components.QrScannerView
 import com.just_for_fun.synctax.presentation.components.utils.BottomPaddingSpacer
 import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 import com.just_for_fun.synctax.presentation.viewmodels.PartyViewModel
@@ -101,6 +103,9 @@ fun JoinPartyScreen(
     val wifiManager = remember {
         context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     }
+    val userPreferences = remember { UserPreferences(context) }
+    val recentPartySsids by userPreferences.recentPartySsids.collectAsState()
+    val isConnected by partyViewModel.isConnected.collectAsState()
 
     val accentOrange = AppColors.accentPrimary
     val darkBackground = AppColors.mainBackground
@@ -113,6 +118,12 @@ fun JoinPartyScreen(
     var joinSsid by remember { mutableStateOf("") }
     var joinPassphrase by remember { mutableStateOf("") }
     var joinError by remember { mutableStateOf<String?>(null) }
+    var isJoining by remember { mutableStateOf(false) }
+    var showJoinSheet by remember { mutableStateOf(false) }
+    var showAllNetworks by remember { mutableStateOf(false) }
+
+    // Display state for our new native Compose QR Scanner component
+    var showQrScanner by remember { mutableStateOf(false) }
 
     var showPermissionSheet by remember { mutableStateOf(false) }
     var pendingAction by remember { mutableStateOf<JoinAction?>(null) }
@@ -120,7 +131,19 @@ fun JoinPartyScreen(
     var triggerAction by remember { mutableStateOf<JoinAction?>(null) }
 
     val permissionSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val joinSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val joinPermissions = remember { getJoinPermissions() }
+    val filteredCandidates = remember(candidates, recentPartySsids, showAllNetworks) {
+        if (showAllNetworks) {
+            candidates
+        } else {
+            candidates.filter { candidate ->
+                recentPartySsids.any { it.equals(candidate.ssid, ignoreCase = true) } ||
+                        candidate.ssid.contains("synctax", ignoreCase = true)
+            }
+        }
+    }
+    val hiddenNetworkCount = (candidates.size - filteredCandidates.size).coerceAtLeast(0)
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -132,24 +155,6 @@ fun JoinPartyScreen(
             pendingPermissions = emptyList()
         } else {
             showPermissionSheet = true
-        }
-    }
-
-    val qrScanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val contents = result.contents
-        if (contents.isNullOrBlank()) {
-            joinError = "QR scan canceled."
-        } else {
-            val uri = runCatching { Uri.parse(contents) }.getOrNull()
-            val ssid = uri?.getQueryParameter("ssid")
-            val passphrase = uri?.getQueryParameter("pass")
-            if (ssid.isNullOrBlank() || passphrase.isNullOrBlank()) {
-                joinError = "Invalid QR code."
-            } else {
-                joinSsid = ssid
-                joinPassphrase = passphrase
-                triggerAction = JoinAction.Join
-            }
         }
     }
 
@@ -187,8 +192,9 @@ fun JoinPartyScreen(
             return
         }
         joinError = null
-        partyViewModel.joinParty(ssid.trim(), passphrase, "Guest")
-        onJoinSuccess(ssid.trim())
+        val displayName = userPreferences.getUserName().ifBlank { "Guest" } + "_SyncTax"
+        partyViewModel.joinParty(ssid.trim(), passphrase, displayName)
+        isJoining = true
     }
 
     DisposableEffect(Unit) {
@@ -220,17 +226,34 @@ fun JoinPartyScreen(
         when (triggerAction) {
             JoinAction.Join -> attemptJoin(joinSsid)
             JoinAction.ScanQr -> {
-                val options = ScanOptions()
-                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                    .setPrompt("Scan the host QR code")
-                    .setBeepEnabled(true)
-                    .setOrientationLocked(false)
-                qrScanLauncher.launch(options)
+                showQrScanner = true
             }
             JoinAction.RefreshWifi -> refreshWifi()
             null -> {}
         }
         triggerAction = null
+    }
+
+    LaunchedEffect(isConnected, isJoining) {
+        if (isJoining && isConnected) {
+            isJoining = false
+            val normalized = joinSsid.trim()
+            if (normalized.isNotBlank()) {
+                userPreferences.addRecentPartySsid(normalized)
+            }
+            onJoinSuccess(normalized)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        partyViewModel.uiEvents.collect { event ->
+            if (event is com.just_for_fun.synctax.presentation.viewmodels.PartyUiEvent.HostDisconnected) {
+                if (isJoining) {
+                    joinError = "Unable to connect to the party. Check the passphrase and try again."
+                    isJoining = false
+                }
+            }
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -240,6 +263,34 @@ fun JoinPartyScreen(
         if (missing.isEmpty()) {
             refreshWifi()
         }
+    }
+
+    // Intercept standard rendering and show the full-screen QR Scanner instead when active
+    if (showQrScanner) {
+        QrScannerView(
+            onNavigateBack = {
+                showQrScanner = false
+                joinError = "QR scan canceled."
+            },
+            onQrScanned = { contents ->
+                showQrScanner = false
+                if (contents.isBlank()) {
+                    joinError = "QR scan canceled."
+                } else {
+                    val uri = runCatching { Uri.parse(contents) }.getOrNull()
+                    val ssid = uri?.getQueryParameter("ssid")
+                    val passphrase = uri?.getQueryParameter("pass")
+                    if (ssid.isNullOrBlank() || passphrase.isNullOrBlank()) {
+                        joinError = "Invalid QR code format."
+                    } else {
+                        joinSsid = ssid
+                        joinPassphrase = passphrase
+                        triggerAction = JoinAction.Join
+                    }
+                }
+            }
+        )
+        return // Return here so the rest of the layout isn't drawn while scanning!
     }
 
     if (showPermissionSheet) {
@@ -337,6 +388,85 @@ fun JoinPartyScreen(
         }
     }
 
+    if (showJoinSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showJoinSheet = false },
+            sheetState = joinSheetState,
+            containerColor = AppColors.cardBackground
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = "Join Party",
+                    color = AppColors.textTitle,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "SSID: $joinSsid",
+                    color = AppColors.textBody,
+                    fontSize = 13.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = joinPassphrase,
+                    onValueChange = { joinPassphrase = it },
+                    label = { Text("Passphrase", color = AppColors.textBody) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = accentOrange,
+                        unfocusedBorderColor = AppColors.textBody,
+                        focusedTextColor = AppColors.textTitle,
+                        unfocusedTextColor = AppColors.textTitle,
+                        cursorColor = accentOrange
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    singleLine = true
+                )
+
+                if (joinError != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = joinError ?: "",
+                        color = Color.Red,
+                        fontSize = 12.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        showJoinSheet = false
+                        requestPermissionsFor(JoinAction.Join, joinPermissions)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentOrange)
+                ) {
+                    Text("Join Party", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Ask the host for the passphrase or scan the QR code.",
+                    color = AppColors.textBody,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -386,7 +516,40 @@ fun JoinPartyScreen(
                 }
             }
 
-            items(candidates) { party ->
+            if (hiddenNetworkCount > 0 || showAllNetworks) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (showAllNetworks) {
+                                "Showing all Wi-Fi networks"
+                            } else {
+                                "Showing SyncTax parties only"
+                            },
+                            color = AppColors.textBody,
+                            fontSize = 12.sp
+                        )
+                        TextButton(onClick = { showAllNetworks = !showAllNetworks }) {
+                            Text(
+                                text = if (showAllNetworks) {
+                                    "Show parties"
+                                } else {
+                                    "Show all ($hiddenNetworkCount hidden)"
+                                },
+                                color = AppColors.textTitle,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            items(filteredCandidates) { party ->
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -416,7 +579,7 @@ fun JoinPartyScreen(
                         Button(
                             onClick = {
                                 joinSsid = party.ssid
-                                requestPermissionsFor(JoinAction.Join, joinPermissions)
+                                showJoinSheet = true
                             },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = accentOrange)
@@ -427,10 +590,14 @@ fun JoinPartyScreen(
                 }
             }
 
-            if (candidates.isEmpty() && !scanInProgress) {
+            if (filteredCandidates.isEmpty() && !scanInProgress) {
                 item {
                     Text(
-                        text = "No parties found yet. Ask the host for SSID or scan the QR code below.",
+                        text = if (candidates.isNotEmpty() && !showAllNetworks) {
+                            "No SyncTax parties found. Scan the host QR or show all networks."
+                        } else {
+                            "No parties found yet. Ask the host for SSID or scan the QR code below."
+                        },
                         color = AppColors.textBody,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,

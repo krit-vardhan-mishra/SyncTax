@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,10 +52,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.just_for_fun.synctax.presentation.components.utils.BottomPaddingSpacer
 import com.just_for_fun.synctax.presentation.ui.theme.AppColors
 import com.just_for_fun.synctax.presentation.viewmodels.PartyViewModel
@@ -66,22 +77,80 @@ import java.net.URLEncoder
 
 private const val TAG = "CreatePartyScreen"
 
+private fun getHostPermissions(): List<String> {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        listOf(Manifest.permission.NEARBY_WIFI_DEVICES)
+    } else {
+        listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreatePartyScreen(
     partyViewModel: PartyViewModel,
     onNavigateBack: () -> Unit,
-    onStartPartyClick: () -> Unit
+    onStartPartyClick: (String) -> Unit,
+    initialPartyName: String? = null,
+    autoStart: Boolean = false
 ) {
     val lavenderColor = AppColors.textTitle
     val accentOrange = AppColors.accentPrimary
     val darkBackground = AppColors.mainBackground
+    val context = LocalContext.current
 
     val isHosting by partyViewModel.isHosting.collectAsState()
     val members by partyViewModel.members.collectAsState()
     val hotspotInfo by partyViewModel.hostHotspotInfo.collectAsState()
+    val hotspotError by partyViewModel.hotspotError.collectAsState()
 
-    var partyName by remember { mutableStateOf("My Party") }
+    var partyName by remember { mutableStateOf(initialPartyName ?: "My Party") }
+    var autoStartConsumed by remember { mutableStateOf(false) }
+    var startAttempted by remember { mutableStateOf(false) }
+    
+    val hostPermissions = remember { getHostPermissions() }
+    var showPermissionSheet by remember { mutableStateOf(false) }
+    var pendingPermissions by remember { mutableStateOf<List<String>>(emptyList()) }
+    val permissionSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.values.all { it }
+        if (allGranted) {
+            startAttempted = true
+            partyViewModel.startHosting(partyName)
+        } else {
+            showPermissionSheet = true
+        }
+    }
+
+    fun attemptStartHosting() {
+        val missing = hostPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            startAttempted = true
+            partyViewModel.startHosting(partyName)
+        } else {
+            pendingPermissions = missing
+            showPermissionSheet = true
+        }
+    }
+
+    LaunchedEffect(initialPartyName) {
+        if (!initialPartyName.isNullOrBlank() && !isHosting) {
+            partyName = initialPartyName
+        }
+    }
+
+    LaunchedEffect(autoStart, isHosting, partyName) {
+        if (autoStart && !autoStartConsumed && !isHosting) {
+            autoStartConsumed = true
+            Log.d(TAG, "⚡ Auto-starting party: $partyName")
+            attemptStartHosting()
+        }
+    }
 
     // Radar pulse animation
     val infiniteTransition = rememberInfiniteTransition(label = "radar")
@@ -104,6 +173,177 @@ fun CreatePartyScreen(
         label = "radar_alpha"
     )
 
+    if (showPermissionSheet) {
+        val wifiManager = remember { context.applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager }
+        val locationManager = remember { context.getSystemService(android.content.Context.LOCATION_SERVICE) as android.location.LocationManager }
+        val isWifiEnabled = wifiManager.isWifiEnabled
+        val isLocationEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)
+        val permissionsToShow = if (pendingPermissions.isNotEmpty()) pendingPermissions else hostPermissions
+
+        ModalBottomSheet(
+            onDismissRequest = { showPermissionSheet = false },
+            sheetState = permissionSheetState,
+            containerColor = AppColors.cardBackground
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Prerequisites to Host",
+                    color = AppColors.textTitle,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Enable all requirements below, then tap Start.",
+                    color = AppColors.textBody,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Wi-Fi Status
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (isWifiEnabled) Color.Green else Color.Red)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Wi-Fi", color = AppColors.textTitle, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    if (!isWifiEnabled) {
+                        Button(
+                            onClick = {
+                                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("Turn On", color = Color.White, fontSize = 12.sp)
+                        }
+                    } else {
+                        Text("ON", color = Color.Green, fontSize = 12.sp)
+                    }
+                }
+
+                // Location Status
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (isLocationEnabled) Color.Green else Color.Red)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Location", color = AppColors.textTitle, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                    if (!isLocationEnabled) {
+                        Button(
+                            onClick = {
+                                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("Turn On", color = Color.White, fontSize = 12.sp)
+                        }
+                    } else {
+                        Text("ON", color = Color.Green, fontSize = 12.sp)
+                    }
+                }
+
+                // Runtime Permissions
+                permissionsToShow.forEach { permission ->
+                    val isGranted = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (isGranted) Color.Green else Color.Red)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = permission.substringAfterLast("."),
+                            color = AppColors.textTitle,
+                            fontSize = 16.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = if (isGranted) "Granted" else "Needed",
+                            color = if (isGranted) Color.Green else AppColors.textBody,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        showPermissionSheet = false
+                        val missing = permissionsToShow.filter { p ->
+                            ContextCompat.checkSelfPermission(context, p) != PackageManager.PERMISSION_GRANTED
+                        }
+                        if (missing.isNotEmpty()) {
+                            permissionLauncher.launch(missing.toTypedArray())
+                        } else {
+                            // All permissions granted, try starting
+                            startAttempted = true
+                            partyViewModel.startHosting(partyName)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentOrange)
+                ) {
+                    Text("Grant & Start", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = { showPermissionSheet = false },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.mainBackground)
+                ) {
+                    Text("Cancel", color = AppColors.textBody, fontWeight = FontWeight.Medium)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
+    val isWaitingForHotspot = startAttempted && !isHosting && hotspotError == null
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -118,27 +358,62 @@ fun CreatePartyScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = lavenderColor)
                     }
                 },
+                actions = {
+                    if (isHosting && hotspotInfo != null) {
+                        Button(
+                            onClick = { onStartPartyClick(partyName) },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Text("Go to Session", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else if (!isHosting && !isWaitingForHotspot) {
+                        Button(
+                            onClick = {
+                                Log.d(TAG, "🎉 Starting party from top bar: $partyName")
+                                attemptStartHosting()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
+                        ) {
+                            Text("Start", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = darkBackground)
             )
         },
         bottomBar = {
             Button(
                 onClick = {
-                    if (!isHosting) {
+                    if (isHosting && hotspotInfo != null) {
+                        onStartPartyClick(partyName)
+                    } else if (!isHosting && !isWaitingForHotspot) {
                         Log.d(TAG, "🎉 Starting party: $partyName")
-                        partyViewModel.startHosting(partyName)
+                        attemptStartHosting()
                     }
-                    onStartPartyClick()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 80.dp)
                     .height(56.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
-                shape = RoundedCornerShape(24.dp)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isWaitingForHotspot) accentOrange.copy(alpha = 0.5f) else accentOrange
+                ),
+                shape = RoundedCornerShape(24.dp),
+                enabled = !isWaitingForHotspot
             ) {
                 Text(
-                    if (isHosting) "Go to Session" else "Start Party",
+                    when {
+                        isWaitingForHotspot -> "Starting Hotspot..."
+                        isHosting && hotspotInfo != null -> "Go to Session"
+                        isHosting -> "Waiting for Hotspot..."
+                        else -> "Start Party"
+                    },
                     color = Color.White,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -223,6 +498,60 @@ fun CreatePartyScreen(
                         color = AppColors.textBody,
                         fontSize = 14.sp
                     )
+                }
+            }
+
+            // Show loading state while waiting for hotspot
+            if (startAttempted && !isHosting && hotspotError == null) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Starting hotspot...",
+                        color = AppColors.textBody,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            // Show error if hotspot failed
+            if (hotspotError != null) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF442222))
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "⚠ Failed to Start Hotspot",
+                            color = Color(0xFFFF6B6B),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = hotspotError ?: "",
+                            color = AppColors.textBody,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                startAttempted = false
+                                partyViewModel.connectionManager.clearHotspotError()
+                                // Open the prerequisites sheet so user can fix Wi-Fi/Location/Permissions
+                                showPermissionSheet = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentOrange),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Fix & Retry", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
 
@@ -367,6 +696,11 @@ fun CreatePartyScreen(
                         textAlign = TextAlign.Center
                     )
                 }
+            }
+
+            // Always add bottom padding to avoid mini player overlap
+            item {
+                BottomPaddingSpacer()
             }
         }
     }
