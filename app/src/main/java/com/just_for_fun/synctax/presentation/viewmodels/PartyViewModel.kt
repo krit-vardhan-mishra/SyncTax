@@ -56,8 +56,8 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
     val clientIssues = connectionManager.clientIssues
     
     // Use this flow to trigger player actions in the PlayerViewModel
-    private val _playerCommands = MutableStateFlow<PartyMessage?>(null)
-    val playerCommands: StateFlow<PartyMessage?> = _playerCommands.asStateFlow()
+    private val _playerCommands = MutableSharedFlow<PartyMessage>()
+    val playerCommands = _playerCommands.asSharedFlow()
 
     // Events for the UI (snackbars, navigation)
     private val _uiEvents = MutableSharedFlow<PartyUiEvent>()
@@ -79,9 +79,7 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
                 is PartyMessage.PauseCommand,
                 is PartyMessage.SeekCommand,
                 is PartyMessage.NowPlaying -> {
-                    _playerCommands.value = message
-                    // Reset to null so same command can be triggered again later
-                    viewModelScope.launch { _playerCommands.value = null }
+                    viewModelScope.launch { _playerCommands.emit(message) }
                 }
                 is PartyMessage.Handshake -> {
                     Log.d(TAG, "🤝 Handshake from ${message.userName}, version=${message.appVersion}")

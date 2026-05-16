@@ -156,6 +156,9 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     val scope = rememberCoroutineScope()
     var checkForUpdate by remember { mutableStateOf(false) }
     var isCheckingUpdate by remember { mutableStateOf(false) }
+    
+    // State for Missing Song Prompt in Party Mode
+    var missingSongPrompt by remember { mutableStateOf<com.just_for_fun.synctax.core.party.PartyMessage.NowPlaying?>(null) }
 
     // Handle update check
     LaunchedEffect(checkForUpdate) {
@@ -234,9 +237,8 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
     }
 
     // Collect party mode player commands
-    val partyPlayerCommands by partyViewModel.playerCommands.collectAsState()
-    LaunchedEffect(partyPlayerCommands) {
-        partyPlayerCommands?.let { command ->
+    LaunchedEffect(partyViewModel.playerCommands) {
+        partyViewModel.playerCommands.collect { command ->
             android.util.Log.d("MusicApp", "🎵 [PARTY CMD] Received: ${command::class.simpleName}")
             when (command) {
                 is com.just_for_fun.synctax.core.party.PartyMessage.PlayCommand -> {
@@ -275,22 +277,9 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                             playerViewModel.playSong(localSong)
                             partyViewModel.clearPlaceholder()
                         } else {
-                            // Song NOT available locally — use placeholder metadata
-                            android.util.Log.d("MusicApp", "⚠️ [PARTY] Song NOT found locally, using placeholder")
-                            val placeholderSong = com.just_for_fun.synctax.data.local.entities.Song(
-                                id = "placeholder:${command.songId}",
-                                title = command.title ?: "Unknown Song",
-                                artist = command.artist ?: "Unknown Artist",
-                                album = command.album,
-                                duration = 0L,
-                                filePath = "",
-                                genre = null,
-                                releaseYear = null,
-                                albumArtUri = command.thumbnailUrl
-                            )
-                            playerViewModel.setPlaceholderSong(placeholderSong)
-                            partyViewModel.reportMissingSong("Guest")
-                            snackbarHostState.showSnackbar("Song not found locally. Showing host's metadata.")
+                            // Song NOT available locally — trigger prompt
+                            android.util.Log.d("MusicApp", "⚠️ [PARTY] Song NOT found locally, prompting user")
+                            missingSongPrompt = command
                         }
                     } else {
                         android.util.Log.d("MusicApp", "🎵 [PARTY] Song already playing, skipping NowPlaying")
@@ -301,6 +290,54 @@ fun MusicApp(userPreferences: UserPreferences, initialMediaUri: Uri? = null) {
                 }
             }
         }
+    }
+
+    if (missingSongPrompt != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { missingSongPrompt = null },
+            title = { androidx.compose.material3.Text("Song Not Found") },
+            text = { androidx.compose.material3.Text("The host is playing '${missingSongPrompt?.title}'. You don't have this song locally. What would you like to do?") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val cmd = missingSongPrompt
+                    if (cmd != null) {
+                        partyViewModel.requestMediaFromHost("FILE", cmd.songId)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Requested file from host.")
+                        }
+                    }
+                    missingSongPrompt = null
+                }) {
+                    androidx.compose.material3.Text("Receive File")
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    val cmd = missingSongPrompt
+                    if (cmd != null) {
+                        val placeholderSong = com.just_for_fun.synctax.data.local.entities.Song(
+                            id = "placeholder:${cmd.songId}",
+                            title = cmd.title ?: "Unknown Song",
+                            artist = cmd.artist ?: "Unknown Artist",
+                            album = cmd.album,
+                            duration = 0L,
+                            filePath = "",
+                            genre = null,
+                            releaseYear = null,
+                            albumArtUri = cmd.thumbnailUrl
+                        )
+                        playerViewModel.setPlaceholderSong(placeholderSong)
+                        partyViewModel.reportMissingSong("Guest")
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Showing host's metadata.")
+                        }
+                    }
+                    missingSongPrompt = null
+                }) {
+                    androidx.compose.material3.Text("Use Placeholder")
+                }
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

@@ -47,6 +47,8 @@ class PartyConnectionManager(private val context: Context) {
     private val wifiManager = appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val connectivityManager = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val _isHosting = MutableStateFlow(false)
     val isHosting: StateFlow<Boolean> = _isHosting.asStateFlow()
 
@@ -509,21 +511,23 @@ class PartyConnectionManager(private val context: Context) {
     }
 
     private fun sendMessage(connection: ClientConnection, message: PartyMessage) {
-        val json = String(message.toByteArray(), StandardCharsets.UTF_8)
-        Log.d(TAG, "📤 sendMessage to=${connection.endpointId} type=${message::class.simpleName}")
-        try {
-            synchronized(connection) {
-                connection.writer.write(json)
-                connection.writer.newLine()
-                connection.writer.flush()
-            }
-            Log.d(TAG, "📤 sendMessage SUCCESS to=${connection.endpointId}")
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to send message to=${connection.endpointId}", e)
-            if (_isHosting.value) {
-                handleClientDisconnected(connection.endpointId)
-            } else {
-                handleHostDisconnected()
+        ioScope.launch {
+            val json = String(message.toByteArray(), StandardCharsets.UTF_8)
+            Log.d(TAG, "📤 sendMessage to=${connection.endpointId} type=${message::class.simpleName}")
+            try {
+                synchronized(connection) {
+                    connection.writer.write(json)
+                    connection.writer.newLine()
+                    connection.writer.flush()
+                }
+                Log.d(TAG, "📤 sendMessage SUCCESS to=${connection.endpointId}")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to send message to=${connection.endpointId}", e)
+                if (_isHosting.value) {
+                    handleClientDisconnected(connection.endpointId)
+                } else {
+                    handleHostDisconnected()
+                }
             }
         }
     }
