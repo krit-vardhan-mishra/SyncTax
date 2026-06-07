@@ -1397,8 +1397,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Initialize queue with this song
         queueManager.initializeQueue(listOf(onlineSong), 0)
 
-        // Use prepareWithCacheKey to leverage ExoPlayer's cached data
-        player.prepareWithCacheKey(streamUrl, onlineSong.id, videoId)
+        // Use prepareWithCache to leverage ExoPlayer's cached data
+        player.prepareWithCache(streamUrl, onlineSong.id)
         player.play()
 
         // Pass metadata for online song tracking
@@ -1687,7 +1687,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 artist = artist ?: "Unknown",
                 album = null,
                 duration = durationMs,
-                filePath = tempFile.absolutePath,
+                filePath = streamUrl, // Pass streamUrl so ExoPlayer can stream via HTTP
                 genre = null,
                 releaseYear = null,
                 albumArtUri = highQualityThumbnail  // Use high-quality thumbnail
@@ -1699,7 +1699,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // Initialize queue with streaming song
             queueManager.initializeQueue(listOf(onlineSong), 0)
 
-            player.prepare(tempFile.absolutePath, onlineSong.id)
+            // Use prepareWithCache so ExoPlayer streams natively over HTTP and caches by URL
+            player.prepareWithCache(streamUrl, onlineSong.id)
             player.play()
 
             // Pass metadata for online song tracking
@@ -1741,7 +1742,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             viewModelScope.launch {
                 chunkedStreamManager.state.collect { st ->
                     _uiState.value = _uiState.value.copy(
-                        isBuffering = !st.isComplete,
                         duration = if (durationMs > 0) durationMs else _uiState.value.duration,
                         downloadPercent = st.percent
                     )

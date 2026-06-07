@@ -11,6 +11,7 @@ import com.just_for_fun.synctax.core.party.PartyMessage
 import com.just_for_fun.synctax.core.party.PartySyncController
 import com.just_for_fun.synctax.core.service.PartyService
 import com.just_for_fun.synctax.data.preferences.UserPreferences
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -200,10 +201,11 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Sends a PlayCommand with full metadata so clients can show placeholders
      * if they don't have the song locally.
+     * Calculates a target execution time of T+500ms for perfectly synced playback.
      */
     fun sendPlayCommand(
         songId: String,
-        startTimestamp: Long,
+        position: Long,
         title: String? = null,
         artist: String? = null,
         album: String? = null,
@@ -211,16 +213,22 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
         isOffline: Boolean = true
     ) {
         if (_isHosting.value) {
+            // Compute target execution time: Host's current synchronized time + 500ms
+            val executionTime = syncController.getSynchronizedTime() + 500L
+
+            // Ensure all clients start at the correct position before hitting Play
+            sendSeekCommand(position, executionTime)
+
             val cmd = PartyMessage.PlayCommand(
                 songId = songId,
-                startTimestamp = startTimestamp,
+                startTimestamp = executionTime,
                 title = title,
                 artist = artist,
                 album = album,
                 thumbnailUrl = thumbnailUrl,
                 isOffline = isOffline
             )
-            Log.d(TAG, "📤 Sending PlayCommand: $title by $artist (songId=$songId)")
+            Log.d(TAG, "📤 Sending PlayCommand: $title by $artist (songId=$songId) at T=$executionTime")
             connectionManager.sendMessageToAll(cmd)
         } else {
             Log.d(TAG, "⚠️ sendPlayCommand ignored — not the host")
@@ -263,6 +271,52 @@ class PartyViewModel(application: Application) : AndroidViewModel(application) {
             )
             Log.d(TAG, "📤 Sending NowPlaying: $title by $artist")
             connectionManager.sendMessageToAll(msg)
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Acoustic Calibration (Hardware Latency)
+    // ════════════════════════════════════════════════════════════════════
+
+    private val _isCalibrating = MutableStateFlow(false)
+    val isCalibrating: StateFlow<Boolean> = _isCalibrating.asStateFlow()
+
+    /**
+     * Runs the acoustic calibration process.
+     * Host plays an ultrasonic chirp, Guest listens.
+     */
+    fun runAcousticCalibration() {
+        if (_isCalibrating.value) return
+        viewModelScope.launch {
+            _isCalibrating.value = true
+            try {
+                if (_isHosting.value) {
+                    Log.d(TAG, "🔊 Emitting ultrasonic calibration chirp as Host")
+                    // Schedule chirp to happen slightly in the future so guests can prepare if needed
+                    val targetTime = syncController.getSynchronizedTime() + 1000L
+                    
+                    // A real implementation might send a PartyMessage here telling guests to start listening.
+                    // For now, we assume the guest user clicks "Calibrate" manually first.
+                    
+                    // Simulate delay to target time
+                    val delayMs = targetTime - syncController.getSynchronizedTime()
+                    if (delayMs > 0) delay(delayMs)
+                    
+                    syncController.calibrator.playChirp()
+                } else {
+                    Log.d(TAG, "🎤 Listening for ultrasonic calibration chirp as Guest")
+                    val offset = syncController.calibrator.listenForChirp()
+                    Log.d(TAG, "✅ Calibration complete: measured offset = ${offset}ms")
+                    
+                    // We measure how long it took the sound to arrive compared to expected network time.
+                    // If it took longer, our device plays later. We want to advance it (negative offset).
+                    syncController.setLatencyOffset(-offset)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Calibration failed", e)
+            } finally {
+                _isCalibrating.value = false
+            }
         }
     }
 

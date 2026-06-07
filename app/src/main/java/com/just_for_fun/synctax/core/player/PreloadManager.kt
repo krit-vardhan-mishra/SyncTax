@@ -188,10 +188,9 @@ class PreloadManager(private val context: Context) {
                 val cacheDataSourceFactory = StreamCache.createPreloadDataSourceFactory(context)
                 val dataSource = cacheDataSourceFactory.createDataSource()
 
-                // Use video ID as cache key
+                // Use default URI cache key to match ExoPlayer's default behavior
                 val dataSpec = DataSpec.Builder()
                     .setUri(streamUrl)
-                    .setKey(videoId)
                     .setLength(PRELOAD_BYTES)
                     .build()
 
@@ -204,7 +203,7 @@ class PreloadManager(private val context: Context) {
 
                 cacheWriter.cache()
 
-                val cachedBytes = StreamCache.getCachedBytes(context, videoId)
+                val cachedBytes = StreamCache.getCachedBytes(context, streamUrl)
                 Log.d(TAG, "Pre-cached ${cachedBytes / 1024}KB for video: $videoId")
 
             } catch (e: Exception) {
@@ -235,7 +234,8 @@ class PreloadManager(private val context: Context) {
      */
     fun isPreloaded(song: Song): Boolean {
         val videoId = extractVideoId(song) ?: return false
-        return preloadedSongs.contains(videoId) || StreamCache.isCached(context, videoId)
+        val streamUrl = StreamUrlCache.get(videoId) ?: return false
+        return preloadedSongs.contains(videoId) || StreamCache.isCached(context, streamUrl)
     }
 
     /**

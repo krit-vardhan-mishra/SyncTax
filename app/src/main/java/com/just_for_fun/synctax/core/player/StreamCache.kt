@@ -77,7 +77,6 @@ object StreamCache {
             .setConnectTimeoutMs(15000)
             .setReadTimeoutMs(60000)  // Increased read timeout for large chunks
             .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
 
         // Wrap with default data source (handles file:// URIs too)
         val upstreamFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
@@ -104,7 +103,6 @@ object StreamCache {
             .setConnectTimeoutMs(10000)
             .setReadTimeoutMs(20000)
             .setAllowCrossProtocolRedirects(true)
-            .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
 
         val upstreamFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
 

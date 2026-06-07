@@ -41,6 +41,14 @@
 -keep class com.just_for_fun.synctax.data.local.entities.** { *; }
 -keep class com.just_for_fun.synctax.presentation.viewmodels.** { *; }
 
+# NewPipe Extractor and its dependencies (jsoup, Rhino, etc.)
+-dontwarn com.google.re2j.**
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn org.jsoup.helper.Re2jRegex**
+-dontwarn org.mozilla.javascript.JavaToJSONConverters**
+-dontwarn org.mozilla.javascript.engine.RhinoScriptEngineFactory
+
 # Optimization
 -repackageclasses ''
 -allowaccessmodification

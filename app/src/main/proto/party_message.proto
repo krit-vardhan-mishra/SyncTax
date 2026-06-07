@@ -1,0 +1,113 @@
+syntax = "proto3";
+
+package com.just_for_fun.synctax.core.party.proto;
+
+option java_package = "com.just_for_fun.synctax.core.party.proto";
+option java_multiple_files = true;
+
+// Base message wrapper
+message PartyMessageProto {
+  oneof payload {
+    Handshake handshake = 1;
+    PlayCommand play = 2;
+    PauseCommand pause = 3;
+    SeekCommand seek = 4;
+    SyncPulse sync_pulse = 5;
+    MediaIssue media_issue = 6;
+    GuestJoined guest_joined = 7;
+    GuestLeft guest_left = 8;
+    SyncRequest sync_request = 9;
+    SyncResponse sync_response = 10;
+    NowPlaying now_playing = 11;
+    MediaRequest media_request = 12;
+    MediaResponse media_response = 13;
+    EndParty end_party = 14;
+    HostTransferRequest host_transfer_request = 15;
+    HostTransferResponse host_transfer_response = 16;
+  }
+}
+
+message Handshake {
+  string app_version = 1;
+  string user_name = 2;
+}
+
+message PlayCommand {
+  string song_id = 1;
+  int64 start_timestamp = 2;
+  string title = 3;
+  string artist = 4;
+  string album = 5;
+  string thumbnail_url = 6;
+  bool is_offline = 7;
+}
+
+message PauseCommand {
+  int64 timestamp = 1;
+}
+
+message SeekCommand {
+  int64 position = 1;
+  int64 timestamp = 2;
+}
+
+message SyncRequest {
+  int64 client_tx_time = 1;
+}
+
+message SyncResponse {
+  int64 client_tx_time = 1;
+  int64 host_rx_time = 2;
+  int64 host_tx_time = 3;
+}
+
+message NowPlaying {
+  string song_id = 1;
+  string title = 2;
+  string artist = 3;
+  string album = 4;
+  string thumbnail_url = 5;
+  bool is_offline = 6;
+}
+
+message MediaIssue {
+  string user_name = 1;
+  string issue_type = 2;
+}
+
+message MediaRequest {
+  string request_type = 1;
+  string song_id = 2;
+}
+
+message MediaResponse {
+  bool is_accepted = 1;
+  string request_type = 2;
+  string song_id = 3;
+}
+
+message EndParty {
+  string reason = 1;
+}
+
+message HostTransferRequest {
+  string user_name = 1;
+}
+
+message HostTransferResponse {
+  bool accepted = 1;
+  string from_host = 2;
+}
+
+// UDP Pulse for keeping clocks aligned
+message SyncPulse {
+  int64 host_timestamp_ms = 1;
+}
+
+message GuestJoined {
+  string device_name = 1;
+}
+
+message GuestLeft {
+  string device_name = 1;
+}

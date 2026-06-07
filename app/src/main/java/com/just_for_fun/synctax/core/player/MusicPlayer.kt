@@ -148,24 +148,20 @@ class MusicPlayer(context: Context) {
     }
 
     /**
-     * Prepare a media item with a custom cache key for cached playback.
+     * Prepare a media item for cached playback.
      * Use this for online songs to leverage pre-cached audio data.
      * 
      * @param uri The stream URL or file path
      * @param songId The song ID for state tracking
-     * @param cacheKey Optional cache key (usually video ID for online songs)
      */
-    fun prepareWithCacheKey(uri: String, songId: String, cacheKey: String? = null) {
+    fun prepareWithCache(uri: String, songId: String) {
         _playerState.value = _playerState.value.copy(isEnded = false)
         
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(uri)
         
-        // Set custom cache key if provided (for online songs)
-        if (cacheKey != null) {
-            mediaItemBuilder.setCustomCacheKey(cacheKey)
-            Log.d(TAG, "Preparing with cache key: $cacheKey")
-        }
+        // Remove custom cache key, use default URI cache key to avoid caching conflicts
+        // between different stream formats or expired URLs for the same video.
         
         val mediaItem = mediaItemBuilder.build()
         exoPlayer.setMediaItem(mediaItem)

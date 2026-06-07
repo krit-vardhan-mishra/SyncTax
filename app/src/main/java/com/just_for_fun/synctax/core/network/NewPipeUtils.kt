@@ -100,23 +100,38 @@ object NewPipeUtils {
         val extractor = ServiceList.YouTube.getStreamExtractor(url)
         extractor.fetchPage()
 
-        // Get best audio stream
+        // Try audio-only streams first (preferred for music playback)
         val audioStreams = extractor.audioStreams
-        if (audioStreams.isNullOrEmpty()) {
-            throw IllegalStateException("No audio streams available for $videoId")
+        if (!audioStreams.isNullOrEmpty()) {
+            val bestAudio = audioStreams.maxByOrNull { it.averageBitrate }
+            if (bestAudio != null) {
+                Log.d(
+                    "NewPipeUtils",
+                    "Found audio stream: ${bestAudio.format?.name ?: "unknown"}, bitrate: ${bestAudio.averageBitrate}"
+                )
+                return@runCatching bestAudio.content
+            }
         }
 
-        // Sort by bitrate and get best quality
-        val bestAudio = audioStreams.maxByOrNull { it.averageBitrate }
-            ?: throw IllegalStateException("Could not determine best audio stream")
+        // Fallback: try video streams (some content only has combined audio+video)
+        Log.w("NewPipeUtils", "No audio-only streams for $videoId, trying video streams")
+        val videoStreams = extractor.videoStreams
+        if (!videoStreams.isNullOrEmpty()) {
+            // Pick the lowest resolution video (smallest bandwidth, we only need audio)
+            val bestVideoForAudio = videoStreams.minByOrNull { 
+                try { it.getResolution()?.replace("p", "")?.toIntOrNull() ?: Int.MAX_VALUE }
+                catch (_: Exception) { Int.MAX_VALUE }
+            }
+            if (bestVideoForAudio != null) {
+                Log.d(
+                    "NewPipeUtils",
+                    "Using video stream as audio fallback: ${bestVideoForAudio.getResolution()}"
+                )
+                return@runCatching bestVideoForAudio.content
+            }
+        }
 
-        val streamUrl = bestAudio.content
-        Log.d(
-            "NewPipeUtils",
-            "Found audio stream: ${bestAudio.format?.name ?: "unknown"}, bitrate: ${bestAudio.averageBitrate}"
-        )
-
-        streamUrl
+        throw IllegalStateException("No audio streams available for $videoId")
     }
 
     /**

@@ -113,7 +113,8 @@ object LibraryUpdateChecker {
         return errorMessage.contains("page needs to be reloaded", ignoreCase = true) ||
                errorMessage.contains("ContentNotAvailableException", ignoreCase = true) ||
                errorMessage.contains("signature", ignoreCase = true) ||
-               errorMessage.contains("cipher", ignoreCase = true)
+               errorMessage.contains("cipher", ignoreCase = true) ||
+               errorMessage.contains("No audio streams available", ignoreCase = true)
     }
 }
 

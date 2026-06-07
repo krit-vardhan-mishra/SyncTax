@@ -198,25 +198,38 @@ class YouTubeInnerTubeClient {
     }
 
     /**
-     * Extract stream URL using yt-dlp as fallback when NewPipe fails
+     * Extract stream URL using yt-dlp as fallback when NewPipe fails.
+     * 
+     * The Python module monkey-patches subprocess.Popen to prevent native crashes
+     * on Android (_posixsubprocess would crash the whole app). yt-dlp gracefully
+     * handles the FileNotFoundError and extracts streams without ffprobe.
      */
     private suspend fun extractStreamUrlWithYTDLP(videoId: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                // Import Chaquopy Python module
-                val sys = com.chaquo.python.Python.getInstance().getModule("sys")
-                val ytStreamExtractor = com.chaquo.python.Python.getInstance().getModule("yt_stream_extractor")
+                Log.d(TAG, "yt-dlp: Starting extraction for $videoId")
+                
+                val python = com.chaquo.python.Python.getInstance()
+                val ytStreamExtractor = python.getModule("yt_stream_extractor")
 
-                // Call the Python function
+                // Call the Python function — returns a JSON string
                 val result = ytStreamExtractor.callAttr("extract_stream_url", videoId)
+                val jsonString = result.toString()
+                
+                Log.d(TAG, "yt-dlp: Raw result length=${jsonString.length}")
 
                 // Parse JSON result
-                val jsonResult = org.json.JSONObject(result.toString())
+                val jsonResult = org.json.JSONObject(jsonString)
 
-                if (jsonResult.getBoolean("success")) {
-                    val streamUrl = jsonResult.getString("url")
-                    Log.d(TAG, "yt-dlp extracted URL for $videoId: ${streamUrl.take(100)}...")
-                    return@withContext streamUrl
+                if (jsonResult.optBoolean("success", false)) {
+                    val streamUrl = jsonResult.optString("url", "")
+                    if (streamUrl.isNotEmpty()) {
+                        Log.d(TAG, "✅ yt-dlp extracted URL for $videoId: ${streamUrl.take(100)}...")
+                        return@withContext streamUrl
+                    } else {
+                        Log.w(TAG, "yt-dlp returned success=true but empty URL for $videoId")
+                        return@withContext null
+                    }
                 } else {
                     val error = jsonResult.optString("error", "Unknown error")
                     Log.w(TAG, "yt-dlp failed for $videoId: $error")

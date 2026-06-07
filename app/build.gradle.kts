@@ -10,6 +10,7 @@ plugins {
     id("com.chaquo.python") version "16.1.0"
     id("kotlin-parcelize")
     id("kotlin-kapt")
+    id("com.google.protobuf")
 }
 
 android {
@@ -237,4 +238,22 @@ dependencies {
     // Glide for image loading
     implementation("com.github.bumptech.glide:glide:4.16.0")
     kapt("com.github.bumptech.glide:compiler:4.16.0")
+
+    // Protobuf
+    implementation("com.google.protobuf:protobuf-javalite:3.25.1")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.1"
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("java") {
+                    option("lite")
+                }
+            }
+        }
+    }
 }

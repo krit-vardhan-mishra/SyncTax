@@ -549,25 +549,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         filterType: SearchFilterType = SearchFilterType.ALL,
         forceRefresh: Boolean = false
     ) {
-        // Optimization: If query hasn't changed and we have cached ALL results, filter locally
-        if (!forceRefresh && query == lastSearchQuery && cachedAllSearchResults.isNotEmpty()) {
-            val filteredResults = when (filterType) {
-                SearchFilterType.ALL -> cachedAllSearchResults
-                SearchFilterType.SONGS -> cachedAllSearchResults.filter { it.type == OnlineResultType.SONG }
-                SearchFilterType.ALBUMS -> cachedAllSearchResults.filter { it.type == OnlineResultType.ALBUM }
-                SearchFilterType.ARTISTS -> cachedAllSearchResults.filter { it.type == OnlineResultType.ARTIST }
-                SearchFilterType.VIDEOS -> cachedAllSearchResults.filter { it.type == OnlineResultType.VIDEO }
-                // For PODCAST/EPISODE, we might not have a specific filter tab unless added, but we can filter if needed
-                else -> cachedAllSearchResults 
-            }
-            _uiState.value = _uiState.value.copy(
-                searchQuery = query,
-                selectedFilter = filterType,
-                onlineSearchResults = filteredResults,
-                isSearchingOnline = false
-            )
-            return
-        }
+        // We removed the flawed local cache optimization here.
+        // `searchAll` from Python only returns top mixed results (e.g. 3 items). 
+        // We cannot locally filter those 3 items for "SONGS" tab to get a full list of songs.
+        // So we must fetch from the API when switching filter tabs.
 
         // Cancel any existing search job before starting a new one
         currentSearchJob?.cancel()
@@ -575,7 +560,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         currentSearchJob = viewModelScope.launch(AppDispatchers.Network) {
             withContext(Dispatchers.Main) {
                 _uiState.value =
-                    _uiState.value.copy(isSearchingOnline = true, onlineSearchResults = emptyList())
+                    _uiState.value.copy(
+                        searchQuery = query,
+                        selectedFilter = filterType,
+                        isSearchingOnline = true, 
+                        onlineSearchResults = emptyList()
+                    )
             }
 
             // Save search query to history

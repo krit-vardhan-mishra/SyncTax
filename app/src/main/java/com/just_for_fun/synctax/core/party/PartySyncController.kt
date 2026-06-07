@@ -23,6 +23,8 @@ class PartySyncController(
     private val connectionManager: PartyConnectionManager,
     private val scope: CoroutineScope
 ) {
+    val udpManager = UdpMulticastManager(connectionManager.isHosting.value)
+    val calibrator = AcousticCalibrator()
     private val _clockOffset = MutableStateFlow(0L)
     val clockOffset: StateFlow<Long> = _clockOffset.asStateFlow()
 
@@ -47,6 +49,9 @@ class PartySyncController(
             previousListener?.invoke(message)
             handleMessage(message)
         }
+        
+        udpManager.onMessageReceived = { handleMessage(it) }
+        udpManager.start()
     }
 
     private fun handleMessage(message: PartyMessage) {
@@ -55,8 +60,8 @@ class PartySyncController(
                 // We are the host. Respond with our time.
                 val hostRxTime = SystemClock.elapsedRealtime()
                 val hostTxTime = SystemClock.elapsedRealtime()
-                Log.d(TAG, "⏱️ SyncRequest received, responding. clientTxTime=${message.clientTxTime}")
-                connectionManager.sendMessageToAll(
+                // Log.d(TAG, "⏱️ SyncRequest received, responding.")
+                udpManager.broadcast(
                     PartyMessage.SyncResponse(
                         clientTxTime = message.clientTxTime,
                         hostRxTime = hostRxTime,
@@ -85,7 +90,7 @@ class PartySyncController(
 
                 // Use median offset for stability
                 _clockOffset.value = syncOffsets.sorted()[syncOffsets.size / 2]
-                Log.d(TAG, "⏱️ Sync: offset=${_clockOffset.value}ms, latency=${delay}ms, samples=${syncOffsets.size}")
+                // Log.d(TAG, "⏱️ Sync: offset=${_clockOffset.value}ms, latency=${delay}ms, samples=${syncOffsets.size}")
             }
             else -> {} // Handled elsewhere
         }
@@ -101,7 +106,7 @@ class PartySyncController(
             scope.launch(Dispatchers.IO) {
                 while (connectionManager.isConnected.value) {
                     val clientTxTime = SystemClock.elapsedRealtime()
-                    connectionManager.sendMessageToHost(PartyMessage.SyncRequest(clientTxTime))
+                    udpManager.broadcast(PartyMessage.SyncRequest(clientTxTime))
                     // Send sync request every 1.5 seconds (reduced from 3s for tighter sync)
                     delay(1500)
                 }
@@ -133,6 +138,13 @@ class PartySyncController(
     fun setLatencyOffset(offsetMs: Long) {
         _localLatencyOffsetMs.value = offsetMs
         Log.d(TAG, "🔧 Audio latency offset set to ${offsetMs}ms")
+    }
+
+    /**
+     * Stop the UDP Manager when leaving party.
+     */
+    fun cleanup() {
+        udpManager.stop()
     }
 
     companion object {

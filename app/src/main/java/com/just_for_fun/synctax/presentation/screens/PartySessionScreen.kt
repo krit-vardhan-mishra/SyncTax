@@ -25,6 +25,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.SurroundSound
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -45,6 +46,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
+import android.Manifest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,6 +99,39 @@ fun PartySessionScreen(
     val isHosting by partyViewModel.isHosting.collectAsState()
     val clientIssues by partyViewModel.clientIssues.collectAsState()
     val homeState by homeViewModel.uiState.collectAsState()
+    val isCalibrating by partyViewModel.isCalibrating.collectAsState()
+
+    var showCalibrationRationale by remember { mutableStateOf(false) }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            partyViewModel.runAcousticCalibration()
+        }
+    }
+
+    if (showCalibrationRationale) {
+        AlertDialog(
+            onDismissRequest = { showCalibrationRationale = false },
+            containerColor = AppColors.cardBackground,
+            title = { Text("Microphone Permission Needed", color = lavenderColor, fontWeight = FontWeight.Bold) },
+            text = { Text("We need microphone access to measure the exact latency of your speaker to keep the party perfectly synced.", color = AppColors.textBody) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCalibrationRationale = false
+                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }) {
+                    Text("Allow", color = accentOrange)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCalibrationRationale = false }) {
+                    Text("Cancel", color = AppColors.textBody)
+                }
+            }
+        )
+    }
 
     var showLibrarySheet by remember { mutableStateOf(false) }
     var songQuery by remember { mutableStateOf("") }
@@ -323,6 +360,23 @@ fun PartySessionScreen(
                                 Text("Request Host", color = accentOrange, fontSize = 13.sp)
                             }
                         }
+
+                        // Chirp Test / Calibration Button
+                        TextButton(onClick = {
+                            if (isHosting) {
+                                partyViewModel.runAcousticCalibration()
+                            } else {
+                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                    partyViewModel.runAcousticCalibration()
+                                } else {
+                                    showCalibrationRationale = true
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.SurroundSound, contentDescription = null, tint = accentOrange)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isCalibrating) "Calibrating..." else "Chirp Test", color = accentOrange, fontSize = 13.sp)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -465,10 +519,9 @@ fun PartySessionScreen(
                                         isOffline = true
                                     )
                                     // 2. Send PlayCommand for timing sync
-                                    val now = SystemClock.elapsedRealtime() + 1500L
                                     partyViewModel.sendPlayCommand(
                                         songId = itemSong.id,
-                                        startTimestamp = now,
+                                        position = 0L, // start from the beginning
                                         title = itemSong.title,
                                         artist = itemSong.artist,
                                         album = itemSong.album,

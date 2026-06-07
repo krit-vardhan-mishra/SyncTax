@@ -1,6 +1,21 @@
 package com.just_for_fun.synctax.core.party
 
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.BluetoothLeAdvertiser
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
@@ -9,14 +24,20 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
+import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pGroup
+import android.net.wifi.p2p.WifiP2pInfo
+import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelUuid
 import android.util.Log
 import com.just_for_fun.synctax.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +63,7 @@ data class DiscoveredParty(val endpointId: String, val name: String)
 
 data class PartyHotspotInfo(val ssid: String, val passphrase: String, val port: Int)
 
+@SuppressLint("MissingPermission")
 class PartyConnectionManager(private val context: Context) {
     private val appContext = context.applicationContext
     private val wifiManager = appContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -80,6 +102,19 @@ class PartyConnectionManager(private val context: Context) {
     private var activeNetwork: Network? = null
     internal var hostDisplayName: String = "Host"
 
+    // ── BLE ──────────────────────────────────────────────────────────
+    private val bluetoothManager = appContext.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager?.adapter
+    private var bleAdvertiser: BluetoothLeAdvertiser? = null
+    private var bleScanner: BluetoothLeScanner? = null
+    private var bleAdvertiseCallback: AdvertiseCallback? = null
+    private var bleScanCallback: ScanCallback? = null
+
+    // ── Wi-Fi P2P ───────────────────────────────────────────────────
+    private var wifiP2pManager: WifiP2pManager? = null
+    private var wifiP2pChannel: WifiP2pManager.Channel? = null
+    private var p2pReceiver: BroadcastReceiver? = null
+
     private data class ClientConnection(
         val endpointId: String,
         val socket: Socket,
@@ -116,87 +151,23 @@ class PartyConnectionManager(private val context: Context) {
         }
         hostDisplayName = partyName
 
-        // Pre-check: Wi-Fi must be enabled
-        if (!wifiManager.isWifiEnabled) {
-            val msg = "Wi-Fi is turned off. Please enable Wi-Fi to host a party."
-            Log.e(TAG, msg)
-            _hotspotError.value = msg
-            return
-        }
+        // Step 1: Create Wi-Fi P2P Group (acts as a soft AP for data)
+        initWifiP2p()
+        wifiP2pManager?.createGroup(wifiP2pChannel, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                Log.d(TAG, "✅ Wi-Fi P2P Group created")
+                // onSuccess fires before group info is ready; we get the actual
+                // group details from the WIFI_P2P_CONNECTION_CHANGED_ACTION broadcast.
+            }
+            override fun onFailure(reason: Int) {
+                val msg = "Wi-Fi Direct group failed (reason=$reason). Make sure Wi-Fi and Location are ON."
+                Log.e(TAG, "❌ $msg")
+                _hotspotError.value = msg
+            }
+        })
 
-        // Pre-check: Location Services must be enabled (required for hotspot on most devices)
-        val locationManager = appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val locationEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        if (!locationEnabled) {
-            val msg = "Location Services are turned off. Please enable Location to host a party."
-            Log.e(TAG, msg)
-            _hotspotError.value = msg
-            return
-        }
-
-        Log.d(TAG, "Pre-checks passed. Wi-Fi=ON, Location=ON. Calling startLocalOnlyHotspot...")
-
-        val handler = Handler(Looper.getMainLooper())
-        try {
-            wifiManager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
-                override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation) {
-                    Log.d(TAG, "✅ onStarted() callback fired")
-                    hotspotReservation = reservation
-                    val ssid: String
-                    val passphrase: String
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        val config = reservation.softApConfiguration
-                        ssid = config?.ssid ?: "PartyHotspot"
-                        passphrase = config?.passphrase ?: ""
-                        Log.d(TAG, "softApConfiguration: ssid=$ssid, passphrase length=${passphrase.length}")
-                    } else {
-                        @Suppress("DEPRECATION")
-                        val config = reservation.wifiConfiguration
-                        ssid = config?.SSID?.trim('"') ?: "PartyHotspot"
-                        passphrase = config?.preSharedKey?.trim('"') ?: ""
-                        Log.d(TAG, "wifiConfiguration: ssid=$ssid, passphrase length=${passphrase.length}")
-                    }
-                    _hostHotspotInfo.value = PartyHotspotInfo(ssid, passphrase, PARTY_PORT)
-                    _isHosting.value = true
-                    _isConnected.value = true
-                    _hotspotError.value = null
-                    startServer()
-                    Log.d(TAG, "✅ Hotspot started with SSID=$ssid, port=$PARTY_PORT")
-                }
-
-                override fun onStopped() {
-                    Log.d(TAG, "⛔ Hotspot stopped callback")
-                    if (_isHosting.value) {
-                        stopHosting()
-                    }
-                }
-
-                override fun onFailed(reason: Int) {
-                    val reasonStr = when (reason) {
-                        ERROR_NO_CHANNEL -> "ERROR_NO_CHANNEL"
-                        ERROR_GENERIC -> "ERROR_GENERIC"
-                        ERROR_INCOMPATIBLE_MODE -> "ERROR_INCOMPATIBLE_MODE"
-                        ERROR_TETHERING_DISALLOWED -> "ERROR_TETHERING_DISALLOWED"
-                        else -> "UNKNOWN($reason)"
-                    }
-                    Log.e(TAG, "❌ Hotspot onFailed: $reasonStr (code=$reason)")
-                    _hotspotError.value = "Hotspot failed: $reasonStr. Make sure Wi-Fi and Location are ON, and no other hotspot is active."
-                    _hostHotspotInfo.value = null
-                    _isHosting.value = false
-                    _isConnected.value = false
-                }
-            }, handler)
-            Log.d(TAG, "startLocalOnlyHotspot() called — waiting for callback...")
-        } catch (e: SecurityException) {
-            val msg = "Permission denied: ${e.message}"
-            Log.e(TAG, msg, e)
-            _hotspotError.value = msg
-        } catch (e: Exception) {
-            val msg = "Failed to start hotspot: ${e.message}"
-            Log.e(TAG, msg, e)
-            _hotspotError.value = msg
-        }
+        // Step 2: Start BLE Advertising so guests can discover us
+        startBleAdvertising(partyName)
     }
 
     fun stopHosting() {
@@ -210,6 +181,7 @@ class PartyConnectionManager(private val context: Context) {
         _isHosting.value = false
         _isConnected.value = false
         stopServer()
+        cleanupP2p()
         hotspotReservation?.close()
         hotspotReservation = null
 
@@ -219,57 +191,44 @@ class PartyConnectionManager(private val context: Context) {
     }
 
     fun startDiscovery() {
-        Log.d(TAG, "Manual join flow started")
+        Log.d(TAG, "🔍 Starting BLE discovery for parties")
         _discoveredParties.value = emptyList()
+        startBleScanning()
     }
 
     fun stopDiscovery() {
-        // Manual join flow uses text inputs, no active discovery
+        stopBleScanning()
     }
 
+    /**
+     * Joins via Wi-Fi Direct. The 'ssid' param is the P2P device address
+     * discovered via BLE, and 'passphrase' is unused for P2P but kept
+     * for backward-compat with the manual-entry UI.
+     */
     fun joinParty(ssid: String, passphrase: String, userName: String) {
-        Log.d(TAG, "Joining hotspot ssid=$ssid as $userName")
+        Log.d(TAG, "🔌 joinParty via Wi-Fi Direct: deviceAddr=$ssid as $userName")
         leaveParty()
+        initWifiP2p()
 
-        if (ssid.isBlank() || passphrase.length < 8) {
-            Log.e(TAG, "Invalid hotspot credentials")
-            return
+        val config = WifiP2pConfig().apply {
+            deviceAddress = ssid
         }
 
-        val specifier = WifiNetworkSpecifier.Builder()
-            .setSsid(ssid)
-            .setWpa2Passphrase(passphrase)
-            .build()
-
-        val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .setNetworkSpecifier(specifier)
-            .build()
-
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                activeNetwork = network
-                connectivityManager.bindProcessToNetwork(network)
-                connectToHost(network, userName)
+        wifiP2pManager?.connect(wifiP2pChannel, config, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                Log.d(TAG, "✅ Wi-Fi P2P connect initiated to $ssid")
+                // Connection info arrives via broadcast; we handle it in the receiver.
+                // Store userName so we can send handshake when TCP connects.
+                pendingJoinUserName = userName
             }
-
-            override fun onUnavailable() {
-                Log.e(TAG, "Hotspot connection unavailable")
+            override fun onFailure(reason: Int) {
+                Log.e(TAG, "❌ Wi-Fi P2P connect failed (reason=$reason)")
                 handleHostDisconnected()
             }
-
-            override fun onLost(network: Network) {
-                if (activeNetwork == network) {
-                    Log.d(TAG, "Hotspot network lost")
-                    handleHostDisconnected()
-                }
-            }
-        }
-
-        networkCallback = callback
-        connectivityManager.requestNetwork(request, callback)
+        })
     }
+
+    private var pendingJoinUserName: String? = null
 
     fun leaveParty() {
         Log.d(TAG, "Leaving party")
@@ -279,6 +238,7 @@ class PartyConnectionManager(private val context: Context) {
         _isConnected.value = false
         _members.value = emptyList()
         _clientIssues.value = emptyMap()
+        cleanupP2p()
         connectivityManager.bindProcessToNetwork(null)
         networkCallback?.let { callback ->
             runCatching { connectivityManager.unregisterNetworkCallback(callback) }
@@ -532,10 +492,204 @@ class PartyConnectionManager(private val context: Context) {
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // BLE Advertising (Host)
+    // ════════════════════════════════════════════════════════════════════
+
+    private fun startBleAdvertising(partyName: String) {
+        try {
+            bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+            if (bleAdvertiser == null) {
+                Log.w(TAG, "⚠️ BLE Advertiser not available on this device")
+                return
+            }
+
+            val settings = AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setConnectable(false)
+                .build()
+
+            val serviceData = partyName.toByteArray(StandardCharsets.UTF_8).take(20).toByteArray()
+            val data = AdvertiseData.Builder()
+                .setIncludeDeviceName(false)
+                .addServiceUuid(ParcelUuid(SYNCTAX_BLE_UUID))
+                .addServiceData(ParcelUuid(SYNCTAX_BLE_UUID), serviceData)
+                .build()
+
+            bleAdvertiseCallback = object : AdvertiseCallback() {
+                override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+                    Log.d(TAG, "📡 BLE Advertising started for '$partyName'")
+                }
+                override fun onStartFailure(errorCode: Int) {
+                    Log.e(TAG, "❌ BLE Advertising failed: errorCode=$errorCode")
+                }
+            }
+
+            bleAdvertiser?.startAdvertising(settings, data, bleAdvertiseCallback)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "BLE Advertise permission denied", e)
+        }
+    }
+
+    private fun stopBleAdvertising() {
+        try {
+            bleAdvertiseCallback?.let { bleAdvertiser?.stopAdvertising(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping BLE advertising", e)
+        }
+        bleAdvertiseCallback = null
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // BLE Scanning (Guest)
+    // ════════════════════════════════════════════════════════════════════
+
+    private fun startBleScanning() {
+        try {
+            bleScanner = bluetoothAdapter?.bluetoothLeScanner
+            if (bleScanner == null) {
+                Log.w(TAG, "⚠️ BLE Scanner not available")
+                return
+            }
+
+            val filter = ScanFilter.Builder()
+                .setServiceUuid(ParcelUuid(SYNCTAX_BLE_UUID))
+                .build()
+
+            val settings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build()
+
+            bleScanCallback = object : ScanCallback() {
+                override fun onScanResult(callbackType: Int, result: ScanResult) {
+                    val record = result.scanRecord ?: return
+                    val serviceData = record.getServiceData(ParcelUuid(SYNCTAX_BLE_UUID))
+                    val partyName = serviceData?.toString(StandardCharsets.UTF_8) ?: "Unknown Party"
+                    val deviceAddr = result.device?.address ?: return
+
+                    val current = _discoveredParties.value
+                    if (current.none { it.endpointId == deviceAddr }) {
+                        _discoveredParties.value = current + DiscoveredParty(deviceAddr, partyName)
+                        Log.d(TAG, "🔍 Discovered party: '$partyName' at $deviceAddr")
+                    }
+                }
+
+                override fun onScanFailed(errorCode: Int) {
+                    Log.e(TAG, "❌ BLE Scan failed: errorCode=$errorCode")
+                }
+            }
+
+            bleScanner?.startScan(listOf(filter), settings, bleScanCallback)
+            Log.d(TAG, "📡 BLE Scanning started")
+        } catch (e: SecurityException) {
+            Log.e(TAG, "BLE Scan permission denied", e)
+        }
+    }
+
+    private fun stopBleScanning() {
+        try {
+            bleScanCallback?.let { bleScanner?.stopScan(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping BLE scan", e)
+        }
+        bleScanCallback = null
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // Wi-Fi P2P Initialization & Broadcast Receiver
+    // ════════════════════════════════════════════════════════════════════
+
+    private fun initWifiP2p() {
+        if (wifiP2pManager != null) return
+
+        wifiP2pManager = appContext.getSystemService(Context.WIFI_P2P_SERVICE) as? WifiP2pManager
+        wifiP2pChannel = wifiP2pManager?.initialize(appContext, Looper.getMainLooper(), null)
+
+        p2pReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                when (intent.action) {
+                    WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
+                        val info = intent.getParcelableExtra<WifiP2pInfo>(WifiP2pManager.EXTRA_WIFI_P2P_INFO)
+                        if (info?.groupFormed == true) {
+                            Log.d(TAG, "📶 P2P Group formed. isGroupOwner=${info.isGroupOwner}, ownerAddr=${info.groupOwnerAddress}")
+                            if (info.isGroupOwner) {
+                                // We are the Host — set hotspot info and start TCP server
+                                val ownerIp = info.groupOwnerAddress?.hostAddress ?: "unknown"
+                                _hostHotspotInfo.value = PartyHotspotInfo(ownerIp, "", PARTY_PORT)
+                                _isHosting.value = true
+                                _isConnected.value = true
+                                _hotspotError.value = null
+                                startServer()
+                            } else {
+                                // We are the Guest — connect TCP to the group owner
+                                val ownerAddr = info.groupOwnerAddress
+                                if (ownerAddr != null) {
+                                    val userName = pendingJoinUserName ?: "Guest"
+                                    connectToP2pHost(ownerAddr, userName)
+                                }
+                            }
+                        }
+                    }
+                    WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
+                        val state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1)
+                        if (state != WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
+                            Log.w(TAG, "⚠️ Wi-Fi P2P is not enabled")
+                        }
+                    }
+                }
+            }
+        }
+
+        val intentFilter = IntentFilter().apply {
+            addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+            addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+        }
+        appContext.registerReceiver(p2pReceiver, intentFilter)
+        Log.d(TAG, "📡 Wi-Fi P2P initialized")
+    }
+
+    /**
+     * Guest connects TCP to the P2P group owner (Host).
+     */
+    private fun connectToP2pHost(ownerAddress: InetAddress, userName: String) {
+        scope.launch {
+            Log.d(TAG, "🔌 Connecting TCP to P2P host at ${ownerAddress.hostAddress}:$PARTY_PORT")
+            try {
+                val socket = Socket()
+                socket.connect(InetSocketAddress(ownerAddress, PARTY_PORT), CONNECT_TIMEOUT_MS)
+                val writer = BufferedWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))
+                val connection = ClientConnection(HOST_ENDPOINT_ID, socket, writer)
+                hostConnection = connection
+                _isConnected.value = true
+                _members.value = listOf(PartyMember(HOST_ENDPOINT_ID, "Host", true))
+                Log.d(TAG, "✅ Connected to P2P host! Sending handshake as '$userName'")
+                sendMessage(connection, PartyMessage.Handshake(BuildConfig.VERSION_NAME, userName))
+                listenToHost(connection)
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to connect TCP to P2P host", e)
+                handleHostDisconnected()
+            }
+        }
+    }
+
+    private fun cleanupP2p() {
+        stopBleAdvertising()
+        stopBleScanning()
+        try {
+            p2pReceiver?.let { appContext.unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        p2pReceiver = null
+        try {
+            wifiP2pManager?.removeGroup(wifiP2pChannel, null)
+        } catch (_: Exception) {}
+    }
+
     companion object {
         private const val TAG = "PartyConnectionManager"
         private const val PARTY_PORT = 45123
         private const val CONNECT_TIMEOUT_MS = 5000
         private const val HOST_ENDPOINT_ID = "host"
+        private val SYNCTAX_BLE_UUID: UUID = UUID.fromString("0000FFAB-0000-1000-8000-00805F9B34FB")
     }
 }
