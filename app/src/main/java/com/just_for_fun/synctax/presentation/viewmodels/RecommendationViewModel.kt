@@ -58,6 +58,9 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     
     private val _hasEnoughHistory = MutableStateFlow(false)
     val hasEnoughHistory: StateFlow<Boolean> = _hasEnoughHistory.asStateFlow()
+
+    private val _historyCount = MutableStateFlow(0)
+    val historyCount: StateFlow<Int> = _historyCount.asStateFlow()
     
     // Internal state for shuffle functionality
     private var allAvailableSongs = listOf<OnlineSearchResult>()
@@ -87,7 +90,11 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
         }
         
         viewModelScope.launch(AppDispatchers.Database) {
-            val hasHistory = analyticsService.hasEnoughHistory(3)
+            val allHistory = historyDao.getAllHistory()
+            val count = allHistory.size
+            _historyCount.value = count
+            
+            val hasHistory = count >= 2
             _hasEnoughHistory.value = hasHistory
             
             if (hasHistory) {
@@ -133,6 +140,12 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
     private suspend fun loadRecommendationsInternal(forceRefresh: Boolean) {
         if (_isLoading.value) return
         
+        if (!com.just_for_fun.synctax.core.utils.NetworkUtil.isNetworkAvailable(getApplication())) {
+            _error.value = "The internet is down, please connect to internet first."
+            _isLoading.value = false
+            return
+        }
+        
         _isLoading.value = true
         _error.value = null
         
@@ -174,8 +187,15 @@ class RecommendationViewModel(application: Application) : AndroidViewModel(appli
      * Use refreshRecommendations() to force a refresh.
      */
     fun loadRecommendations() {
-        // Skip if recommendations already exist (prevents reload on scroll/navigation)
-        if (_recommendations.value != null && hasInitializedData) {
+        // Skip if recommendations already exist and are not empty (prevents reload on scroll/navigation)
+        val currentRecs = _recommendations.value
+        val hasSongs = currentRecs != null && (
+            currentRecs.artistBased.isNotEmpty() ||
+            currentRecs.similarSongs.isNotEmpty() ||
+            currentRecs.discovery.isNotEmpty() ||
+            currentRecs.trending.isNotEmpty()
+        )
+        if (hasSongs && hasInitializedData) {
             Log.d(TAG, "Recommendations already loaded, use refreshRecommendations() to update")
             return
         }

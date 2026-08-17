@@ -371,7 +371,23 @@ class MusicRecommendationManager(private val context: Context) {
         history: List<com.just_for_fun.synctax.data.local.entities.ListeningHistory>,
         preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
     ): SongFeatures {
-        val song = database.songDao().getSongById(songId)
+        var song = database.songDao().getSongById(songId)
+        if (song == null && (songId.startsWith("online:") || songId.startsWith("youtube:"))) {
+            val videoId = songId.removePrefix("online:").removePrefix("youtube:")
+            val onlineSong = database.onlineSongDao().getOnlineSongByVideoId(videoId)
+            if (onlineSong != null) {
+                song = Song(
+                    id = songId,
+                    title = onlineSong.title,
+                    artist = onlineSong.artist,
+                    album = onlineSong.album,
+                    duration = (onlineSong.duration ?: 0).toLong() * 1000L,
+                    filePath = "",
+                    genre = "Online",
+                    releaseYear = null
+                )
+            }
+        }
         val pref = preferences.find { it.songId == songId }
         val songHistory = history.filter { it.songId == songId }
 
@@ -420,6 +436,28 @@ class MusicRecommendationManager(private val context: Context) {
         return currentHourCount.toDouble() / maxCount
     }
 
+    private suspend fun getSongWithOnlineFallback(songId: String): Song? {
+        val song = database.songDao().getSongById(songId)
+        if (song != null) return song
+        if (songId.startsWith("online:") || songId.startsWith("youtube:")) {
+            val videoId = songId.removePrefix("online:").removePrefix("youtube:")
+            val onlineSong = database.onlineSongDao().getOnlineSongByVideoId(videoId)
+            if (onlineSong != null) {
+                return Song(
+                    id = songId,
+                    title = onlineSong.title,
+                    artist = onlineSong.artist,
+                    album = onlineSong.album,
+                    duration = (onlineSong.duration ?: 0).toLong() * 1000L,
+                    filePath = "",
+                    genre = "Online",
+                    releaseYear = null
+                )
+            }
+        }
+        return null
+    }
+
     private suspend fun calculateGenreAffinity(
         genre: String?,
         preferences: List<com.just_for_fun.synctax.data.local.entities.UserPreference>
@@ -428,7 +466,7 @@ class MusicRecommendationManager(private val context: Context) {
 
         // Count plays for same genre
         val genrePlays = preferences.sumOf { pref ->
-            val song = database.songDao().getSongById(pref.songId)
+            val song = getSongWithOnlineFallback(pref.songId)
             if (song?.genre == genre) pref.playCount else 0
         }
 
@@ -443,7 +481,7 @@ class MusicRecommendationManager(private val context: Context) {
         if (artist == null) return 0.5
 
         val artistPlays = preferences.sumOf { pref ->
-            val song = database.songDao().getSongById(pref.songId)
+            val song = getSongWithOnlineFallback(pref.songId)
             if (song?.artist == artist) pref.playCount else 0
         }
 
@@ -490,7 +528,7 @@ class MusicRecommendationManager(private val context: Context) {
         // Calculate average preferred duration from user's most played songs
         val topSongs = preferences.sortedByDescending { it.playCount }.take(20)
         val durations = topSongs.mapNotNull { pref ->
-            database.songDao().getSongById(pref.songId)?.duration
+            getSongWithOnlineFallback(pref.songId)?.duration
         }
         
         if (durations.isEmpty()) return 0.5
@@ -510,7 +548,7 @@ class MusicRecommendationManager(private val context: Context) {
         if (album.isNullOrEmpty()) return 0.5
 
         val albumPlays = preferences.sumOf { pref ->
-            val song = database.songDao().getSongById(pref.songId)
+            val song = getSongWithOnlineFallback(pref.songId)
             if (song?.album == album) pref.playCount else 0
         }
 

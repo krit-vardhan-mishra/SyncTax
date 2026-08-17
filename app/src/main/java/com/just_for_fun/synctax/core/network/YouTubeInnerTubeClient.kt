@@ -20,19 +20,19 @@ class YouTubeInnerTubeClient {
 
     companion object {
         private const val TAG = "YouTubeInnerTube"
-        
+
         // WEB_REMIX for search (YouTube Music)
         private const val MUSIC_BASE_URL = "https://music.youtube.com/youtubei/v1"
         private val MUSIC_API_KEY = BuildConfig.MUSIC_API_KEY
         private const val MUSIC_CLIENT_NAME = "WEB_REMIX"
         private const val MUSIC_CLIENT_VERSION = "1.20240918.01.00"
-        
+
         // WEB client for player (works with visitor_data, uses NewPipe for cipher)
         private const val PLAYER_BASE_URL = "https://www.youtube.com/youtubei/v1"
         private val PLAYER_API_KEY = BuildConfig.PLAYER_API_KEY
         private const val PLAYER_CLIENT_NAME = "WEB"
         private const val PLAYER_CLIENT_VERSION = "2.20241111.00.00"
-        
+
         // Cache visitor data to avoid fetching on every request
         @Volatile
         private var cachedVisitorData: String? = null
@@ -48,23 +48,26 @@ class YouTubeInnerTubeClient {
         if (cachedVisitorData != null && now < visitorDataExpiry) {
             return cachedVisitorData
         }
-        
+
         return withContext(Dispatchers.IO) {
             try {
                 val url = URL("https://www.youtube.com/")
                 val conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "GET"
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                conn.setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                )
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
-                
+
                 val html = conn.inputStream.bufferedReader().use { it.readText() }
                 conn.disconnect()
-                
+
                 // Extract visitor_data from ytcfg.set or JSON
                 val regex = """"VISITOR_DATA":"([^"]+)""".toRegex()
                 val match = regex.find(html)
-                
+
                 if (match != null) {
                     val visitorData = match.groupValues[1]
                     cachedVisitorData = visitorData
@@ -72,7 +75,7 @@ class YouTubeInnerTubeClient {
                     Log.d(TAG, "Fetched visitor_data: ${visitorData.take(20)}...")
                     return@withContext visitorData
                 }
-                
+
                 Log.w(TAG, "Could not extract visitor_data from YouTube")
                 null
             } catch (e: Exception) {
@@ -81,7 +84,7 @@ class YouTubeInnerTubeClient {
             }
         }
     }
-    
+
     /**
      * Search for music on YouTube Music
      */
@@ -89,17 +92,17 @@ class YouTubeInnerTubeClient {
         return withContext(Dispatchers.IO) {
             try {
                 val results = mutableListOf<OnlineSearchResult>()
-                
+
                 // Build search request body
                 val requestBody = buildSearchRequest(query)
-                
+
                 // Make API call to YouTube Music
                 val url = "$MUSIC_BASE_URL/search?key=$MUSIC_API_KEY&prettyPrint=false"
                 val response = makePostRequest(url, requestBody, forPlayer = false)
-                
+
                 // Parse response
                 val jsonResponse = JSONObject(response)
-                
+
                 // Navigate to search results
                 val contents = jsonResponse.optJSONObject("contents")
                     ?.optJSONObject("tabbedSearchResultsRenderer")
@@ -109,20 +112,21 @@ class YouTubeInnerTubeClient {
                     ?.optJSONObject("content")
                     ?.optJSONObject("sectionListRenderer")
                     ?.optJSONArray("contents")
-                
+
                 if (contents != null) {
                     // Find the music shelf with actual results
                     for (i in 0 until contents.length()) {
                         val section = contents.optJSONObject(i)
                         val musicShelf = section?.optJSONObject("musicShelfRenderer")
-                        
+
                         if (musicShelf != null) {
                             val items = musicShelf.optJSONArray("contents")
                             if (items != null) {
                                 for (j in 0 until minOf(items.length(), limit)) {
                                     val item = items.optJSONObject(j)
-                                    val listItem = item?.optJSONObject("musicResponsiveListItemRenderer")
-                                    
+                                    val listItem =
+                                        item?.optJSONObject("musicResponsiveListItemRenderer")
+
                                     if (listItem != null) {
                                         parseSearchResult(listItem)?.let { results.add(it) }
                                     }
@@ -132,13 +136,89 @@ class YouTubeInnerTubeClient {
                         }
                     }
                 }
-                
+
                 Log.d(TAG, "Search completed: found ${results.size} results for '$query'")
-                results
+                if (results.isEmpty()) {
+                    Log.d(
+                        TAG,
+                        "Search returned 0 results for '$query' (attempting Python fallback)"
+                    )
+                    performPythonFallback(query, limit)
+                } else {
+                    results
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Search failed for query: $query", e)
-                emptyList()
+                Log.e(TAG, "Search failed for query: $query (attempting Python fallback)", e)
+                performPythonFallback(query, limit)
             }
+        }
+    }
+
+    private fun performPythonFallback(query: String, limit: Int): List<OnlineSearchResult> {
+        return try {
+            val python = com.chaquo.python.Python.getInstance()
+            val module = python.getModule("ytmusic_recommender")
+            val jsonResult = module.callAttr("search_all", query, limit).toString()
+            val jsonArray = org.json.JSONArray(jsonResult)
+            val results = mutableListOf<OnlineSearchResult>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val typeStr = obj.optString("resultType", "unknown")
+                val type = when (typeStr) {
+                    "song" -> OnlineResultType.SONG
+                    "video" -> OnlineResultType.VIDEO
+                    "album" -> OnlineResultType.ALBUM
+                    "artist" -> OnlineResultType.ARTIST
+                    "podcast" -> OnlineResultType.PODCAST
+                    "episode" -> OnlineResultType.EPISODE
+                    else -> continue
+                }
+                val id = when (type) {
+                    OnlineResultType.ALBUM, OnlineResultType.ARTIST, OnlineResultType.PODCAST -> obj.optString(
+                        "browseId",
+                        ""
+                    )
+
+                    else -> obj.optString("videoId", "")
+                }
+                if (id.isEmpty()) continue
+
+                // Parse duration
+                var durationMs: Long? = null
+                val durationStr = obj.optString("duration", "")
+                if (durationStr.isNotEmpty()) {
+                    val parts = durationStr.split(":")
+                    if (parts.size == 2) {
+                        val min = parts[0].toLongOrNull() ?: 0L
+                        val sec = parts[1].toLongOrNull() ?: 0L
+                        durationMs = (min * 60 + sec) * 1000
+                    } else if (parts.size == 3) {
+                        val hr = parts[0].toLongOrNull() ?: 0L
+                        val min = parts[1].toLongOrNull() ?: 0L
+                        val sec = parts[2].toLongOrNull() ?: 0L
+                        durationMs = (hr * 3600 + min * 60 + sec) * 1000
+                    }
+                }
+
+                results.add(
+                    OnlineSearchResult(
+                        id = id,
+                        title = obj.optString("title", "Unknown Title"),
+                        author = obj.optString("artist", "Unknown Artist"),
+                        duration = durationMs,
+                        thumbnailUrl = obj.optString("thumbnail", ""),
+                        streamUrl = null,
+                        type = type,
+                        year = obj.optString("year", null),
+                        browseId = if (type == OnlineResultType.ALBUM || type == OnlineResultType.ARTIST || type == OnlineResultType.PODCAST) id else null
+                    )
+                )
+            }
+            Log.d(TAG, "Fallback search succeeded: found ${results.size} results for '$query'")
+            results
+        } catch (fallbackEx: Exception) {
+            Log.e(TAG, "Fallback search also failed", fallbackEx)
+            emptyList()
         }
     }
 
@@ -160,7 +240,10 @@ class YouTubeInnerTubeClient {
                 if (result.isSuccess) {
                     val streamUrl = result.getOrNull()
                     if (streamUrl != null) {
-                        Log.d(TAG, "✅ NewPipe got stream URL for $videoId: ${streamUrl.take(100)}...")
+                        Log.d(
+                            TAG,
+                            "✅ NewPipe got stream URL for $videoId: ${streamUrl.take(100)}..."
+                        )
                         return@withContext streamUrl
                     }
                 } else {
@@ -169,7 +252,10 @@ class YouTubeInnerTubeClient {
                     // Check if this is a known NewPipe version issue
                     val exception = result.exceptionOrNull()
                     if (LibraryUpdateChecker.isNewPipeVersionError(exception)) {
-                        Log.w(TAG, "🔄 NewPipe failed with known version issue - trying yt-dlp fallback")
+                        Log.w(
+                            TAG,
+                            "🔄 NewPipe failed with known version issue - trying yt-dlp fallback"
+                        )
 
                         // Try yt-dlp fallback
                         try {
@@ -180,7 +266,10 @@ class YouTubeInnerTubeClient {
                             } else {
                                 Log.w(TAG, "❌ yt-dlp fallback also failed for $videoId")
                                 // Could notify user here about potential NewPipe update needed
-                                Log.w(TAG, "⚠️ Both NewPipe and yt-dlp failed - NewPipeExtractor may need updating")
+                                Log.w(
+                                    TAG,
+                                    "⚠️ Both NewPipe and yt-dlp failed - NewPipeExtractor may need updating"
+                                )
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "❌ yt-dlp fallback exception for $videoId", e)
@@ -199,7 +288,7 @@ class YouTubeInnerTubeClient {
 
     /**
      * Extract stream URL using yt-dlp as fallback when NewPipe fails.
-     * 
+     *
      * The Python module monkey-patches subprocess.Popen to prevent native crashes
      * on Android (_posixsubprocess would crash the whole app). yt-dlp gracefully
      * handles the FileNotFoundError and extracts streams without ffprobe.
@@ -208,14 +297,14 @@ class YouTubeInnerTubeClient {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "yt-dlp: Starting extraction for $videoId")
-                
+
                 val python = com.chaquo.python.Python.getInstance()
                 val ytStreamExtractor = python.getModule("yt_stream_extractor")
 
                 // Call the Python function — returns a JSON string
                 val result = ytStreamExtractor.callAttr("extract_stream_url", videoId)
                 val jsonString = result.toString()
-                
+
                 Log.d(TAG, "yt-dlp: Raw result length=${jsonString.length}")
 
                 // Parse JSON result
@@ -262,13 +351,13 @@ class YouTubeInnerTubeClient {
         // Use WEB client with visitor_data to bypass bot detection
         // Streams will be cipher-protected but NewPipe handles that
         val visitorData = getVisitorData()
-        
+
         if (visitorData != null) {
             Log.d(TAG, "Using visitor_data for $videoId")
         } else {
             Log.w(TAG, "No visitor_data available for $videoId - may hit bot detection")
         }
-        
+
         val clientContext = if (visitorData != null) {
             """
                 "clientName": "$PLAYER_CLIENT_NAME",
@@ -285,7 +374,7 @@ class YouTubeInnerTubeClient {
                 "gl": "US"
             """.trimIndent()
         }
-        
+
         return """
         {
             "context": {
@@ -300,10 +389,14 @@ class YouTubeInnerTubeClient {
         """.trimIndent()
     }
 
-    private fun makePostRequest(urlString: String, body: String, forPlayer: Boolean = false): String {
+    private fun makePostRequest(
+        urlString: String,
+        body: String,
+        forPlayer: Boolean = false
+    ): String {
         val url = URL(urlString)
         val conn = url.openConnection() as HttpURLConnection
-        
+
         try {
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
@@ -311,27 +404,33 @@ class YouTubeInnerTubeClient {
             conn.doOutput = true
             conn.connectTimeout = 15000
             conn.readTimeout = 15000
-            
+
             if (forPlayer) {
                 // WEB client headers for player endpoint
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+                conn.setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+                )
                 conn.setRequestProperty("X-YouTube-Client-Name", "1")  // WEB = 1
                 conn.setRequestProperty("X-YouTube-Client-Version", PLAYER_CLIENT_VERSION)
                 conn.setRequestProperty("Origin", "https://www.youtube.com")
                 conn.setRequestProperty("Referer", "https://www.youtube.com/")
             } else {
                 // WEB_REMIX client headers for search
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                conn.setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                )
                 conn.setRequestProperty("X-Goog-Api-Format-Version", "1")
                 conn.setRequestProperty("X-YouTube-Client-Name", "67")  // WEB_REMIX = 67
                 conn.setRequestProperty("X-YouTube-Client-Version", MUSIC_CLIENT_VERSION)
                 conn.setRequestProperty("Origin", "https://music.youtube.com")
                 conn.setRequestProperty("Referer", "https://music.youtube.com/")
             }
-            
+
             // Write request body
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            
+
             // Read response
             val responseCode = conn.responseCode
             if (responseCode == 200) {
@@ -350,20 +449,20 @@ class YouTubeInnerTubeClient {
             // Get video ID
             val playlistItemData = listItem.optJSONObject("playlistItemData")
             val videoId = playlistItemData?.optString("videoId") ?: return null
-            
+
             // Check if this is a song (has WATCH endpoint, not BROWSE for albums/playlists)
             val navigationEndpoint = listItem.optJSONObject("overlay")
                 ?.optJSONObject("musicItemThumbnailOverlayRenderer")
                 ?.optJSONObject("content")
                 ?.optJSONObject("musicPlayButtonRenderer")
                 ?.optJSONObject("playNavigationEndpoint")
-            
+
             // Only include items with watch endpoint (songs/videos)
             if (navigationEndpoint == null || !navigationEndpoint.has("watchEndpoint")) {
                 Log.d(TAG, "Skipping non-song result: $videoId")
                 return null
             }
-            
+
             // Get title
             val flexColumns = listItem.optJSONArray("flexColumns")
             val title = flexColumns?.optJSONObject(0)
@@ -372,39 +471,39 @@ class YouTubeInnerTubeClient {
                 ?.optJSONArray("runs")
                 ?.optJSONObject(0)
                 ?.optString("text") ?: return null
-            
+
             // Get artist and other metadata
             var artist: String? = null
             var duration: Long? = null
-            
+
             if (flexColumns.length() > 1) {
                 val metadataColumn = flexColumns.optJSONObject(1)
                     ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
                     ?.optJSONObject("text")
                     ?.optJSONArray("runs")
-                
+
                 if (metadataColumn != null && metadataColumn.length() > 0) {
                     artist = metadataColumn.optJSONObject(0)?.optString("text")
                 }
             }
-            
+
             // Get thumbnail - use higher quality image (last thumbnail in array)
             val thumbnails = listItem.optJSONObject("thumbnail")
                 ?.optJSONObject("musicThumbnailRenderer")
                 ?.optJSONObject("thumbnail")
                 ?.optJSONArray("thumbnails")
-            
+
             var thumbnail: String? = null
             if (thumbnails != null && thumbnails.length() > 0) {
                 // Get the highest quality thumbnail (last one in array)
                 val thumbnailObj = thumbnails.optJSONObject(thumbnails.length() - 1)
                 thumbnail = thumbnailObj?.optString("url")
-                
+
                 // Handle protocol-relative URLs (//i.ytimg.com/...)
                 if (thumbnail?.startsWith("//") == true) {
                     thumbnail = "https:$thumbnail"
                 }
-                
+
                 // Upgrade to maximum quality thumbnail (maxresdefault = 1280x720)
                 // Falls back to high quality if maxres is not available
                 thumbnail = thumbnail?.replace("/default.jpg", "/maxresdefault.jpg")
@@ -412,7 +511,7 @@ class YouTubeInnerTubeClient {
                     ?.replace("/sddefault.jpg", "/maxresdefault.jpg")
                     ?.replace("/hqdefault.jpg", "/maxresdefault.jpg")
             }
-            
+
             // Get fixed run (duration)
             val fixedColumns = listItem.optJSONArray("fixedColumns")
             if (fixedColumns != null && fixedColumns.length() > 0) {
@@ -422,12 +521,12 @@ class YouTubeInnerTubeClient {
                     ?.optJSONArray("runs")
                     ?.optJSONObject(0)
                     ?.optString("text")
-                
+
                 if (durationText != null) {
                     duration = parseDuration(durationText)
                 }
             }
-            
+
             // Determine type based on duration and title
             // Videos over 20 minutes or with certain keywords are classified as VIDEO
             val titleLower = title.lowercase()
@@ -440,9 +539,9 @@ class YouTubeInnerTubeClient {
                     titleLower.contains("10 hours") ||
                     titleLower.contains("1 hour") ||
                     titleLower.contains("compilation")
-            
+
             val resultType = if (isLikelyVideo) OnlineResultType.VIDEO else OnlineResultType.SONG
-            
+
             return OnlineSearchResult(
                 id = videoId,
                 title = title,
@@ -467,12 +566,14 @@ class YouTubeInnerTubeClient {
                     val seconds = parts[1].toLongOrNull() ?: 0
                     (minutes * 60 + seconds)
                 }
+
                 3 -> { // HH:MM:SS
                     val hours = parts[0].toLongOrNull() ?: 0
                     val minutes = parts[1].toLongOrNull() ?: 0
                     val seconds = parts[2].toLongOrNull() ?: 0
                     (hours * 3600 + minutes * 60 + seconds)
                 }
+
                 else -> null
             }
         } catch (e: Exception) {

@@ -41,7 +41,7 @@ class HeuristicMLAgent(private val context: Context) {
      * Train the model on user listening history.
      */
     fun train(userHistory: List<SongFeatures>): Boolean {
-        if (userHistory.size < 5) {
+        if (userHistory.isEmpty()) {
             Log.d(TAG, "Insufficient training data (${userHistory.size} samples)")
             return false
         }

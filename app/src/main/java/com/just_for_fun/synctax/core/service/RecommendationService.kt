@@ -66,7 +66,10 @@ class RecommendationService(
         // Check cache first (unless forcing refresh)
         if (!forceRefresh) {
             val cached = getCachedRecommendations()
-            if (cached != null) {
+            if (cached != null && (cached.artistBased.isNotEmpty() || 
+                cached.similarSongs.isNotEmpty() || 
+                cached.discovery.isNotEmpty() || 
+                cached.trending.isNotEmpty())) {
                 Log.d(TAG, "Returning cached recommendations")
                 return cached
             }
@@ -80,13 +83,47 @@ class RecommendationService(
             historyDao.getRecentHistory(50)
         }
         
+        val errors = mutableListOf<String>()
+        
         // Generate recommendations on network dispatcher
         val result = withContext(AppDispatchers.Network) {
+            val artistBased = try {
+                filterSongsOnly(generateArtistBasedRecommendations(preferences.topArtists))
+            } catch (e: Exception) {
+                errors.add("Artist-based: ${e.message}")
+                emptyList()
+            }
+            
+            val similarSongs = try {
+                filterSongsOnly(generateSimilarSongRecommendations(recentHistory))
+            } catch (e: Exception) {
+                errors.add("Similar songs: ${e.message}")
+                emptyList()
+            }
+            
+            val discovery = try {
+                filterSongsOnly(generateDiscoveryRecommendations(recentHistory, preferences))
+            } catch (e: Exception) {
+                errors.add("Discovery: ${e.message}")
+                emptyList()
+            }
+            
+            val trending = try {
+                filterSongsOnly(getTrendingRecommendations())
+            } catch (e: Exception) {
+                errors.add("Trending: ${e.message}")
+                emptyList()
+            }
+            
+            if (artistBased.isEmpty() && similarSongs.isEmpty() && discovery.isEmpty() && trending.isEmpty() && errors.isNotEmpty()) {
+                throw Exception("All recommendations failed. Errors: ${errors.joinToString(" | ")}")
+            }
+            
             RecommendationResult(
-                artistBased = filterSongsOnly(generateArtistBasedRecommendations(preferences.topArtists)),
-                similarSongs = filterSongsOnly(generateSimilarSongRecommendations(recentHistory)),
-                discovery = filterSongsOnly(generateDiscoveryRecommendations(recentHistory, preferences)),
-                trending = filterSongsOnly(getTrendingRecommendations())
+                artistBased = artistBased,
+                similarSongs = similarSongs,
+                discovery = discovery,
+                trending = trending
             )
         }
         
@@ -164,6 +201,7 @@ class RecommendationService(
                 Log.d(TAG, "Found ${searchResults.size} songs for artist: $artist")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get recommendations for artist: $artist", e)
+                throw e
             }
         }
         
@@ -195,6 +233,7 @@ class RecommendationService(
                 Log.d(TAG, "Found ${searchResults.size} similar songs for: ${song.title}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get similar songs for: ${song.title}", e)
+                throw e
             }
         }
         
@@ -227,6 +266,7 @@ class RecommendationService(
                 Log.d(TAG, "Found ${newArtistSongs.size} discovery songs")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get discovery recommendations", e)
+                throw e
             }
         }
         
@@ -248,7 +288,7 @@ class RecommendationService(
             results
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get trending recommendations", e)
-            emptyList()
+            throw e
         }
     }
     

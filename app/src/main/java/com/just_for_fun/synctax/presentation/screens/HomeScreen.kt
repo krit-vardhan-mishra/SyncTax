@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -26,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -118,6 +121,7 @@ fun HomeScreen(
     val homeGridRecommendations by recommendationViewModel.homeGridRecommendations.collectAsState() // New state
     val isLoadingRecommendations by recommendationViewModel.isLoading.collectAsState()
     val hasEnoughHistory by recommendationViewModel.hasEnoughHistory.collectAsState()
+    val historyCount by recommendationViewModel.historyCount.collectAsState()
 
     // Directory selection dialog state
     var showDirectorySelectionDialog by remember { mutableStateOf(false) }
@@ -791,33 +795,53 @@ fun HomeScreen(
                                         }
 
                                         recommendations != null -> {
-                                            RecommendationsSection(
-                                                gridSongs = homeGridRecommendations,
-                                                onSongClick = { song ->
-                                                    playerViewModel.playOnlineSongWithRecommendations(
-                                                        videoId = song.id,
-                                                        title = song.title,
-                                                        artist = song.author ?: "Unknown Artist",
-                                                        thumbnailUrl = song.thumbnailUrl
-                                                    )
-                                                    recommendationViewModel.trackInteraction(
-                                                        song.id,
-                                                        "played",
+                                            Column {
+                                                if (historyCount < 5) {
+                                                    androidx.compose.material3.Card(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                                                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
+                                                        )
+                                                    ) {
+                                                        Text(
+                                                            text = "⚠️ Insufficient training data ($historyCount samples). Play more songs to improve ML recommendations.",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onErrorContainer,
+                                                            modifier = Modifier.padding(12.dp),
+                                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                        )
+                                                    }
+                                                }
+                                                RecommendationsSection(
+                                                    gridSongs = homeGridRecommendations,
+                                                    onSongClick = { song ->
+                                                        playerViewModel.playOnlineSongWithRecommendations(
+                                                            videoId = song.id,
+                                                            title = song.title,
+                                                            artist = song.author ?: "Unknown Artist",
+                                                            thumbnailUrl = song.thumbnailUrl
+                                                        )
+                                                        recommendationViewModel.trackInteraction(
+                                                            song.id,
+                                                            "played",
+                                                            recommendationViewModel.getRecommendationReason(
+                                                                song
+                                                            )
+                                                        )
+                                                    },
+                                                    onViewAllClick = {
+                                                        android.util.Log.d("HomeScreen", "🚀 Navigating to Recommendations Screen")
+                                                        onNavigateToRecommendations()
+                                                    },
+                                                    getRecommendationReason = { song ->
                                                         recommendationViewModel.getRecommendationReason(
                                                             song
                                                         )
-                                                    )
-                                                },
-                                                onViewAllClick = {
-                                                    android.util.Log.d("HomeScreen", "🚀 Navigating to Recommendations Screen")
-                                                    onNavigateToRecommendations()
-                                                },
-                                                getRecommendationReason = { song ->
-                                                    recommendationViewModel.getRecommendationReason(
-                                                        song
-                                                    )
-                                                }
-                                            )
+                                                    }
+                                                )
+                                            }
                                         }
 
                                         hasEnoughHistory -> {
@@ -826,7 +850,41 @@ fun HomeScreen(
                                                 onExploreClick = { recommendationViewModel.loadRecommendations() }
                                             )
                                         }
-                                        // Don't show anything if no listening history
+
+                                        else -> {
+                                            androidx.compose.material3.Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 16.dp),
+                                                colors = androidx.compose.material3.CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(24.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Explore,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(48.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                    Text(
+                                                        text = "Insufficient training data ($historyCount samples)",
+                                                        style = MaterialTheme.typography.headlineSmall,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                                    )
+                                                    Text(
+                                                        text = "Please play at least 2 songs to train the ML recommendation system.",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

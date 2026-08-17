@@ -51,11 +51,11 @@ class UserPreferences(context: Context) {
     }
 
     fun getOnlineHistoryCount(): Int {
-        return prefs.getInt(KEY_ONLINE_HISTORY_COUNT, 10)
+        return prefs.getInt(KEY_ONLINE_HISTORY_COUNT, 50)
     }
 
     fun setOnlineHistoryCount(count: Int) {
-        val clamped = count.coerceIn(1, 100)
+        val clamped = count.coerceIn(1, 500)
         prefs.edit().putInt(KEY_ONLINE_HISTORY_COUNT, clamped).apply()
         _onlineHistoryCount.value = clamped
     }

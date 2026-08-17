@@ -14,7 +14,7 @@ interface OnlineListeningHistoryDao {
      * Get the last N online listened songs ordered by timestamp (newest first)
      */
     @Query("SELECT * FROM online_listening_history ORDER BY timestamp DESC LIMIT :limit")
-    fun getRecentOnlineHistory(limit: Int = 10): Flow<List<OnlineListeningHistory>>
+    fun getRecentOnlineHistory(limit: Int = 50): Flow<List<OnlineListeningHistory>>
     
     /**
      * Get all history records (for analytics) - suspend function
@@ -62,7 +62,7 @@ interface OnlineListeningHistoryDao {
     /**
      * Delete oldest records to maintain only 15 records
      */
-    @Query("DELETE FROM online_listening_history WHERE id NOT IN (SELECT id FROM online_listening_history ORDER BY timestamp DESC LIMIT 15)")
+    @Query("DELETE FROM online_listening_history WHERE id NOT IN (SELECT id FROM online_listening_history ORDER BY timestamp DESC LIMIT 100)")
     suspend fun trimOldRecords()
     
     /**

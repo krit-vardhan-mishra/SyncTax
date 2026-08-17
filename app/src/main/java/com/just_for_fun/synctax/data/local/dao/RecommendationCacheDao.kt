@@ -23,4 +23,7 @@ interface RecommendationCacheDao {
     
     @Query("SELECT * FROM recommendations_cache WHERE cacheKey = :key")
     suspend fun getCache(key: String): RecommendationCache?
+
+    @Query("DELETE FROM recommendations_cache")
+    suspend fun clearAll()
 }

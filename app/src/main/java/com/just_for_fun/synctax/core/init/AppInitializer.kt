@@ -352,7 +352,7 @@ object AppInitializer {
                         // Check if user has enough history before loading
                         val hasHistory = analyticsService.hasEnoughHistory(3)
                         if (hasHistory) {
-                            withTimeoutOrNull(3000L) {
+                            withTimeoutOrNull(30000L) {
                                 recommendationService.generateRecommendations()
                             }
                         } else {
@@ -381,7 +381,7 @@ object AppInitializer {
                             }
                             .distinct()
                             .take(10) // Preload first 10 artists
-                        withTimeoutOrNull(3000L) {
+                        withTimeoutOrNull(30000L) {
                             homeViewModel.fetchAllArtistPhotos(uniqueArtists)
                         }
                         Log.d(TAG, "Phase 13 complete: Started preloading artist photos for ${uniqueArtists.size} artists")
@@ -415,7 +415,7 @@ object AppInitializer {
                         updateProgress("Fetching stream...", 0.87f)
                         lastPlayedStreamUrl = try {
                             val ytClient = YouTubeInnerTubeClient()
-                            withTimeoutOrNull(3000L) {
+                            withTimeoutOrNull(30000L) {
                                 ytClient.getStreamUrl(onlineSongState.videoId)
                             }
                         } catch (e: Exception) {

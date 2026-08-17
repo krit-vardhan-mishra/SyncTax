@@ -215,19 +215,37 @@ fun MotionPlayerScreen(
                         modifier = Modifier.padding(32.dp)
                     ) {
                         if (selectedMode == "Online") {
-                            Text(
-                                text = "No online songs played yet",
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = Color.White,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Please play any online song first to see recommendations here.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center
-                            )
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val isConnected = remember(context) { com.just_for_fun.synctax.core.utils.NetworkUtil.isNetworkAvailable(context) }
+                            if (!isConnected) {
+                                Text(
+                                    text = "The internet is down",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "please connect to internet first",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    textAlign = TextAlign.Center
+                                )
+                            } else {
+                                Text(
+                                    text = "No online songs played yet",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Please play any online song first to see recommendations here.",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         } else {
                             Text(
                                 text = "There are no local songs available",

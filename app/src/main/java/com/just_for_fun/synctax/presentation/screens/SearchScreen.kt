@@ -732,25 +732,27 @@ fun SearchScreen(
                                                     .padding(vertical = 16.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
+                                                val isConnected = com.just_for_fun.synctax.core.utils.NetworkUtil.isNetworkAvailable(context)
                                                 Icon(
                                                     imageVector = Icons.Default.CloudOff,
                                                     contentDescription = null,
                                                     modifier = Modifier.size(48.dp),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    tint = if (!isConnected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
 
                                                 Spacer(modifier = Modifier.height(8.dp))
 
                                                 Text(
-                                                    text = "No Online Results",
+                                                    text = if (!isConnected) "The internet is down" else "No Online Results",
                                                     style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (!isConnected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                                                 )
 
                                                 Spacer(modifier = Modifier.height(4.dp))
 
                                                 Text(
-                                                    text = "Try different keywords or check your internet connection",
+                                                    text = if (!isConnected) "please connect to internet first" else "Try different keywords or check your internet connection",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )

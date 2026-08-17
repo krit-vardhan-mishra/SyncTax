@@ -564,8 +564,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         searchQuery = query,
                         selectedFilter = filterType,
                         isSearchingOnline = true, 
-                        onlineSearchResults = emptyList()
+                        onlineSearchResults = emptyList(),
+                        error = null
                     )
+            }
+
+            if (!com.just_for_fun.synctax.core.utils.NetworkUtil.isNetworkAvailable(getApplication())) {
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        isSearchingOnline = false,
+                        error = "The internet is down, please connect to internet first."
+                    )
+                }
+                return@launch
             }
 
             // Save search query to history
